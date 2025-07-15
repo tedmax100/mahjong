@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>線上麻將遊戲</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+  <style>
+    body { margin: 0; }
+    #game-container { width: 100vw; height: 100vh; overflow: hidden; }
+    #ui { position: absolute; top: 10px; left: 10px; z-index: 10; }
+    #ui input, #ui button { margin: 2px; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <input id="roomInput" placeholder="房間ID">
+    <button id="createBtn">建立房間</button>
+    <button id="joinBtn">加入房間</button>
+    <button id="aiBtn">加AI</button>
+    <button id="startBtn">開始遊戲</button>
+  </div>
+  <div id="game-container"></div>
+  <script src="main.js"></script>
+</body>
+</html>
