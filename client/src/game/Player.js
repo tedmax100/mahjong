@@ -81,18 +81,54 @@ export class Player {
     }
   }
 
+  /**
+   * 排序手牌（按照台灣麻將規則：萬 -> 筒 -> 條 -> 字牌 -> 花牌，每組內由小到大）
+   */
+  sortTiles(tilesData) {
+    return tilesData.sort((a, b) => {
+      // 定義花色順序
+      const getSuitOrder = (tile) => {
+        if (tile.startsWith('wan-')) return 1;      // 萬子
+        if (tile.startsWith('tong-')) return 2;     // 筒子
+        if (tile.startsWith('tiao-')) return 3;     // 條子
+        // 字牌
+        if (['dong', 'nan', 'xi', 'bei'].includes(tile)) return 4; // 風牌
+        if (['zhong', 'fa', 'bai'].includes(tile)) return 5;       // 三元牌
+        if (tile.startsWith('flower-')) return 6;   // 花牌
+        return 7; // 其他
+      };
+
+      // 取得數字（如果有）
+      const getNumber = (tile) => {
+        const match = tile.match(/-(\d+)$/);
+        return match ? parseInt(match[1]) : 0;
+      };
+
+      const suitA = getSuitOrder(a);
+      const suitB = getSuitOrder(b);
+
+      // 先比較花色
+      if (suitA !== suitB) {
+        return suitA - suitB;
+      }
+
+      // 同花色，比較數字
+      return getNumber(a) - getNumber(b);
+    });
+  }
+
   setTiles(tilesData, tileAssets) {
     // 清除现有牌
     this.tiles.forEach(tile => tile.destroy());
     this.tiles = [];
 
+    // 排序手牌
+    const sortedTiles = this.sortTiles([...tilesData]);
+
     // 创建新牌
-    tilesData.forEach((tileType, index) => {
+    sortedTiles.forEach((tileType) => {
       const texture = tileAssets[tileType] || tileAssets['back'];
       const tile = new Tile(tileType, texture);
-
-      // 根据位置排列牌
-      this.positionTile(tile, index);
 
       // 只有底部玩家（自己）的牌可以点击
       if (this.position === 'bottom') {
@@ -102,27 +138,51 @@ export class Player {
       this.tiles.push(tile);
       this.container.addChild(tile.container);
     });
+
+    // 所有牌都加入後，統一設置位置
+    this.tiles.forEach((tile, index) => {
+      this.positionTile(tile, index);
+    });
   }
 
   positionTile(tile, index) {
     const tileWidth = 60;
     const tileHeight = 80;
-    const spacing = 5;
+
+    // 動態調整間距：根據牌的數量和螢幕寬度
+    const totalTiles = this.tiles.length;
+    let spacing = 5; // 預設間距
 
     switch (this.position) {
       case 'bottom':
         // 底部 - 水平排列
+        // 計算最佳間距，確保牌不重疊
+        const availableWidth = this.screenWidth - 200; // 左右各留 100px 邊距
+        const totalTileWidth = totalTiles * tileWidth;
+        const totalSpacingWidth = availableWidth - totalTileWidth;
+
+        if (totalSpacingWidth > 0) {
+          // 有足夠空間，平均分配間距
+          spacing = Math.min(totalSpacingWidth / (totalTiles - 1 || 1), 10); // 最大 10px
+        } else {
+          // 空間不足，縮小間距甚至重疊
+          spacing = (availableWidth / totalTiles) - tileWidth;
+        }
+
+        const startX = this.screenWidth / 2 - (totalTiles * tileWidth + (totalTiles - 1) * spacing) / 2;
+
         tile.setPosition(
-          this.screenWidth / 2 - (this.tiles.length * (tileWidth + spacing)) / 2 + index * (tileWidth + spacing),
+          startX + index * (tileWidth + spacing),
           this.screenHeight - 150
         );
         break;
 
       case 'right':
         // 右侧 - 垂直排列
+        spacing = 8; // 右側固定間距
         tile.setPosition(
           this.screenWidth - 100,
-          this.screenHeight / 2 - (this.tiles.length * (tileHeight + spacing)) / 2 + index * (tileHeight + spacing)
+          this.screenHeight / 2 - (totalTiles * (tileHeight * 0.8 + spacing)) / 2 + index * (tileHeight * 0.8 + spacing)
         );
         tile.setRotation(Math.PI / 2);
         tile.setScale(0.8);
@@ -130,8 +190,9 @@ export class Player {
 
       case 'top':
         // 顶部 - 水平排列（背面）
+        spacing = 8; // 上方固定間距
         tile.setPosition(
-          this.screenWidth / 2 - (this.tiles.length * (tileWidth + spacing)) / 2 + index * (tileWidth + spacing),
+          this.screenWidth / 2 - (totalTiles * (tileWidth * 0.8 + spacing)) / 2 + index * (tileWidth * 0.8 + spacing),
           50
         );
         tile.setScale(0.8);
@@ -139,9 +200,10 @@ export class Player {
 
       case 'left':
         // 左侧 - 垂直排列
+        spacing = 8; // 左側固定間距
         tile.setPosition(
           50,
-          this.screenHeight / 2 - (this.tiles.length * (tileHeight + spacing)) / 2 + index * (tileHeight + spacing)
+          this.screenHeight / 2 - (totalTiles * (tileHeight * 0.8 + spacing)) / 2 + index * (tileHeight * 0.8 + spacing)
         );
         tile.setRotation(-Math.PI / 2);
         tile.setScale(0.8);
@@ -200,6 +262,56 @@ export class Player {
         this.positionTile(tile, i);
       });
     }
+  }
+
+  /**
+   * 加入一張新牌到手牌（摸牌）
+   */
+  addTile(tileType, tileAssets) {
+    // 先排序：將新牌加入並排序
+    const allTileTypes = [...this.tiles.map(t => t.type), tileType];
+    const sortedTypes = this.sortTiles(allTileTypes);
+
+    // 清除舊的牌（視覺上）
+    this.tiles.forEach(tile => {
+      this.container.removeChild(tile.container);
+      tile.destroy();
+    });
+    this.tiles = [];
+
+    // 按照排序後的順序重新創建所有牌
+    sortedTypes.forEach((type) => {
+      const texture = tileAssets[type] || tileAssets['back'];
+      const tile = new Tile(type, texture);
+
+      // 只有底部玩家（自己）的牌可以点击
+      if (this.position === 'bottom') {
+        tile.on('click', (clickedTile) => this.onTileClick(clickedTile));
+      }
+
+      // 先加入到陣列
+      this.tiles.push(tile);
+
+      // 加入到容器
+      this.container.addChild(tile.container);
+    });
+
+    // 所有牌都加入後，統一設置位置
+    this.tiles.forEach((tile, index) => {
+      this.positionTile(tile, index);
+    });
+
+    console.log(`✅ 加入新牌完成，手牌數: ${this.tiles.length}`);
+  }
+
+  /**
+   * 重新排列所有手牌（只重新計算位置，不重新創建）
+   */
+  rearrangeTiles() {
+    // 只重新計算每張牌的位置
+    this.tiles.forEach((tile, index) => {
+      this.positionTile(tile, index);
+    });
   }
 
   resize(width, height) {
