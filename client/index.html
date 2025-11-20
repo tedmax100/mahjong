@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台湾16张麻将</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Microsoft JhengHei', 'PingFang TC', Arial, sans-serif;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      overflow: hidden;
+    }
+
+    #app {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    /* 登入界面 */
+    #login-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      z-index: 1000;
+    }
+
+    #login-screen.hidden {
+      display: none;
+    }
+
+    .login-box {
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+      max-width: 400px;
+    }
+
+    .login-box h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    .login-box p {
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    .google-btn {
+      background: white;
+      border: 2px solid #ddd;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s;
+    }
+
+    .google-btn:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transform: translateY(-2px);
+    }
+
+    /* 房间界面 */
+    #room-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    #room-screen.hidden {
+      display: none;
+    }
+
+    .room-box {
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      min-width: 400px;
+    }
+
+    .room-box h2 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .room-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .room-input {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    input {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 12px 24px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    button:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+    }
+
+    button.secondary {
+      background: #48bb78;
+    }
+
+    button.secondary:hover {
+      background: #38a169;
+    }
+
+    /* 游戏界面 */
+    #game-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    #game-container.hidden {
+      display: none;
+    }
+
+    /* 用户信息 */
+    .user-info {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+
+    .room-info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: white;
+      padding: 15px 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 100;
+    }
+
+    .share-btn {
+      margin-top: 10px;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- 登入界面 -->
+    <div id="login-screen">
+      <div class="login-box">
+        <h1>🀄 台湾16张麻将</h1>
+        <p>四人线上对战</p>
+        <div style="margin: 20px 0;">
+          <input
+            type="text"
+            id="player-name-input"
+            placeholder="输入你的名字（或留空随机生成）"
+            style="width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px;"
+            maxlength="20"
+          >
+        </div>
+        <button class="google-btn" id="quick-start-btn" style="width: 100%; background: #667eea; color: white; border: none;">
+          🎮 开始游戏
+        </button>
+      </div>
+    </div>
+
+    <!-- 房间选择界面 -->
+    <div id="room-screen" class="hidden">
+      <div class="room-box">
+        <h2>选择游戏模式</h2>
+        <div class="room-actions">
+          <button id="create-room-btn">创建新房间</button>
+          <div class="room-input">
+            <input type="text" id="room-id-input" placeholder="输入房间号">
+            <button id="join-room-btn" class="secondary">加入房间</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 游戏界面 -->
+    <div id="game-container" class="hidden"></div>
+
+    <!-- 用户信息 -->
+    <div class="user-info hidden" id="user-info">
+      <img class="user-avatar" id="user-avatar" src="" alt="">
+      <span id="user-name"></span>
+    </div>
+
+    <!-- 房间信息 -->
+    <div class="room-info hidden" id="room-info">
+      <div><strong>房间号：</strong><span id="current-room-id"></span></div>
+      <div><strong>玩家：</strong><span id="player-count">1/4</span></div>
+      <button class="share-btn" id="share-room-btn">分享房间</button>
+      <button class="share-btn" id="add-bot-btn" style="background: #48bb78;">🤖 添加Bot</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

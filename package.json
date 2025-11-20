@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "canvas": "^3.2.0",
     "phaser": "^3.90.0"
   }
 }

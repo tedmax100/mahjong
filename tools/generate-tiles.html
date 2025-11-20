@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>麻将牌素材生成器</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .controls {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #preview {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .tile-preview {
+      border: 1px solid #ccc;
+      padding: 5px;
+      text-align: center;
+    }
+    .tile-preview canvas {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .tile-preview span {
+      font-size: 12px;
+      color: #666;
+    }
+    #status {
+      margin-top: 10px;
+      color: #666;
+    }
+    canvas {
+      image-rendering: crisp-edges;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <h1>🀄 麻将牌素材生成器</h1>
+    <p>点击按钮生成所有麻将牌素材，然后右键点击图片保存</p>
+    <button onclick="generateAll()">生成所有素材</button>
+    <button onclick="downloadAll()">打包下载全部</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="preview"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    const TILE_WIDTH = 60;
+    const TILE_HEIGHT = 80;
+
+    const COLORS = {
+      background: '#F5F0E8',
+      border: '#8B7355',
+      borderDark: '#5C4A3A',
+      wan: '#2C5F2D',
+      tong: '#1E5A8E',
+      tiao: '#8B4513',
+      wind: '#1A1A1A',
+      zhong: '#C41E3A',
+      fa: '#2C5F2D',
+      bai: '#4169E1',
+      flower: '#8B008B'
+    };
+
+    const tiles = [];
+
+    function drawTileBase(ctx) {
+      ctx.fillStyle = COLORS.background;
+      ctx.fillRect(0, 0, TILE_WIDTH, TILE_HEIGHT);
+
+      ctx.strokeStyle = COLORS.borderDark;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, TILE_WIDTH - 2, TILE_HEIGHT - 2);
+
+      ctx.strokeStyle = COLORS.border;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(3, 3, TILE_WIDTH - 6, TILE_HEIGHT - 6);
+    }
+
+    function drawNumber(ctx, number, type) {
+      const color = type === 'wan' ? COLORS.wan :
+                    type === 'tong' ? COLORS.tong : COLORS.tiao;
+
+      ctx.fillStyle = color;
+
+      // 数字在上面
+      ctx.font = 'bold 28px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(number.toString(), TILE_WIDTH / 2, TILE_HEIGHT * 0.35);
+
+      // 万/条/筒在下面
+      ctx.font = 'bold 16px Arial';
+      const typeText = type === 'wan' ? '萬' : type === 'tong' ? '筒' : '條';
+      ctx.fillText(typeText, TILE_WIDTH / 2, TILE_HEIGHT * 0.65);
+    }
+
+    function drawWind(ctx, wind) {
+      const windChars = { dong: '東', nan: '南', xi: '西', bei: '北' };
+      ctx.fillStyle = COLORS.wind;
+      ctx.font = 'bold 32px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(windChars[wind], TILE_WIDTH / 2, TILE_HEIGHT / 2);
+    }
+
+    function drawDragon(ctx, dragon) {
+      const dragonChars = { zhong: '中', fa: '發', bai: '白' };
+      const color = COLORS[dragon];
+
+      ctx.fillStyle = color;
+      ctx.font = 'bold 32px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      if (dragon === 'bai') {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(10, 15, TILE_WIDTH - 20, TILE_HEIGHT - 30);
+      } else {
+        ctx.fillText(dragonChars[dragon], TILE_WIDTH / 2, TILE_HEIGHT / 2);
+      }
+    }
+
+    function drawFlower(ctx, flower) {
+      const flowerChars = {
+        chun: '春', xia: '夏', qiu: '秋', dong: '冬',
+        mei: '梅', lan: '蘭', zhu: '竹', ju: '菊'
+      };
+
+      ctx.fillStyle = COLORS.flower;
+      ctx.font = 'bold 28px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(flowerChars[flower], TILE_WIDTH / 2, TILE_HEIGHT / 2);
+
+      ctx.font = '10px Arial';
+      ctx.fillText('花', TILE_WIDTH / 2, TILE_HEIGHT - 12);
+    }
+
+    function drawBack(ctx) {
+      ctx.fillStyle = '#1B5E20';
+      ctx.fillRect(0, 0, TILE_WIDTH, TILE_HEIGHT);
+
+      ctx.strokeStyle = COLORS.borderDark;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, TILE_WIDTH - 2, TILE_HEIGHT - 2);
+
+      ctx.strokeStyle = '#2E7D32';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 5; i++) {
+        const y = 15 + i * 15;
+        ctx.beginPath();
+        ctx.moveTo(10, y);
+        ctx.lineTo(TILE_WIDTH - 10, y);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#388E3C';
+      ctx.fillRect(TILE_WIDTH / 2 - 8, TILE_HEIGHT / 2 - 8, 16, 16);
+    }
+
+    function createTile(name, drawFunc) {
+      const canvas = document.createElement('canvas');
+      canvas.width = TILE_WIDTH;
+      canvas.height = TILE_HEIGHT;
+      const ctx = canvas.getContext('2d');
+
+      drawTileBase(ctx);
+      drawFunc(ctx);
+
+      tiles.push({ name, canvas });
+      return canvas;
+    }
+
+    function addPreview(name, canvas) {
+      const div = document.createElement('div');
+      div.className = 'tile-preview';
+
+      const clonedCanvas = document.createElement('canvas');
+      clonedCanvas.width = TILE_WIDTH;
+      clonedCanvas.height = TILE_HEIGHT;
+      const clonedCtx = clonedCanvas.getContext('2d');
+      clonedCtx.drawImage(canvas, 0, 0);
+
+      div.appendChild(clonedCanvas);
+      div.appendChild(document.createElement('br'));
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = name;
+      div.appendChild(nameSpan);
+
+      const downloadLink = document.createElement('br');
+      div.appendChild(downloadLink);
+
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = name;
+      link.textContent = '下载';
+      link.style.fontSize = '12px';
+      div.appendChild(link);
+
+      document.getElementById('preview').appendChild(div);
+    }
+
+    function generateAll() {
+      tiles.length = 0;
+      document.getElementById('preview').innerHTML = '';
+      document.getElementById('status').textContent = '正在生成...';
+
+      // 生成万子 1-9
+      for (let i = 1; i <= 9; i++) {
+        const canvas = createTile(`wan-${i}.png`, ctx => drawNumber(ctx, i, 'wan'));
+        addPreview(`wan-${i}.png`, canvas);
+      }
+
+      // 生成筒子 1-9
+      for (let i = 1; i <= 9; i++) {
+        const canvas = createTile(`tong-${i}.png`, ctx => drawNumber(ctx, i, 'tong'));
+        addPreview(`tong-${i}.png`, canvas);
+      }
+
+      // 生成条子 1-9
+      for (let i = 1; i <= 9; i++) {
+        const canvas = createTile(`tiao-${i}.png`, ctx => drawNumber(ctx, i, 'tiao'));
+        addPreview(`tiao-${i}.png`, canvas);
+      }
+
+      // 生成风牌
+      ['dong', 'nan', 'xi', 'bei'].forEach(wind => {
+        const canvas = createTile(`${wind}.png`, ctx => drawWind(ctx, wind));
+        addPreview(`${wind}.png`, canvas);
+      });
+
+      // 生成三元牌
+      ['zhong', 'fa', 'bai'].forEach(dragon => {
+        const canvas = createTile(`${dragon}.png`, ctx => drawDragon(ctx, dragon));
+        addPreview(`${dragon}.png`, canvas);
+      });
+
+      // 生成花牌
+      ['chun', 'xia', 'qiu', 'dong', 'mei', 'lan', 'zhu', 'ju'].forEach(flower => {
+        const canvas = createTile(`flower-${flower}.png`, ctx => drawFlower(ctx, flower));
+        addPreview(`flower-${flower}.png`, canvas);
+      });
+
+      // 生成牌背
+      const backCanvas = document.createElement('canvas');
+      backCanvas.width = TILE_WIDTH;
+      backCanvas.height = TILE_HEIGHT;
+      const backCtx = backCanvas.getContext('2d');
+      drawBack(backCtx);
+      tiles.push({ name: 'back.png', canvas: backCanvas });
+      addPreview('back.png', backCanvas);
+
+      document.getElementById('status').textContent = `✓ 已生成 ${tiles.length} 个素材`;
+    }
+
+    async function downloadAll() {
+      if (tiles.length === 0) {
+        alert('请先生成素材');
+        return;
+      }
+
+      document.getElementById('status').textContent = '正在打包...';
+
+      const zip = new JSZip();
+      const folder = zip.folder('tiles');
+
+      for (const tile of tiles) {
+        const dataUrl = tile.canvas.toDataURL('image/png');
+        const base64 = dataUrl.split(',')[1];
+        folder.file(tile.name, base64, { base64: true });
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'mahjong-tiles.zip';
+      link.click();
+
+      document.getElementById('status').textContent = '✓ 下载完成！';
+    }
+  </script>
+</body>
+</html>
