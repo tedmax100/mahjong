@@ -240,7 +240,7 @@ export class Game {
     const tileSprite = new Sprite(texture);
 
     // 设置弃牌大小（稍微大一些，方便阅读）
-    const scale = 0.9;
+    const scale = 0.8;
     tileSprite.scale.set(scale);
 
     // 计算弃牌位置（在中央区域，根据玩家位置排列）
