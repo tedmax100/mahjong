@@ -117,7 +117,7 @@ export class Player {
     });
   }
 
-  setTiles(tilesData, tileAssets) {
+  async setTiles(tilesData, tileAssets) {
     // 清除现有牌
     this.tiles.forEach(tile => tile.destroy());
     this.tiles = [];
@@ -125,10 +125,13 @@ export class Player {
     // 排序手牌
     const sortedTiles = this.sortTiles([...tilesData]);
 
-    // 创建新牌
-    sortedTiles.forEach((tileType) => {
+    // 创建新牌（等待所有牌創建完成）
+    for (const tileType of sortedTiles) {
       const texture = tileAssets[tileType] || tileAssets['back'];
       const tile = new Tile(tileType, texture);
+
+      // 等待牌創建完成（包括牌底載入）
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       // 只有底部玩家（自己）的牌可以点击
       if (this.position === 'bottom') {
@@ -137,7 +140,7 @@ export class Player {
 
       this.tiles.push(tile);
       this.container.addChild(tile.container);
-    });
+    }
 
     // 所有牌都加入後，統一設置位置
     this.tiles.forEach((tile, index) => {
@@ -267,7 +270,7 @@ export class Player {
   /**
    * 加入一張新牌到手牌（摸牌）
    */
-  addTile(tileType, tileAssets) {
+  async addTile(tileType, tileAssets) {
     // 先排序：將新牌加入並排序
     const allTileTypes = [...this.tiles.map(t => t.type), tileType];
     const sortedTypes = this.sortTiles(allTileTypes);
@@ -280,9 +283,12 @@ export class Player {
     this.tiles = [];
 
     // 按照排序後的順序重新創建所有牌
-    sortedTypes.forEach((type) => {
+    for (const type of sortedTypes) {
       const texture = tileAssets[type] || tileAssets['back'];
       const tile = new Tile(type, texture);
+
+      // 等待牌創建完成（包括牌底載入）
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       // 只有底部玩家（自己）的牌可以点击
       if (this.position === 'bottom') {
@@ -294,7 +300,7 @@ export class Player {
 
       // 加入到容器
       this.container.addChild(tile.container);
-    });
+    }
 
     // 所有牌都加入後，統一設置位置
     this.tiles.forEach((tile, index) => {

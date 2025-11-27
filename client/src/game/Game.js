@@ -61,33 +61,46 @@ export class Game {
   async loadAssets() {
     console.log('开始加载麻将牌素材...');
 
-    const tileTypes = [
-      // 万子
-      ...Array.from({ length: 9 }, (_, i) => `wan-${i + 1}`),
-      // 筒子
-      ...Array.from({ length: 9 }, (_, i) => `tong-${i + 1}`),
-      // 条子
-      ...Array.from({ length: 9 }, (_, i) => `tiao-${i + 1}`),
-      // 风牌
-      'dong', 'nan', 'xi', 'bei',
-      // 三元牌
-      'zhong', 'fa', 'bai',
+    // 映射內部牌名到新圖片檔名
+    const tileMapping = {
+      // 萬子 (w = 萬)
+      'wan-1': '1wf', 'wan-2': '2wf', 'wan-3': '3wf',
+      'wan-4': '4wf', 'wan-5': '5wf', 'wan-6': '6wf',
+      'wan-7': '7wf', 'wan-8': '8wf', 'wan-9': '9wf',
+
+      // 筒子 (t = 筒)
+      'tong-1': '1tf', 'tong-2': '2tf', 'tong-3': '3tf',
+      'tong-4': '4tf', 'tong-5': '5tf', 'tong-6': '6tf',
+      'tong-7': '7tf', 'tong-8': '8tf', 'tong-9': '9tf',
+
+      // 條子 (tt = 條)
+      'tiao-1': '1ttf', 'tiao-2': '2ttf', 'tiao-3': '3ttf',
+      'tiao-4': '4ttf', 'tiao-5': '5ttf', 'tiao-6': '6ttf',
+      'tiao-7': '7ttf', 'tiao-8': '8ttf', 'tiao-9': '9ttf',
+
+      // 風牌 (z1-z4)
+      'dong': 'z1f', 'nan': 'z2f', 'xi': 'z3f', 'bei': 'z4f',
+
+      // 三元牌 (z5-z7)
+      'zhong': 'z5f', 'fa': 'z6f', 'bai': 'z7f',
+
       // 花牌
-      'flower-chun', 'flower-xia', 'flower-qiu', 'flower-dong',
-      'flower-mei', 'flower-lan', 'flower-zhu', 'flower-ju',
+      'flower-chun': 'chun', 'flower-xia': 'xia', 'flower-qiu': 'qiu', 'flower-dong': 'dong',
+      'flower-mei': 'mei', 'flower-lan': 'lan', 'flower-zhu': 'zhu', 'flower-ju': 'ju',
+
       // 牌背
-      'back'
-    ];
+      'back': 'pback1'
+    };
 
     // 加载所有素材
-    for (const type of tileTypes) {
+    for (const [tileType, fileName] of Object.entries(tileMapping)) {
       try {
-        const texture = await Assets.load(`/assets/tiles/${type}.png`);
-        this.tileAssets[type] = texture;
+        const texture = await Assets.load(`/assets/tiles/carddown/${fileName}.png`);
+        this.tileAssets[tileType] = texture;
       } catch (error) {
-        console.warn(`加载素材失败: ${type}.png`, error);
+        console.warn(`加载素材失败: ${fileName}.png`, error);
         // 创建占位纹理
-        this.tileAssets[type] = this.createPlaceholderTexture(type);
+        this.tileAssets[tileType] = this.createPlaceholderTexture(tileType);
       }
     }
 
@@ -373,7 +386,7 @@ export class Game {
     });
   }
 
-  handleDiscard(playerId, tile) {
+  async handleDiscard(playerId, tile) {
     console.log(`玩家 ${playerId} 打出了 ${tile}`);
 
     // 找到打出牌的玩家
@@ -390,14 +403,33 @@ export class Game {
       return;
     }
 
-    // 创建弃牌sprite
+    // 創建棄牌容器（包含牌底和牌面）
+    const discardContainer = new Container();
+
+    // 載入並創建牌底 sprite
+    let baseTexture;
+    try {
+      baseTexture = await Assets.load('/assets/tiles/carddown/pbaseBig.png');
+    } catch (error) {
+      console.warn('無法載入棄牌牌底圖片', error);
+    }
+
+    if (baseTexture) {
+      const baseSprite = new Sprite(baseTexture);
+      baseSprite.anchor.set(0.5); // 設置錨點在中心
+      discardContainer.addChild(baseSprite);
+    }
+
+    // 创建牌面 sprite
     const texture = this.tileAssets[tile] || this.tileAssets['back'];
     const tileSprite = new Sprite(texture);
+    tileSprite.anchor.set(0.5); // 設置錨點在中心
+    tileSprite.y = -25; // 將牌面往上移一點點
+    discardContainer.addChild(tileSprite);
 
     // 设置弃牌大小（參考圖片樣式，縮小一點）
     const scale = 0.6;
-    tileSprite.scale.set(scale);
-    tileSprite.anchor.set(0.5); // 設置錨點在中心
+    discardContainer.scale.set(scale);
 
     // 计算弃牌位置（在中央区域，根据玩家位置排列）
     const centerX = this.app.screen.width / 2;
@@ -439,18 +471,18 @@ export class Game {
         break;
     }
 
-    tileSprite.x = x;
-    tileSprite.y = y;
+    discardContainer.x = x;
+    discardContainer.y = y;
 
     // 记录弃牌信息
     this.discardedTiles.push({
-      sprite: tileSprite,
+      sprite: discardContainer,
       playerPosition: playerPosition,
       tile: tile
     });
 
     // 添加到弃牌区域
-    this.discardContainer.addChild(tileSprite);
+    this.discardContainer.addChild(discardContainer);
 
     // 从玩家手牌中移除该牌（视觉上）
     const player = this.players[playerPosition];

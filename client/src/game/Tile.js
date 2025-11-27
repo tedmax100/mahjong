@@ -1,4 +1,4 @@
-import { Sprite, Container } from 'pixi.js';
+import { Sprite, Container, Assets } from 'pixi.js';
 
 /**
  * 麻将牌类
@@ -9,13 +9,31 @@ export class Tile {
     this.texture = texture;
     this.faceUp = faceUp;
     this.container = new Container();
-    this.sprite = null;
+    this.baseSprite = null; // 牌底
+    this.sprite = null; // 牌面
 
     this.create();
   }
 
-  create() {
+  async create() {
+    // 載入牌底圖片
+    let baseTexture;
+    try {
+      baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
+    } catch (error) {
+      console.warn('無法載入牌底圖片，使用預設', error);
+    }
+
+    // 創建牌底 sprite（如果有載入成功）
+    if (baseTexture) {
+      this.baseSprite = new Sprite(baseTexture);
+      this.baseSprite.anchor.set(0, 0); // 左上角對齊
+      this.container.addChild(this.baseSprite);
+    }
+
+    // 創建牌面 sprite
     this.sprite = new Sprite(this.texture);
+    this.sprite.anchor.set(0, 0); // 左上角對齊
     this.sprite.interactive = true;
     this.sprite.buttonMode = true;
 
