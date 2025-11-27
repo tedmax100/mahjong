@@ -202,9 +202,60 @@
       padding: 8px 16px;
       font-size: 14px;
     }
+
+    /* 启动画面 */
+    #splash-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      opacity: 1;
+      transition: opacity 0.5s ease-out;
+    }
+
+    #splash-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #splash-logo {
+      width: 300px;
+      height: auto;
+      animation: splashAnimation 3s ease-in-out forwards;
+    }
+
+    @keyframes splashAnimation {
+      0% {
+        transform: scale(0);
+        opacity: 0;
+      }
+      40% {
+        transform: scale(1.2);
+        opacity: 1;
+      }
+      60% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(0);
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 <body>
+  <!-- 启动画面 -->
+  <div id="splash-screen">
+    <img id="splash-logo" src="/assets/ui/LINE_ALBUM_元哥照_251127_1.jpg" alt="Loading">
+  </div>
+
   <div id="app">
     <!-- 登入界面 -->
     <div id="login-screen">

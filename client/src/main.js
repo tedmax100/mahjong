@@ -14,8 +14,24 @@ class MahjongApp {
   }
 
   init() {
+    // 显示启动画面动画
+    this.showSplashScreen();
+
     // 绑定UI事件
     this.bindEvents();
+  }
+
+  showSplashScreen() {
+    // 3秒后隐藏启动画面
+    setTimeout(() => {
+      const splashScreen = document.getElementById('splash-screen');
+      splashScreen.classList.add('hidden');
+
+      // 再等0.5秒后完全移除元素（等待淡出动画完成）
+      setTimeout(() => {
+        splashScreen.remove();
+      }, 500);
+    }, 3000);
   }
 
   bindEvents() {
