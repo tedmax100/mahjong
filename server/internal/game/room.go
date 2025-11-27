@@ -23,6 +23,8 @@ type Player struct {
 	Position int // 0=东, 1=南, 2=西, 3=北
 	Hand     []string
 	Score    int
+	Melds    []Meld   // 已展示的牌组（碰、杠等）
+	Flowers  []string // 花牌
 }
 
 // NewRoom 创建新房间
@@ -47,6 +49,8 @@ func (r *Room) AddPlayer(userID, userName string) error {
 		Position: len(r.Players),
 		Hand:     make([]string, 0, 17),
 		Score:    1000,
+		Melds:    make([]Meld, 0),
+		Flowers:  make([]string, 0),
 	}
 
 	r.Players = append(r.Players, player)
@@ -171,6 +175,19 @@ func (r *Room) HandleDiscard(userID, tile string) {
 		}
 	}
 
+	// 将牌加入弃牌堆
+	if r.Game != nil {
+		r.Game.DiscardPile = append(r.Game.DiscardPile, tile)
+		log.Printf("弃牌堆: %v (共 %d 张)", r.Game.DiscardPile, len(r.Game.DiscardPile))
+
+		// 检查流局
+		if r.Game.CheckDraw() {
+			log.Printf("流局！牌山剩余 %d 张", r.Game.GetRemainingTiles())
+			r.GameStarted = false
+			return
+		}
+	}
+
 	// 切换到下一个玩家
 	r.NextTurn()
 	log.Printf("轮到下一位玩家（位置: %d）", r.CurrentTurn)
@@ -182,19 +199,204 @@ func (r *Room) NextTurn() {
 }
 
 // HandlePong 处理碰牌
-func (r *Room) HandlePong(userID, tile string) {
-	log.Printf("玩家 %s 碰 %s", userID, tile)
-	// TODO: 实现碰牌逻辑
+func (r *Room) HandlePong(userID, tile string) bool {
+	// 找到玩家
+	var player *Player
+	for _, p := range r.Players {
+		if p.ID == userID {
+			player = p
+			break
+		}
+	}
+
+	if player == nil {
+		log.Printf("未找到玩家: %s", userID)
+		return false
+	}
+
+	// 检查是否可以碰（需要手牌中有至少2张相同的牌）
+	if r.Game == nil || !r.Game.CanPong(player.Hand, tile) {
+		log.Printf("玩家 %s 无法碰 %s", player.Name, tile)
+		return false
+	}
+
+	log.Printf("玩家 %s 碰 %s", player.Name, tile)
+
+	// 从手牌中移除2张
+	removed := 0
+	for i := len(player.Hand) - 1; i >= 0 && removed < 2; i-- {
+		if player.Hand[i] == tile {
+			player.Hand = append(player.Hand[:i], player.Hand[i+1:]...)
+			removed++
+		}
+	}
+
+	// 从弃牌堆中移除最后一张（即被碰的牌）
+	if len(r.Game.DiscardPile) > 0 {
+		r.Game.DiscardPile = r.Game.DiscardPile[:len(r.Game.DiscardPile)-1]
+	}
+
+	// 添加到已展示的牌组
+	player.Melds = append(player.Melds, Meld{
+		Type:  "pong",
+		Tiles: []string{tile, tile, tile},
+	})
+
+	// 碰牌后轮到该玩家出牌
+	r.CurrentTurn = player.Position
+	log.Printf("碰牌成功，轮到玩家 %s 出牌", player.Name)
+
+	return true
 }
 
 // HandleKong 处理杠牌
-func (r *Room) HandleKong(userID, tile string) {
-	log.Printf("玩家 %s 杠 %s", userID, tile)
-	// TODO: 实现杠牌逻辑
+func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
+	// 找到玩家
+	var player *Player
+	for _, p := range r.Players {
+		if p.ID == userID {
+			player = p
+			break
+		}
+	}
+
+	if player == nil {
+		log.Printf("未找到玩家: %s", userID)
+		return false
+	}
+
+	if r.Game == nil {
+		return false
+	}
+
+	if isConcealed {
+		// 暗杠：手牌中有4张相同的牌
+		count := 0
+		for _, t := range player.Hand {
+			if t == tile {
+				count++
+			}
+		}
+
+		if count < 4 {
+			log.Printf("玩家 %s 无法暗杠 %s（手牌不足4张）", player.Name, tile)
+			return false
+		}
+
+		log.Printf("玩家 %s 暗杠 %s", player.Name, tile)
+
+		// 从手牌中移除4张
+		removed := 0
+		for i := len(player.Hand) - 1; i >= 0 && removed < 4; i-- {
+			if player.Hand[i] == tile {
+				player.Hand = append(player.Hand[:i], player.Hand[i+1:]...)
+				removed++
+			}
+		}
+
+		// 添加到已展示的牌组
+		player.Melds = append(player.Melds, Meld{
+			Type:  "kong_concealed",
+			Tiles: []string{tile, tile, tile, tile},
+		})
+
+	} else {
+		// 明杠：手牌中有3张，加上别人打出的1张
+		if !r.Game.CanKong(player.Hand, tile) {
+			log.Printf("玩家 %s 无法明杠 %s", player.Name, tile)
+			return false
+		}
+
+		log.Printf("玩家 %s 明杠 %s", player.Name, tile)
+
+		// 从手牌中移除3张
+		removed := 0
+		for i := len(player.Hand) - 1; i >= 0 && removed < 3; i-- {
+			if player.Hand[i] == tile {
+				player.Hand = append(player.Hand[:i], player.Hand[i+1:]...)
+				removed++
+			}
+		}
+
+		// 从弃牌堆中移除最后一张
+		if len(r.Game.DiscardPile) > 0 {
+			r.Game.DiscardPile = r.Game.DiscardPile[:len(r.Game.DiscardPile)-1]
+		}
+
+		// 添加到已展示的牌组
+		player.Melds = append(player.Melds, Meld{
+			Type:  "kong_exposed",
+			Tiles: []string{tile, tile, tile, tile},
+		})
+	}
+
+	// 杠牌后需要补牌
+	if len(r.Game.Deck) > 0 {
+		drawnTile := r.Game.DrawTile()
+		player.Hand = append(player.Hand, drawnTile)
+		log.Printf("玩家 %s 杠牌后补牌: %s", player.Name, drawnTile)
+	}
+
+	// 杠牌后轮到该玩家出牌
+	r.CurrentTurn = player.Position
+	log.Printf("杠牌成功，轮到玩家 %s 出牌", player.Name)
+
+	return true
 }
 
 // HandleHu 处理胡牌
-func (r *Room) HandleHu(userID string) {
-	log.Printf("玩家 %s 胡牌", userID)
-	// TODO: 实现胡牌逻辑
+func (r *Room) HandleHu(userID string, isSelfDrawn bool) *WinResult {
+	// 找到玩家
+	var player *Player
+	for _, p := range r.Players {
+		if p.ID == userID {
+			player = p
+			break
+		}
+	}
+
+	if player == nil {
+		log.Printf("未找到玩家: %s", userID)
+		return nil
+	}
+
+	if r.Game == nil {
+		return nil
+	}
+
+	// 检查是否可以胡牌
+	if !r.Game.CanHu(player.Hand, player.Melds) {
+		log.Printf("玩家 %s 无法胡牌", player.Name)
+		return nil
+	}
+
+	log.Printf("玩家 %s 胡牌成功！", player.Name)
+
+	// 计算台数和得分
+	lastTile := ""
+	if len(player.Hand) > 0 {
+		lastTile = player.Hand[len(player.Hand)-1]
+	}
+
+	winResult := r.Game.CalculateScore(player, lastTile, isSelfDrawn)
+
+	// 更新玩家分数
+	if isSelfDrawn {
+		// 自摸：其他三家各付分数
+		for _, p := range r.Players {
+			if p.ID != player.ID {
+				p.Score -= winResult.BaseScore
+				player.Score += winResult.BaseScore
+			}
+		}
+	} else {
+		// 放炮：放炮者付全部分数
+		// TODO: 需要记录是谁放炮
+		// 暂时简化处理
+	}
+
+	// 标记游戏结束
+	r.GameStarted = false
+
+	return winResult
 }

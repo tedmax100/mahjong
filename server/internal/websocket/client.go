@@ -163,15 +163,27 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 		if !ok {
 			return
 		}
-		c.Room.HandleKong(c.UserID, tile)
-		// 广播玩家杠牌动作
-		c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "kong", tile)
+		isConcealed := false
+		if concealed, ok := data["concealed"].(bool); ok {
+			isConcealed = concealed
+		}
+		success := c.Room.HandleKong(c.UserID, tile, isConcealed)
+		if success {
+			// 广播玩家杠牌动作
+			c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "kong", tile)
+		}
 
 	case "hu":
 		// 处理胡牌
-		c.Room.HandleHu(c.UserID)
-		// 广播玩家胡牌动作
-		c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "hu", "")
+		isSelfDrawn := false
+		if selfDrawn, ok := data["selfDrawn"].(bool); ok {
+			isSelfDrawn = selfDrawn
+		}
+		winResult := c.Room.HandleHu(c.UserID, isSelfDrawn)
+		if winResult != nil {
+			// 广播玩家胡牌动作
+			c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "hu", "")
+		}
 
 	case "add_bot":
 		// 添加Bot玩家
