@@ -170,6 +170,9 @@ export class Game {
     if (this.dealerFirstDiscard && this.myPosition === this.dealerPosition) {
       console.log('🎴 莊家第一次打牌，不摸牌（17張→16張）');
       this.dealerFirstDiscard = false; // 之後可以正常摸牌
+
+      // 摸牌后，重新设置为可交互状态
+      this.players[0].setInteractive(true);
       return; // 不摸牌，直接返回
     }
 
@@ -192,6 +195,9 @@ export class Game {
       // 注意：剩餘牌數已經在 handleDiscard 中更新了，這裡不需要再更新
 
       console.log(`✅ 摸牌完成！手牌數量: ${player.tiles.length}，牌池剩餘: ${this.tilePool.length}張`);
+
+      // 摸牌后，重新设置为可交互状态（可以继续出牌）
+      player.setInteractive(true);
     } else if (!this.tileAssets[drawnTile]) {
       console.warn(`⚠️ 找不到牌的素材: ${drawnTile}`);
       // 放回牌池
@@ -333,6 +339,15 @@ export class Game {
     const player = this.players[position];
 
     if (player) {
+      // 检查发牌数据是否有重复牌（每张牌最多4张）
+      const tileCount = {};
+      tiles.forEach(tile => {
+        tileCount[tile] = (tileCount[tile] || 0) + 1;
+        if (tileCount[tile] > 4) {
+          console.error(`❌ 错误：${tile} 在手牌中出现 ${tileCount[tile]} 次！这是服务器端的BUG`);
+        }
+      });
+
       player.setTiles(tiles, this.tileAssets);
 
       // ✅ 從牌池中移除已發的牌
@@ -340,6 +355,7 @@ export class Game {
         const removed = this.removeTileFromPool(tile);
         if (!removed) {
           console.warn(`⚠️ 無法從牌池移除 ${tile}（可能已經被移除或不存在）`);
+          console.warn(`⚠️ 这可能是服务器端发送了重复的牌`);
         }
       });
 
@@ -434,40 +450,43 @@ export class Game {
     // 计算弃牌位置（在中央区域，根据玩家位置排列）
     const centerX = this.app.screen.width / 2;
     const centerY = this.app.screen.height / 2;
-    const tileWidth = 60 * scale;
-    const tileHeight = 80 * scale;
-    const spacing = 3; // 更緊湊的間距
+    // 使用实际的牌底尺寸来计算间距（牌底比牌面稍大）
+    // 弃牌包含牌底和牌面，实际占用空间更大
+    const tileWidth = 95 * scale;  // 再次增加宽度避免重叠（从80改为95）
+    const tileHeight = 115 * scale; // 再次增加高度避免重叠（从100改为115）
+    const spacing = 10; // 进一步增加间距（从8改为10）
 
     // 计算该玩家已经打出的牌数
     const playerDiscards = this.discardedTiles.filter(d => d.playerPosition === playerPosition);
     const discardIndex = playerDiscards.length;
 
-    // 根据玩家位置计算弃牌位置
+    // 根据玩家位置计算弃牌位置（按照红框标注的区域）
     let x, y;
-    const maxTilesPerRow = 10; // 每行最多10張牌（參考圖片）
+    // 上下方向每行10张，左右方向每列8张
+    const maxTilesPerRow = (playerPosition === 1 || playerPosition === 3) ? 8 : 10;
     const row = Math.floor(discardIndex / maxTilesPerRow);
     const col = discardIndex % maxTilesPerRow;
 
-    // 所有弃牌都保持正向（不旋轉），參考圖片的風格
+    // 所有弃牌都保持正向（不旋轉）
     switch (playerPosition) {
-      case 0: // 底部玩家 - 弃牌放在中央偏下，从左到右排列
+      case 0: // 底部玩家 - 弃牌放在底部中央区域
         x = centerX - (maxTilesPerRow * (tileWidth + spacing)) / 2 + col * (tileWidth + spacing) + tileWidth / 2;
-        y = centerY + 80 + row * (tileHeight + spacing);
+        y = centerY + 200 + row * (tileHeight + spacing);
         break;
 
-      case 1: // 右侧玩家 - 弃牌放在中央偏右，从左到右排列
-        x = centerX + 90 + col * (tileWidth + spacing);
-        y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + row * (tileHeight + spacing);
+      case 1: // 右侧玩家 - 弃牌放在右侧区域，垂直排列（每列8张）
+        x = centerX + 400 + row * (tileWidth + spacing);
+        y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing) + tileHeight / 2;
         break;
 
-      case 2: // 顶部玩家 - 弃牌放在中央偏上，从左到右排列
+      case 2: // 顶部玩家 - 弃牌放在顶部中央区域
         x = centerX - (maxTilesPerRow * (tileWidth + spacing)) / 2 + col * (tileWidth + spacing) + tileWidth / 2;
-        y = centerY - 100 - row * (tileHeight + spacing);
+        y = centerY - 200 - row * (tileHeight + spacing);
         break;
 
-      case 3: // 左侧玩家 - 弃牌放在中央偏左，从左到右排列
-        x = centerX - 110 - (maxTilesPerRow - 1 - col) * (tileWidth + spacing);
-        y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + row * (tileHeight + spacing);
+      case 3: // 左侧玩家 - 弃牌放在左侧区域，垂直排列（每列8张）
+        x = centerX - 400 - row * (tileWidth + spacing);
+        y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing) + tileHeight / 2;
         break;
     }
 
@@ -576,9 +595,10 @@ export class Game {
     const tileWidth = 60;
     const tileHeight = 80;
 
-    // 根據螢幕大小計算牌山位置（更靠近邊緣）
-    const wallDistanceVertical = Math.min(centerY - 100, 350);   // 上下方向
-    const wallDistanceHorizontal = Math.min(centerX - 150, 400); // 左右方向
+    // 根據螢幕大小計算牌山位置（緊貼牌桌邊緣）
+    // 牌桌是 92% 大小，所以边缘在 46% 的位置，牌山应该在稍微内侧
+    const wallDistanceVertical = Math.min(centerY * 0.85, 460);   // 上下方向（更靠近牌桌）
+    const wallDistanceHorizontal = Math.min(centerX * 0.86, 830); // 左右方向（更靠近牌桌）
     const tilesPerSide = 18; // 每邊18張牌（144張 / 4邊 / 2層）
 
     // 獲取牌背紋理
@@ -671,9 +691,9 @@ export class Game {
     this.wallTextContainer.addChild(bg);
     this.wallTextContainer.addChild(this.wallText);
 
-    // 設置位置（畫面上方中央）
-    this.wallTextContainer.x = this.app.screen.width / 2;
-    this.wallTextContainer.y = 40;
+    // 設置位置（左上角，緊挨著房間號框）
+    this.wallTextContainer.x = 240;
+    this.wallTextContainer.y = 30;
 
     // 加入到主容器的最上層
     this.container.addChild(this.wallTextContainer);
@@ -690,6 +710,43 @@ export class Game {
       this.wallText.text = `海底: ${this.remainingTiles}張`;
       console.log(`🎲 剩餘牌數更新: ${this.remainingTiles}張`);
     }
+
+    // 台湾麻将规则：海底剩余8张时流局
+    if (this.remainingTiles <= 8 && this.remainingTiles > 0) {
+      console.log('🚫 海底剩余8张，流局！');
+      this.handleDraw(); // 触发流局
+    }
+  }
+
+  /**
+   * 处理流局（荒牌）
+   */
+  handleDraw() {
+    // 禁用所有玩家交互
+    this.players.forEach(player => {
+      player.setInteractive(false);
+    });
+
+    // 显示流局消息
+    const drawText = new Text({
+      text: '流局\n海底剩余不足8张',
+      style: {
+        fontSize: 48,
+        fill: 0xFFFFFF,
+        fontWeight: 'bold',
+        align: 'center',
+        stroke: 0x000000,
+        strokeThickness: 4
+      }
+    });
+
+    drawText.anchor.set(0.5);
+    drawText.x = this.app.screen.width / 2;
+    drawText.y = this.app.screen.height / 2;
+
+    this.container.addChild(drawText);
+
+    console.log('游戏流局，无人胜出');
   }
 
   resize(width, height) {

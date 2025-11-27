@@ -158,11 +158,15 @@ class MahjongApp {
   async initGame() {
     const container = document.getElementById('game-container');
 
+    // 固定画布尺寸为 FullHD (1920x1080)
+    const CANVAS_WIDTH = 1920;
+    const CANVAS_HEIGHT = 1080;
+
     // 创建Pixi应用
     this.app = new Application();
     await this.app.init({
-      width: window.innerWidth,
-      height: window.innerHeight,
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
       backgroundColor: 0x1a5f3c,
       antialias: true,
       resolution: window.devicePixelRatio || 1,
@@ -175,11 +179,11 @@ class MahjongApp {
     this.game = new Game(this.app, this.ws);
     await this.game.init();
 
-    // 窗口大小调整
-    window.addEventListener('resize', () => {
-      this.app.renderer.resize(window.innerWidth, window.innerHeight);
-      this.game.resize(window.innerWidth, window.innerHeight);
-    });
+    // 移除窗口大小调整（固定尺寸）
+    // window.addEventListener('resize', () => {
+    //   this.app.renderer.resize(window.innerWidth, window.innerHeight);
+    //   this.game.resize(window.innerWidth, window.innerHeight);
+    // });
   }
 
   handleServerMessage(message) {

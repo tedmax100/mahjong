@@ -54,7 +54,7 @@ export class Player {
     switch (this.position) {
       case 'bottom':
         bg.x = this.screenWidth / 2 - 60;
-        bg.y = this.screenHeight - 200;
+        bg.y = this.screenHeight - 170;  // 更靠近底部（从 200 改为 170）
         break;
       case 'right':
         bg.x = this.screenWidth - 140;
@@ -62,10 +62,10 @@ export class Player {
         break;
       case 'top':
         bg.x = this.screenWidth / 2 - 60;
-        bg.y = 20;
+        bg.y = 10;  // 更靠近顶部（从 20 改为 10）
         break;
       case 'left':
-        bg.x = 20;
+        bg.x = 10;  // 更靠近左边（从 20 改为 10）
         bg.y = this.screenHeight / 2 - 30;
         break;
     }
@@ -149,8 +149,9 @@ export class Player {
   }
 
   positionTile(tile, index) {
-    const tileWidth = 60;
-    const tileHeight = 80;
+    // 手牌包含牌底，实际占用空间更大
+    const tileWidth = 75;  // 增加宽度考虑牌底（从60改为75）
+    const tileHeight = 95; // 增加高度考虑牌底（从80改为95）
 
     // 動態調整間距：根據牌的數量和螢幕寬度
     const totalTiles = this.tiles.length;
@@ -160,7 +161,7 @@ export class Player {
       case 'bottom':
         // 底部 - 水平排列
         // 計算最佳間距，確保牌不重疊
-        const availableWidth = this.screenWidth - 200; // 左右各留 100px 邊距
+        const availableWidth = this.screenWidth - 120; // 左右各留 60px 邊距（更靠近边缘）
         const totalTileWidth = totalTiles * tileWidth;
         const totalSpacingWidth = availableWidth - totalTileWidth;
 
@@ -176,7 +177,7 @@ export class Player {
 
         tile.setPosition(
           startX + index * (tileWidth + spacing),
-          this.screenHeight - 150
+          this.screenHeight - 120  // 更靠近底部（从 150 改为 120）
         );
         break;
 
@@ -184,7 +185,7 @@ export class Player {
         // 右侧 - 垂直排列
         spacing = 8; // 右側固定間距
         tile.setPosition(
-          this.screenWidth - 100,
+          this.screenWidth - 70,  // 更靠近右边（从 100 改为 70）
           this.screenHeight / 2 - (totalTiles * (tileHeight * 0.8 + spacing)) / 2 + index * (tileHeight * 0.8 + spacing)
         );
         tile.setRotation(Math.PI / 2);
@@ -196,7 +197,7 @@ export class Player {
         spacing = 8; // 上方固定間距
         tile.setPosition(
           this.screenWidth / 2 - (totalTiles * (tileWidth * 0.8 + spacing)) / 2 + index * (tileWidth * 0.8 + spacing),
-          50
+          30  // 更靠近顶部（从 50 改为 30）
         );
         tile.setScale(0.8);
         break;
@@ -205,7 +206,7 @@ export class Player {
         // 左侧 - 垂直排列
         spacing = 8; // 左側固定間距
         tile.setPosition(
-          50,
+          30,  // 更靠近左边（从 50 改为 30）
           this.screenHeight / 2 - (totalTiles * (tileHeight * 0.8 + spacing)) / 2 + index * (tileHeight * 0.8 + spacing)
         );
         tile.setRotation(-Math.PI / 2);
