@@ -321,6 +321,56 @@ export class Player {
     });
   }
 
+  /**
+   * 高亮顯示可以組合的牌組
+   * @param {Array<Array<string>>} tileGroups - 牌組列表，例如 [['wan-1', 'wan-2', 'wan-3'], ['wan-4', 'wan-4']]
+   */
+  highlightTileGroups(tileGroups) {
+    // 先重置所有牌的位置
+    this.clearHighlight();
+
+    if (!tileGroups || tileGroups.length === 0) {
+      return;
+    }
+
+    // 將牌組扁平化，找出所有需要高亮的牌
+    const tilesToHighlight = new Set();
+    tileGroups.forEach(group => {
+      group.forEach(tileType => tilesToHighlight.add(tileType));
+    });
+
+    // 對於底部玩家，將可組合的牌往上移動
+    if (this.position === 'bottom') {
+      this.tiles.forEach((tile, index) => {
+        if (tilesToHighlight.has(tile.type)) {
+          // 往上移動 20 像素
+          tile.container.y -= 20;
+          // 添加發光效果
+          tile.container.alpha = 1.0;
+        } else {
+          // 其他牌變暗
+          tile.container.alpha = 0.5;
+        }
+      });
+    }
+
+    console.log(`✨ 高亮顯示 ${tilesToHighlight.size} 張牌`);
+  }
+
+  /**
+   * 清除高亮效果
+   */
+  clearHighlight() {
+    if (this.position === 'bottom') {
+      this.tiles.forEach((tile, index) => {
+        // 重新定位到正確位置
+        this.positionTile(tile, index);
+        // 恢復透明度
+        tile.container.alpha = 1.0;
+      });
+    }
+  }
+
   resize(width, height) {
     this.screenWidth = width;
     this.screenHeight = height;

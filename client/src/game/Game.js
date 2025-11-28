@@ -2,6 +2,7 @@ import { Container, Text, Graphics, Sprite, Assets } from 'pixi.js';
 import { Tile } from './Tile.js';
 import { Table } from './Table.js';
 import { Player } from './Player.js';
+import { ActionButtons } from './ActionButtons.js';
 
 /**
  * 主游戏类
@@ -32,6 +33,11 @@ export class Game {
     // 莊家相關
     this.dealerPosition = 0; // 莊家位置（0-3）
     this.dealerFirstDiscard = true; // 莊家是否還沒打過第一張牌
+
+    // 動作按鈕
+    this.actionButtons = null;
+    this.lastDiscardedTile = null; // 最後被打出的牌
+    this.pendingActions = []; // 可執行的動作列表
   }
 
   async init() {
@@ -54,8 +60,21 @@ export class Game {
     // 創建牌山視覺
     this.createWalls();
 
+    // 創建動作按鈕（異步初始化）
+    this.actionButtons = new ActionButtons(this.app.screen.width, this.app.screen.height);
+    this.container.addChild(this.actionButtons.container);
+
+    // 設置按鈕回調
+    this.actionButtons.on('pong', () => this.handlePongAction());
+    this.actionButtons.on('chow', () => this.handleChowAction());
+    this.actionButtons.on('kong', () => this.handleKongAction());
+    this.actionButtons.on('hu', () => this.handleHuAction());
+    this.actionButtons.on('cancel', () => this.handleCancelAction());
+
     // 显示等待文字
     this.showWaitingText();
+
+    console.log('✅ Game initialized successfully');
   }
 
   async loadAssets() {
@@ -514,6 +533,15 @@ export class Game {
       this.updateRemainingTiles(this.remainingTiles - 1);
       console.log(`📊 玩家 ${playerPosition} 打牌，下家摸牌，剩餘: ${this.remainingTiles}張`);
     }
+
+    // 記錄最後打出的牌
+    this.lastDiscardedTile = tile;
+
+    // 檢查是否可以執行動作（碰、吃、槓、胡）
+    // 只有當不是自己打的牌時才檢查
+    if (playerPosition !== this.myPosition) {
+      this.checkPossibleActions(tile, playerPosition);
+    }
   }
 
   handleDraw(playerId, tile) {
@@ -749,6 +777,303 @@ export class Game {
     console.log('游戏流局，无人胜出');
   }
 
+  /**
+   * 檢查可執行的動作（碰、吃、槓、胡）
+   */
+  checkPossibleActions(tile, discardPlayerPosition) {
+    const myPlayer = this.players[this.myPosition];
+    if (!myPlayer || !myPlayer.tiles) {
+      return;
+    }
+
+    const myHand = myPlayer.tiles.map(t => t.type);
+    const actions = [];
+    const highlightGroups = []; // 存儲所有可以高亮的牌組
+
+    // 檢查是否可以胡牌（優先級最高）
+    if (this.canHu(myHand, tile)) {
+      actions.push('hu');
+      // TODO: 添加胡牌的牌組高亮
+    }
+
+    // 檢查是否可以槓
+    if (this.canKong(myHand, tile)) {
+      actions.push('kong');
+      // 槓牌：需要3張相同的牌
+      const kongGroup = myHand.filter(t => t === tile);
+      if (kongGroup.length >= 3) {
+        highlightGroups.push(kongGroup.slice(0, 3));
+      }
+    }
+
+    // 檢查是否可以碰
+    if (this.canPong(myHand, tile)) {
+      actions.push('pong');
+      // 碰牌：需要2張相同的牌
+      const pongGroup = myHand.filter(t => t === tile);
+      if (pongGroup.length >= 2) {
+        highlightGroups.push(pongGroup.slice(0, 2));
+      }
+    }
+
+    // 檢查是否可以吃（只能吃上家的牌）
+    const previousPlayer = (this.myPosition + 3) % 4; // 上家位置
+    if (discardPlayerPosition === previousPlayer && this.canChow(myHand, tile)) {
+      actions.push('chow');
+      // 吃牌：可能有多種組合
+      const chowCombinations = this.getChowCombinations(myHand, tile);
+      chowCombinations.forEach(combo => {
+        // 只高亮手牌中的牌（不包含要吃的牌）
+        const handTiles = combo.filter(t => t !== tile);
+        if (handTiles.length > 0) {
+          highlightGroups.push(handTiles);
+        }
+      });
+    }
+
+    // 如果有可執行的動作，顯示按鈕並高亮牌組
+    if (actions.length > 0) {
+      actions.push('cancel'); // 總是添加取消按鈕
+      this.pendingActions = actions;
+      this.actionButtons.show(actions);
+
+      // 高亮顯示可組合的牌
+      myPlayer.highlightTileGroups(highlightGroups);
+
+      console.log(`可執行的動作: ${actions.join(', ')}`);
+      console.log(`高亮牌組數量: ${highlightGroups.length}`);
+    }
+  }
+
+  /**
+   * 檢查是否可以碰
+   */
+  canPong(hand, tile) {
+    let count = 0;
+    for (const t of hand) {
+      if (t === tile) {
+        count++;
+      }
+    }
+    return count >= 2;
+  }
+
+  /**
+   * 檢查是否可以槓
+   */
+  canKong(hand, tile) {
+    let count = 0;
+    for (const t of hand) {
+      if (t === tile) {
+        count++;
+      }
+    }
+    return count >= 3;
+  }
+
+  /**
+   * 檢查是否可以吃
+   */
+  canChow(hand, tile) {
+    // 字牌不能吃
+    const honors = ['dong', 'nan', 'xi', 'bei', 'zhong', 'fa', 'bai'];
+    if (honors.includes(tile)) {
+      return false;
+    }
+
+    // 解析牌的類型和數字
+    const parseTile = (t) => {
+      const match = t.match(/^(wan|tong|tiao)-(\d)$/);
+      if (!match) return null;
+      return { suit: match[1], num: parseInt(match[2]) };
+    };
+
+    const parsed = parseTile(tile);
+    if (!parsed) return false;
+
+    const { suit, num } = parsed;
+
+    // 檢查三種可能的順子組合
+    // 1. tile + tile+1 + tile+2
+    if (num <= 7) {
+      const tile2 = `${suit}-${num + 1}`;
+      const tile3 = `${suit}-${num + 2}`;
+      if (hand.includes(tile2) && hand.includes(tile3)) {
+        return true;
+      }
+    }
+
+    // 2. tile-1 + tile + tile+1
+    if (num >= 2 && num <= 8) {
+      const tile1 = `${suit}-${num - 1}`;
+      const tile3 = `${suit}-${num + 1}`;
+      if (hand.includes(tile1) && hand.includes(tile3)) {
+        return true;
+      }
+    }
+
+    // 3. tile-2 + tile-1 + tile
+    if (num >= 3) {
+      const tile1 = `${suit}-${num - 2}`;
+      const tile2 = `${suit}-${num - 1}`;
+      if (hand.includes(tile1) && hand.includes(tile2)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 檢查是否可以胡牌（簡化版）
+   */
+  canHu(hand, tile) {
+    // TODO: 實作完整的胡牌判斷邏輯
+    // 這裡先返回 false，可以後續實作
+    return false;
+  }
+
+  /**
+   * 處理碰牌動作
+   */
+  handlePongAction() {
+    console.log('執行碰牌');
+    if (this.ws && this.lastDiscardedTile) {
+      this.ws.sendAction('pong', { tile: this.lastDiscardedTile });
+    }
+
+    // 清除牌組高亮
+    const myPlayer = this.players[this.myPosition];
+    if (myPlayer) {
+      myPlayer.clearHighlight();
+    }
+  }
+
+  /**
+   * 處理吃牌動作
+   */
+  handleChowAction() {
+    console.log('執行吃牌');
+
+    // 需要讓玩家選擇吃牌組合
+    // 這裡先使用第一個可能的組合
+    const myHand = this.players[this.myPosition].tiles.map(t => t.type);
+    const combinations = this.getChowCombinations(myHand, this.lastDiscardedTile);
+
+    if (combinations.length > 0 && this.ws) {
+      // 如果有多個組合，這裡簡化處理，使用第一個
+      // TODO: 可以添加UI讓玩家選擇
+      this.ws.sendAction('chow', {
+        tile: this.lastDiscardedTile,
+        chowTiles: combinations[0]
+      });
+    }
+
+    // 清除牌組高亮
+    const myPlayer = this.players[this.myPosition];
+    if (myPlayer) {
+      myPlayer.clearHighlight();
+    }
+  }
+
+  /**
+   * 獲取所有可能的吃牌組合
+   */
+  getChowCombinations(hand, tile) {
+    const combinations = [];
+
+    const parseTile = (t) => {
+      const match = t.match(/^(wan|tong|tiao)-(\d)$/);
+      if (!match) return null;
+      return { suit: match[1], num: parseInt(match[2]) };
+    };
+
+    const parsed = parseTile(tile);
+    if (!parsed) return combinations;
+
+    const { suit, num } = parsed;
+
+    // 檢查三種可能的順子組合
+    if (num <= 7) {
+      const tile2 = `${suit}-${num + 1}`;
+      const tile3 = `${suit}-${num + 2}`;
+      if (hand.includes(tile2) && hand.includes(tile3)) {
+        combinations.push([tile, tile2, tile3]);
+      }
+    }
+
+    if (num >= 2 && num <= 8) {
+      const tile1 = `${suit}-${num - 1}`;
+      const tile3 = `${suit}-${num + 1}`;
+      if (hand.includes(tile1) && hand.includes(tile3)) {
+        combinations.push([tile1, tile, tile3]);
+      }
+    }
+
+    if (num >= 3) {
+      const tile1 = `${suit}-${num - 2}`;
+      const tile2 = `${suit}-${num - 1}`;
+      if (hand.includes(tile1) && hand.includes(tile2)) {
+        combinations.push([tile1, tile2, tile]);
+      }
+    }
+
+    return combinations;
+  }
+
+  /**
+   * 處理槓牌動作
+   */
+  handleKongAction() {
+    console.log('執行槓牌');
+    if (this.ws && this.lastDiscardedTile) {
+      this.ws.sendAction('kong', {
+        tile: this.lastDiscardedTile,
+        isConcealed: false // 明槓
+      });
+    }
+
+    // 清除牌組高亮
+    const myPlayer = this.players[this.myPosition];
+    if (myPlayer) {
+      myPlayer.clearHighlight();
+    }
+  }
+
+  /**
+   * 處理胡牌動作
+   */
+  handleHuAction() {
+    console.log('執行胡牌');
+    if (this.ws && this.lastDiscardedTile) {
+      this.ws.sendAction('hu', {
+        tile: this.lastDiscardedTile,
+        isSelfDrawn: false // 放炮
+      });
+    }
+
+    // 清除牌組高亮
+    const myPlayer = this.players[this.myPosition];
+    if (myPlayer) {
+      myPlayer.clearHighlight();
+    }
+  }
+
+  /**
+   * 處理取消動作
+   */
+  handleCancelAction() {
+    console.log('取消動作');
+    this.actionButtons.hide();
+    this.pendingActions = [];
+
+    // 清除牌組高亮
+    const myPlayer = this.players[this.myPosition];
+    if (myPlayer) {
+      myPlayer.clearHighlight();
+    }
+  }
+
   resize(width, height) {
     if (this.table) {
       this.table.resize(width, height);
@@ -761,6 +1086,11 @@ export class Game {
     // 重新創建牌山以適應新的螢幕尺寸
     if (this.wallContainer) {
       this.createWalls();
+    }
+
+    // 調整動作按鈕位置
+    if (this.actionButtons) {
+      this.actionButtons.resize(width, height);
     }
   }
 }

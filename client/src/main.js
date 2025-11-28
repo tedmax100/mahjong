@@ -24,13 +24,21 @@ class MahjongApp {
   showSplashScreen() {
     // 3秒后隐藏启动画面
     setTimeout(() => {
-      const splashScreen = document.getElementById('splash-screen');
-      splashScreen.classList.add('hidden');
+      try {
+        const splashScreen = document.getElementById('splash-screen');
+        if (splashScreen) {
+          splashScreen.classList.add('hidden');
 
-      // 再等0.5秒后完全移除元素（等待淡出动画完成）
-      setTimeout(() => {
-        splashScreen.remove();
-      }, 500);
+          // 再等0.5秒后完全移除元素（等待淡出动画完成）
+          setTimeout(() => {
+            if (splashScreen && splashScreen.parentNode) {
+              splashScreen.remove();
+            }
+          }, 500);
+        }
+      } catch (error) {
+        console.error('隱藏啟動畫面失敗:', error);
+      }
     }, 3000);
   }
 
@@ -156,34 +164,52 @@ class MahjongApp {
   }
 
   async initGame() {
-    const container = document.getElementById('game-container');
+    try {
+      console.log('🎮 開始初始化遊戲...');
 
-    // 固定画布尺寸为 FullHD (1920x1080)
-    const CANVAS_WIDTH = 1920;
-    const CANVAS_HEIGHT = 1080;
+      const container = document.getElementById('game-container');
 
-    // 创建Pixi应用
-    this.app = new Application();
-    await this.app.init({
-      width: CANVAS_WIDTH,
-      height: CANVAS_HEIGHT,
-      backgroundColor: 0x1a5f3c,
-      antialias: true,
-      resolution: window.devicePixelRatio || 1,
-      autoDensity: true
-    });
+      // 使用視窗大小（響應式設計）
+      const CANVAS_WIDTH = window.innerWidth;
+      const CANVAS_HEIGHT = window.innerHeight;
 
-    container.appendChild(this.app.canvas);
+      console.log(`📐 畫布尺寸: ${CANVAS_WIDTH}x${CANVAS_HEIGHT}`);
 
-    // 创建游戏实例
-    this.game = new Game(this.app, this.ws);
-    await this.game.init();
+      // 创建Pixi应用
+      console.log('📱 創建 PixiJS 應用...');
+      this.app = new Application();
+      await this.app.init({
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        backgroundColor: 0x1a5f3c,
+        antialias: true,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true
+      });
 
-    // 移除窗口大小调整（固定尺寸）
-    // window.addEventListener('resize', () => {
-    //   this.app.renderer.resize(window.innerWidth, window.innerHeight);
-    //   this.game.resize(window.innerWidth, window.innerHeight);
-    // });
+      container.appendChild(this.app.canvas);
+      console.log('✅ PixiJS 應用創建成功');
+
+      // 创建游戏实例
+      console.log('🎲 創建遊戲實例...');
+      this.game = new Game(this.app, this.ws);
+      await this.game.init();
+      console.log('✅ 遊戲初始化完成');
+
+      // 添加窗口大小调整（響應式）
+      window.addEventListener('resize', () => {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight;
+        console.log(`🔄 視窗調整: ${newWidth}x${newHeight}`);
+        this.app.renderer.resize(newWidth, newHeight);
+        if (this.game) {
+          this.game.resize(newWidth, newHeight);
+        }
+      });
+    } catch (error) {
+      console.error('❌ 遊戲初始化失敗:', error);
+      alert('遊戲初始化失敗，請刷新頁面重試。\n錯誤: ' + error.message);
+    }
   }
 
   handleServerMessage(message) {
