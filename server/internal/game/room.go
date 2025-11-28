@@ -249,6 +249,121 @@ func (r *Room) HandlePong(userID, tile string) bool {
 	return true
 }
 
+// HandleChow 处理吃牌（只能吃上家打出的牌）
+func (r *Room) HandleChow(userID, tile string, chowTiles []string) bool {
+	// 找到玩家
+	var player *Player
+	for _, p := range r.Players {
+		if p.ID == userID {
+			player = p
+			break
+		}
+	}
+
+	if player == nil {
+		log.Printf("未找到玩家: %s", userID)
+		return false
+	}
+
+	if r.Game == nil {
+		return false
+	}
+
+	// 检查是否是上家打出的牌
+	// 台湾麻将规则：只能吃上家的牌
+	previousPlayer := (player.Position + 3) % 4 // 上家位置
+	if r.CurrentTurn != previousPlayer {
+		log.Printf("玩家 %s 只能吃上家的牌（当前出牌者位置: %d，上家位置: %d）",
+			player.Name, r.CurrentTurn, previousPlayer)
+		return false
+	}
+
+	// 验证吃牌组合是否有效
+	validCombinations := r.Game.CanChow(player.Hand, tile)
+	if len(validCombinations) == 0 {
+		log.Printf("玩家 %s 无法吃 %s", player.Name, tile)
+		return false
+	}
+
+	// 检查提供的吃牌组合是否在有效组合中
+	isValidCombination := false
+	for _, combo := range validCombinations {
+		if len(combo) == len(chowTiles) && isSameCombination(combo, chowTiles) {
+			isValidCombination = true
+			break
+		}
+	}
+
+	if !isValidCombination {
+		log.Printf("玩家 %s 提供的吃牌组合无效: %v", player.Name, chowTiles)
+		return false
+	}
+
+	log.Printf("玩家 %s 吃 %s，组合: %v", player.Name, tile, chowTiles)
+
+	// 从手牌中移除需要的牌（除了吃的那张）
+	for _, chowTile := range chowTiles {
+		if chowTile == tile {
+			continue // 跳过要吃的牌（从弃牌堆拿）
+		}
+
+		// 从手牌中移除
+		for i, t := range player.Hand {
+			if t == chowTile {
+				player.Hand = append(player.Hand[:i], player.Hand[i+1:]...)
+				break
+			}
+		}
+	}
+
+	// 从弃牌堆中移除最后一张（即被吃的牌）
+	if len(r.Game.DiscardPile) > 0 {
+		r.Game.DiscardPile = r.Game.DiscardPile[:len(r.Game.DiscardPile)-1]
+	}
+
+	// 添加到已展示的牌组
+	player.Melds = append(player.Melds, Meld{
+		Type:  "chow",
+		Tiles: chowTiles,
+	})
+
+	// 吃牌后轮到该玩家出牌
+	r.CurrentTurn = player.Position
+	log.Printf("吃牌成功，轮到玩家 %s 出牌", player.Name)
+
+	return true
+}
+
+// isSameCombination 检查两个牌组是否相同（忽略顺序）
+func isSameCombination(combo1, combo2 []string) bool {
+	if len(combo1) != len(combo2) {
+		return false
+	}
+
+	// 创建副本并排序
+	c1 := make([]string, len(combo1))
+	c2 := make([]string, len(combo2))
+	copy(c1, combo1)
+	copy(c2, combo2)
+
+	// 简单的排序和比较
+	for i := 0; i < len(c1); i++ {
+		found := false
+		for j := 0; j < len(c2); j++ {
+			if c1[i] == c2[j] {
+				found = true
+				c2[j] = "" // 标记已匹配
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}
+
 // HandleKong 处理杠牌
 func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
 	// 找到玩家

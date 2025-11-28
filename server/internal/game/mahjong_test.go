@@ -108,6 +108,64 @@ func TestCanKong(t *testing.T) {
 	}
 }
 
+// TestCanChow 测试吃牌判断
+func TestCanChow(t *testing.T) {
+	game := &MahjongGame{}
+
+	// 测试1: 能吃（wan-2，手牌有wan-1和wan-3）
+	hand1 := []string{"wan-1", "wan-3", "tong-5", "tiao-7"}
+	combos1 := game.CanChow(hand1, "wan-2")
+	if len(combos1) != 1 {
+		t.Errorf("应该有1种吃牌组合，实际: %d", len(combos1))
+	}
+	expectedCombo1 := []string{"wan-1", "wan-2", "wan-3"}
+	if len(combos1) > 0 && !isSameCombination(combos1[0], expectedCombo1) {
+		t.Errorf("吃牌组合错误，期望: %v，实际: %v", expectedCombo1, combos1[0])
+	}
+
+	// 测试2: 能吃（wan-5，手牌有wan-4,wan-6和wan-6,wan-7）- 多种组合
+	hand2 := []string{"wan-4", "wan-6", "wan-7", "tong-1"}
+	combos2 := game.CanChow(hand2, "wan-5")
+	if len(combos2) != 2 {
+		t.Errorf("应该有2种吃牌组合，实际: %d", len(combos2))
+	}
+
+	// 测试3: 不能吃（字牌）
+	hand3 := []string{"wan-1", "wan-2", "tong-5"}
+	combos3 := game.CanChow(hand3, "dong")
+	if len(combos3) != 0 {
+		t.Errorf("字牌不应该能吃，实际组合数: %d", len(combos3))
+	}
+
+	// 测试4: 不能吃（手牌不连续）
+	hand4 := []string{"wan-1", "wan-4", "tong-5"}
+	combos4 := game.CanChow(hand4, "wan-2")
+	if len(combos4) != 0 {
+		t.Errorf("手牌不连续不应该能吃，实际组合数: %d", len(combos4))
+	}
+
+	// 测试5: 能吃（wan-1，手牌有wan-2和wan-3）
+	hand5 := []string{"wan-2", "wan-3", "tong-5"}
+	combos5 := game.CanChow(hand5, "wan-1")
+	if len(combos5) != 1 {
+		t.Errorf("应该有1种吃牌组合，实际: %d", len(combos5))
+	}
+
+	// 测试6: 能吃（wan-9，手牌有wan-7和wan-8）
+	hand6 := []string{"wan-7", "wan-8", "tong-5"}
+	combos6 := game.CanChow(hand6, "wan-9")
+	if len(combos6) != 1 {
+		t.Errorf("应该有1种吃牌组合，实际: %d", len(combos6))
+	}
+
+	// 测试7: 不能吃（不同花色）
+	hand7 := []string{"wan-1", "wan-3", "tong-5"}
+	combos7 := game.CanChow(hand7, "tong-2")
+	if len(combos7) != 0 {
+		t.Errorf("不同花色不应该能吃，实际组合数: %d", len(combos7))
+	}
+}
+
 // TestIsFlowerTile 测试花牌判断
 func TestIsFlowerTile(t *testing.T) {
 	if !isFlowerTile("flower-chun") {

@@ -220,6 +220,51 @@ func (g *MahjongGame) CanKong(hand []string, tile string) bool {
 	return count >= 3
 }
 
+// CanChow 检查是否可以吃牌（只能吃上家打出的牌）
+// 返回所有可能的吃牌组合
+func (g *MahjongGame) CanChow(hand []string, tile string) [][]string {
+	// 字牌（风牌、三元牌）不能吃
+	if isHonorTile(tile) {
+		return nil
+	}
+
+	typ, num := parseTile(tile)
+	if num == 0 {
+		return nil
+	}
+
+	validCombinations := make([][]string, 0)
+
+	// 情况1: tile + tile+1 + tile+2 (例如: 1,2,3)
+	if num <= 7 {
+		tile2 := tileID(typ, num+1)
+		tile3 := tileID(typ, num+2)
+		if countTile(hand, tile2) > 0 && countTile(hand, tile3) > 0 {
+			validCombinations = append(validCombinations, []string{tile, tile2, tile3})
+		}
+	}
+
+	// 情况2: tile-1 + tile + tile+1 (例如: 2,3,4)
+	if num >= 2 && num <= 8 {
+		tile1 := tileID(typ, num-1)
+		tile3 := tileID(typ, num+1)
+		if countTile(hand, tile1) > 0 && countTile(hand, tile3) > 0 {
+			validCombinations = append(validCombinations, []string{tile1, tile, tile3})
+		}
+	}
+
+	// 情况3: tile-2 + tile-1 + tile (例如: 3,4,5)
+	if num >= 3 {
+		tile1 := tileID(typ, num-2)
+		tile2 := tileID(typ, num-1)
+		if countTile(hand, tile1) > 0 && countTile(hand, tile2) > 0 {
+			validCombinations = append(validCombinations, []string{tile1, tile2, tile})
+		}
+	}
+
+	return validCombinations
+}
+
 // CanHu 检查是否可以胡牌
 func (g *MahjongGame) CanHu(hand []string, melds []Meld) bool {
 	// 台湾16张麻将：5组牌（4组顺子/刻子 + 1对眼）
