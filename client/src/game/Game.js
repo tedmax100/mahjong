@@ -231,6 +231,26 @@ export class Game {
     if (this.ws) {
       this.ws.sendAction('discard', { tile: tileType });
     }
+
+    // 出牌後延遲檢查聽牌狀態（給伺服器時間更新狀態）
+    setTimeout(() => {
+      const myPlayer = this.players[this.myPosition];
+      if (myPlayer && myPlayer.tiles) {
+        const myHand = myPlayer.tiles.map(t => t.type);
+        const meldCount = myPlayer.melds ? myPlayer.melds.length : 0;
+
+        console.log(`🎴 出牌後檢查聽牌 - 手牌數: ${myHand.length}, 面子數: ${meldCount}`, myHand);
+
+        // 檢查是否聽牌
+        const readyTiles = this.checkReadyHand(myHand);
+        if (readyTiles.length > 0) {
+          console.log(`🎯 聽牌！聽: ${readyTiles.join(', ')}（共${readyTiles.length}張）`);
+          // 顯示聽牌按鈕
+          this.actionButtons.show(['ready', 'cancel']);
+          this.pendingActions = ['ready'];
+        }
+      }
+    }, 300);
   }
 
   /**

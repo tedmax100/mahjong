@@ -6,17 +6,45 @@ import (
 	"log"
 	"reflect"
 	"sort"
+	"sync"
+	"time"
 )
+
+// ActionPriority 定義動作優先權等級
+type ActionPriority int
+
+const (
+	PriorityChow ActionPriority = 1 // 吃牌（最低）
+	PriorityPong ActionPriority = 2 // 碰牌
+	PriorityKong ActionPriority = 3 // 槓牌
+	PriorityHu   ActionPriority = 4 // 胡牌（最高）
+)
+
+// PendingAction 代表一個待處理的動作請求
+type PendingAction struct {
+	PlayerID   string
+	PlayerPos  int
+	ActionType string // "chow", "pong", "kong", "hu"
+	Priority   ActionPriority
+	Tile       string
+	Data       map[string]interface{} // 額外數據（如吃牌組合）
+	Timestamp  time.Time
+}
 
 // Room 代表一个游戏房间
 type Room struct {
-	ID              string
-	Players         []*Player
-	Clients         map[string]interface{} // 存储WebSocket客户端
-	Game            *MahjongGame
-	GameStarted     bool
-	CurrentTurn     int // 当前轮到谁（0-3）
+	ID                string
+	Players           []*Player
+	Clients           map[string]interface{} // 存储WebSocket客户端
+	Game              *MahjongGame
+	GameStarted       bool
+	CurrentTurn       int // 当前轮到谁（0-3）
 	LastDiscardPlayer int // 最後打牌的玩家位置（用於檢查吃牌資格）
+	LastDiscardTile   string // 最後打出的牌
+	PendingActions    []PendingAction // 待處理的動作請求
+	ActionTimeout     *time.Timer // 動作超時計時器
+	ActionMutex       sync.Mutex // 保護 PendingActions 的互斥鎖
+	IsWaitingForActions bool // 是否正在等待玩家動作回應
 }
 
 // Player 代表一个玩家
@@ -256,13 +284,15 @@ func (r *Room) HandleDiscard(userID, tile string) {
 		}
 	}
 
-	// 記錄最後打牌的玩家（用於檢查吃牌資格）
+	// 記錄最後打牌的玩家和牌（用於檢查吃牌資格）
 	r.LastDiscardPlayer = player.Position
+	r.LastDiscardTile = tile
 
 	// 📋 記錄打牌後的手牌狀態
 	LogPlayerHand(player, "打牌: "+tile)
 
 	// 切换到下一个玩家
+	// TODO: 當實作完整優先權處理後，這裡應該等待其他玩家響應後再切換
 	r.NextTurn()
 	log.Printf("轮到下一位玩家（位置: %d）", r.CurrentTurn)
 }
@@ -603,4 +633,182 @@ func (r *Room) HandleHu(userID string, isSelfDrawn bool) *WinResult {
 	r.GameStarted = false
 
 	return winResult
+}
+
+// AddPendingAction 添加待處理的動作請求
+func (r *Room) AddPendingAction(playerID string, actionType string, tile string, data map[string]interface{}) {
+	r.ActionMutex.Lock()
+	defer r.ActionMutex.Unlock()
+
+	// 找到玩家位置
+	var playerPos int
+	for i, p := range r.Players {
+		if p.ID == playerID {
+			playerPos = i
+			break
+		}
+	}
+
+	// 確定優先權
+	var priority ActionPriority
+	switch actionType {
+	case "hu":
+		priority = PriorityHu
+	case "kong":
+		priority = PriorityKong
+	case "pong":
+		priority = PriorityPong
+	case "chow":
+		priority = PriorityChow
+	default:
+		log.Printf("未知的動作類型: %s", actionType)
+		return
+	}
+
+	// 驗證動作是否合法
+	if !r.ValidateAction(playerID, actionType, tile, data) {
+		log.Printf("玩家 %s 的動作 %s 不合法，忽略", playerID, actionType)
+		return
+	}
+
+	action := PendingAction{
+		PlayerID:   playerID,
+		PlayerPos:  playerPos,
+		ActionType: actionType,
+		Priority:   priority,
+		Tile:       tile,
+		Data:       data,
+		Timestamp:  time.Now(),
+	}
+
+	r.PendingActions = append(r.PendingActions, action)
+	log.Printf("添加待處理動作: 玩家 %d, 動作 %s, 優先權 %d", playerPos, actionType, priority)
+}
+
+// ValidateAction 驗證動作是否合法
+func (r *Room) ValidateAction(playerID string, actionType string, tile string, data map[string]interface{}) bool {
+	// 找到玩家
+	var player *Player
+	for _, p := range r.Players {
+		if p.ID == playerID {
+			player = p
+			break
+		}
+	}
+
+	if player == nil {
+		return false
+	}
+
+	if r.Game == nil {
+		return false
+	}
+
+	switch actionType {
+	case "hu":
+		return r.Game.CanHu(player.Hand, player.Melds)
+	case "kong":
+		if data != nil {
+			if isConcealed, ok := data["isConcealed"].(bool); ok && isConcealed {
+				// 暗槓檢查
+				count := 0
+				for _, t := range player.Hand {
+					if t == tile {
+						count++
+					}
+				}
+				return count >= 4
+			}
+		}
+		return r.Game.CanExposedKong(player, tile)
+	case "pong":
+		return r.Game.CanPong(player.Hand, tile)
+	case "chow":
+		// 檢查是否是上家打出的牌
+		previousPlayer := (player.Position + 3) % 4
+		if r.LastDiscardPlayer != previousPlayer {
+			return false
+		}
+		validCombinations := r.Game.CanChow(player.Hand, tile)
+		return len(validCombinations) > 0
+	}
+
+	return false
+}
+
+// ProcessPendingActions 處理所有待處理的動作，執行優先權最高的
+func (r *Room) ProcessPendingActions() *PendingAction {
+	r.ActionMutex.Lock()
+	defer r.ActionMutex.Unlock()
+
+	if len(r.PendingActions) == 0 {
+		log.Println("沒有待處理的動作")
+		return nil
+	}
+
+	// 按優先權排序（優先權高的在前）
+	sort.Slice(r.PendingActions, func(i, j int) bool {
+		if r.PendingActions[i].Priority != r.PendingActions[j].Priority {
+			return r.PendingActions[i].Priority > r.PendingActions[j].Priority
+		}
+		// 優先權相同時，按時間戳排序（先提交的在前）
+		return r.PendingActions[i].Timestamp.Before(r.PendingActions[j].Timestamp)
+	})
+
+	// 取得優先權最高的動作
+	highestAction := r.PendingActions[0]
+	log.Printf("執行優先權最高的動作: 玩家 %d, 動作 %s, 優先權 %d",
+		highestAction.PlayerPos, highestAction.ActionType, highestAction.Priority)
+
+	// 清空待處理動作列表
+	r.PendingActions = []PendingAction{}
+	r.IsWaitingForActions = false
+
+	// 取消計時器
+	if r.ActionTimeout != nil {
+		r.ActionTimeout.Stop()
+		r.ActionTimeout = nil
+	}
+
+	return &highestAction
+}
+
+// ClearPendingActions 清空所有待處理的動作
+func (r *Room) ClearPendingActions() {
+	r.ActionMutex.Lock()
+	defer r.ActionMutex.Unlock()
+
+	r.PendingActions = []PendingAction{}
+	r.IsWaitingForActions = false
+
+	if r.ActionTimeout != nil {
+		r.ActionTimeout.Stop()
+		r.ActionTimeout = nil
+	}
+
+	log.Println("清空待處理動作列表")
+}
+
+// StartActionCollection 開始收集玩家動作（設定超時）
+func (r *Room) StartActionCollection(timeoutCallback func()) {
+	r.ActionMutex.Lock()
+	defer r.ActionMutex.Unlock()
+
+	r.IsWaitingForActions = true
+	r.PendingActions = []PendingAction{}
+
+	// 設定3秒超時
+	r.ActionTimeout = time.AfterFunc(3*time.Second, func() {
+		log.Println("動作收集超時，處理待處理動作")
+		timeoutCallback()
+	})
+
+	log.Println("開始收集玩家動作（3秒超時）")
+}
+
+// GetPendingActionCount 獲取待處理動作數量
+func (r *Room) GetPendingActionCount() int {
+	r.ActionMutex.Lock()
+	defer r.ActionMutex.Unlock()
+	return len(r.PendingActions)
 }

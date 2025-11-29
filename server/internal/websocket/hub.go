@@ -259,8 +259,8 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 	if !strings.HasPrefix(currentPlayer.ID, "bot_") {
 		if withDelay {
 			go func() {
-				log.Printf("检测到玩家 %s (位置 %d) 有可执行动作，开始 5 秒等待...", currentPlayer.Name, currentTurnAtCheck)
-				time.Sleep(5 * time.Second)
+				log.Printf("检测到玩家 %s (位置 %d) 有可执行动作，开始 15 秒等待...", currentPlayer.Name, currentTurnAtCheck)
+				time.Sleep(15 * time.Second)
 				h.mu.Lock()
 				defer h.mu.Unlock()
 				log.Printf("玩家 %s 的等待时间结束。当前轮次: %d, 期望轮次: %d", currentPlayer.Name, room.CurrentTurn, currentTurnAtCheck)
@@ -294,13 +294,31 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 				return
 			}
 
-			// 只有在正常轮次（手牌16张）才摸牌
-			if len(currentPlayer.Hand) == 16 {
-				drawnTile := room.Game.DrawTile()
+			// 計算總牌數（手牌 + 已展示的吃碰槓）
+			totalTiles := len(currentPlayer.Hand) + len(currentPlayer.Melds)*3
+
+			// 只有在正常轮次（總牌數 16 張）才摸牌
+			// 如果剛吃/碰/槓完（總牌數 17 張），不摸牌直接出牌
+			if totalTiles == 16 {
+				// 使用 DrawTileWithFlowerReplacement 自動處理花牌
+				drawnTile := room.Game.DrawTileWithFlowerReplacement(currentPlayer)
 				if drawnTile != "" {
-					log.Printf("Bot %s 摸到了 %s", currentPlayer.Name, drawnTile)
+					log.Printf("Bot %s 摸到了 %s（手牌 %d 張 + 吃碰槓 %d 組 + 花牌 %d 張）",
+						currentPlayer.Name, drawnTile, len(currentPlayer.Hand), len(currentPlayer.Melds), len(currentPlayer.Flowers))
 					currentPlayer.Hand = append(currentPlayer.Hand, drawnTile)
+
+					// 如果摸牌過程中補了花牌，記錄並廣播
+					if len(currentPlayer.Flowers) > 0 {
+						log.Printf("Bot %s 的花牌: %v", currentPlayer.Name, currentPlayer.Flowers)
+						// TODO: 廣播花牌給前端
+					}
 				}
+			} else if totalTiles == 17 {
+				log.Printf("Bot %s 剛吃/碰/槓完，不摸牌直接出牌（手牌 %d 張 + 吃碰槓 %d 組）",
+					currentPlayer.Name, len(currentPlayer.Hand), len(currentPlayer.Melds))
+			} else if totalTiles < 16 {
+				log.Printf("警告：Bot %s 牌數異常！總牌數 %d（手牌 %d + 吃碰槓 %d 組），預期 16 或 17",
+					currentPlayer.Name, totalTiles, len(currentPlayer.Hand), len(currentPlayer.Melds))
 			}
 
 			if len(currentPlayer.Hand) > 0 {
@@ -342,12 +360,29 @@ func (h *Hub) drawForRealPlayer_needsLock(room *game.Room) {
 		return
 	}
 
-	// 只有在正常轮次（手牌16张）才摸牌
-	if len(currentPlayer.Hand) == 16 {
-		drawnTile := room.Game.DrawTile()
+	// 計算總牌數（手牌 + 已展示的吃碰槓）
+	totalTiles := len(currentPlayer.Hand) + len(currentPlayer.Melds)*3
+
+	// 只有在正常轮次（總牌數 16 張）才摸牌
+	// 如果剛吃/碰/槓完（總牌數 17 張），不摸牌直接等待出牌
+	if totalTiles == 16 {
+		// 記錄摸牌前的花牌數量
+		flowerCountBefore := len(currentPlayer.Flowers)
+
+		// 使用 DrawTileWithFlowerReplacement 自動處理花牌
+		drawnTile := room.Game.DrawTileWithFlowerReplacement(currentPlayer)
 		if drawnTile != "" {
-			log.Printf("玩家 %s 摸到了 %s", currentPlayer.Name, drawnTile)
+			log.Printf("玩家 %s 摸到了 %s（手牌 %d 張 + 吃碰槓 %d 組 + 花牌 %d 張）",
+				currentPlayer.Name, drawnTile, len(currentPlayer.Hand), len(currentPlayer.Melds), len(currentPlayer.Flowers))
 			currentPlayer.Hand = append(currentPlayer.Hand, drawnTile)
+
+			// 檢查是否有新的花牌
+			if len(currentPlayer.Flowers) > flowerCountBefore {
+				newFlowers := currentPlayer.Flowers[flowerCountBefore:]
+				log.Printf("玩家 %s 摸到花牌: %v，補牌後摸到 %s", currentPlayer.Name, newFlowers, drawnTile)
+				// 廣播花牌事件
+				h.BroadcastFlowerTiles(room, currentPlayer.ID, newFlowers)
+			}
 
 			// 广播摸牌事件
 			h.BroadcastDrawTile(room, currentPlayer.ID, drawnTile)
@@ -355,6 +390,12 @@ func (h *Hub) drawForRealPlayer_needsLock(room *game.Room) {
 			// 記錄摸牌後的手牌狀態
 			game.LogPlayerHand(currentPlayer, "摸牌: "+drawnTile)
 		}
+	} else if totalTiles == 17 {
+		log.Printf("玩家 %s 剛吃/碰/槓完，不摸牌等待出牌（手牌 %d 張 + 吃碰槓 %d 組）",
+			currentPlayer.Name, len(currentPlayer.Hand), len(currentPlayer.Melds))
+	} else if totalTiles < 16 {
+		log.Printf("警告：玩家 %s 牌數異常！總牌數 %d（手牌 %d + 吃碰槓 %d 組），預期 16 或 17",
+			currentPlayer.Name, totalTiles, len(currentPlayer.Hand), len(currentPlayer.Melds))
 	}
 }
 
@@ -648,6 +689,35 @@ func (h *Hub) BroadcastKongAction(room *game.Room, playerID string, meld game.Me
 		case client.Send <- msgBytes:
 		default:
 			log.Printf("警告：客户端 %s 的发送缓冲区已满，广播杠牌消息被丢弃", client.UserName)
+		}
+	}
+}
+
+// BroadcastFlowerTiles 广播花牌事件
+func (h *Hub) BroadcastFlowerTiles(room *game.Room, playerID string, flowers []string) {
+	message := map[string]interface{}{
+		"type": "player_action",
+		"data": map[string]interface{}{
+			"playerId": playerID,
+			"action":   "flower",
+			"flowers":  flowers,
+		},
+	}
+
+	msgBytes, _ := json.Marshal(message)
+
+	log.Printf("广播玩家花牌: %s 摸到花牌 %v", playerID, flowers)
+
+	// 向所有玩家发送
+	for _, clientInterface := range room.Clients {
+		client, ok := clientInterface.(*Client)
+		if !ok {
+			continue
+		}
+		select {
+		case client.Send <- msgBytes:
+		default:
+			log.Printf("警告：客户端 %s 的发送缓冲区已满，广播花牌消息被丢弃", client.UserName)
 		}
 	}
 }
