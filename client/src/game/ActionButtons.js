@@ -14,11 +14,12 @@ export class ActionButtons {
 
     // 按鈕配置
     this.buttonConfigs = [
-      { action: 'pong', image: '/assets/ui/Pong.png', x: -180 },
-      { action: 'chow', image: '/assets/ui/Chow.png', x: -60 },
-      { action: 'kong', image: '/assets/ui/Kong.png', x: 60 },
-      { action: 'hu', image: '/assets/ui/Hu.png', x: 180 },
-      { action: 'cancel', image: '/assets/ui/playcancel.png', x: 300 }
+      { action: 'pong', image: '/assets/ui/Pong.png', x: -240 },
+      { action: 'chow', image: '/assets/ui/Chow.png', x: -120 },
+      { action: 'kong', image: '/assets/ui/Kong.png', x: 0 },
+      { action: 'ready', image: '/assets/ui/ting.png', x: 120 },
+      { action: 'hu', image: '/assets/ui/Hu.png', x: 240 },
+      { action: 'cancel', image: '/assets/ui/playcancel.png', x: 360 }
     ];
 
     this.init();

@@ -32,6 +32,66 @@ type Player struct {
 	WinningTiles []string // 听牌所胡的牌
 }
 
+// LogPlayerHand 記錄單個玩家的手牌狀態（用於 debug）
+func LogPlayerHand(player *Player, action string) {
+	if player == nil {
+		return
+	}
+
+	// 複製手牌並排序
+	sortedHand := make([]string, len(player.Hand))
+	copy(sortedHand, player.Hand)
+	sort.Strings(sortedHand)
+
+	// 格式化吃碰槓牌組
+	melds := make([]string, 0)
+	for _, meld := range player.Melds {
+		melds = append(melds, meld.Type+": "+formatTiles(meld.Tiles))
+	}
+
+	actionPrefix := ""
+	if action != "" {
+		actionPrefix = "[" + action + "] "
+	}
+
+	log.Printf("📋 %s玩家 %s (位置%d)", actionPrefix, player.Name, player.Position)
+	log.Printf("   手牌 (%d張): %s", len(sortedHand), formatTiles(sortedHand))
+	if len(melds) > 0 {
+		log.Printf("   吃碰槓: %v", melds)
+	}
+	totalTiles := len(sortedHand) + len(player.Melds)*3
+	log.Printf("   總牌數: %d張", totalTiles)
+}
+
+// LogAllPlayersHands 記錄所有玩家的手牌狀態
+func LogAllPlayersHands(room *Room, action string) {
+	log.Println("============================================================")
+	if action != "" {
+		log.Printf("📊 %s", action)
+	} else {
+		log.Println("📊 當前遊戲狀態")
+	}
+	log.Println("============================================================")
+
+	for _, player := range room.Players {
+		LogPlayerHand(player, "")
+	}
+
+	log.Println("============================================================")
+}
+
+// formatTiles 格式化牌列表為字符串
+func formatTiles(tiles []string) string {
+	result := ""
+	for i, tile := range tiles {
+		if i > 0 {
+			result += " "
+		}
+		result += tile
+	}
+	return result
+}
+
 // NewRoom 创建新房间
 func NewRoom(id string) *Room {
 	return &Room{
@@ -87,6 +147,9 @@ func (r *Room) StartGame() {
 func (r *Room) DealTiles() {
 	if r.Game != nil {
 		r.Game.DealTiles()
+
+		// 📋 記錄所有玩家的初始手牌
+		LogAllPlayersHands(r, "遊戲開始 - 所有玩家初始手牌")
 	}
 }
 
@@ -196,6 +259,9 @@ func (r *Room) HandleDiscard(userID, tile string) {
 	// 記錄最後打牌的玩家（用於檢查吃牌資格）
 	r.LastDiscardPlayer = player.Position
 
+	// 📋 記錄打牌後的手牌狀態
+	LogPlayerHand(player, "打牌: "+tile)
+
 	// 切换到下一个玩家
 	r.NextTurn()
 	log.Printf("轮到下一位玩家（位置: %d）", r.CurrentTurn)
@@ -253,6 +319,9 @@ func (r *Room) HandlePong(userID, tile string) bool {
 	// 碰牌后轮到该玩家出牌
 	r.CurrentTurn = player.Position
 	log.Printf("碰牌成功，轮到玩家 %s 出牌", player.Name)
+
+	// 📋 記錄碰牌後的手牌狀態
+	LogPlayerHand(player, "碰牌: "+tile)
 
 	return true
 }
@@ -338,6 +407,9 @@ func (r *Room) HandleChow(userID, tile string, chowTiles []string) bool {
 	// 吃牌后轮到该玩家出牌
 	r.CurrentTurn = player.Position
 	log.Printf("吃牌成功，轮到玩家 %s 出牌", player.Name)
+
+	// 📋 記錄吃牌後的手牌狀態
+	LogPlayerHand(player, "吃牌: "+formatTiles(chowTiles))
 
 	return true
 }
@@ -465,6 +537,13 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
 	// 杠牌后轮到该玩家出牌
 	r.CurrentTurn = player.Position
 	log.Printf("杠牌成功，轮到玩家 %s 出牌", player.Name)
+
+	// 📋 記錄槓牌後的手牌狀態
+	kongType := "kong"
+	if isConcealed {
+		kongType = "kong_concealed"
+	}
+	LogPlayerHand(player, "槓牌: "+tile+" ("+kongType+")")
 
 	return true
 }

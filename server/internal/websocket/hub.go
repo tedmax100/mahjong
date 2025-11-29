@@ -5,6 +5,7 @@ import (
 	"log"
 	"mahjong/internal/game"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 )
@@ -154,7 +155,7 @@ func (h *Hub) startGame(room *game.Room) {
 	h.dealTiles(room)
 
 	// 检查第一个回合是否是Bot
-	h.CheckAndPlayBotTurn(room)
+	h.CheckAndPlayBotTurn(room, false) // 游戏开始时庄家直接打牌，不应该有延迟
 }
 
 // dealTiles 发牌
@@ -240,7 +241,7 @@ func (h *Hub) addBot(room *game.Room) {
 }
 
 // CheckAndPlayBotTurn 检查并执行Bot回合
-func (h *Hub) CheckAndPlayBotTurn(room *game.Room) {
+func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 	if room == nil || room.Game == nil || !room.GameStarted {
 		return
 	}
@@ -254,7 +255,33 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room) {
 	currentTurnAtCheck := room.CurrentTurn
 	h.mu.RUnlock()
 
-	if len(currentPlayer.ID) > 4 && currentPlayer.ID[:4] == "bot_" {
+	// 如果是真实玩家，根据情况决定是否延迟发牌
+	if !strings.HasPrefix(currentPlayer.ID, "bot_") {
+		if withDelay {
+			go func() {
+				log.Printf("检测到玩家 %s (位置 %d) 有可执行动作，开始 5 秒等待...", currentPlayer.Name, currentTurnAtCheck)
+				time.Sleep(5 * time.Second)
+				h.mu.Lock()
+				defer h.mu.Unlock()
+				log.Printf("玩家 %s 的等待时间结束。当前轮次: %d, 期望轮次: %d", currentPlayer.Name, room.CurrentTurn, currentTurnAtCheck)
+				if room.GameStarted && room.CurrentTurn == currentTurnAtCheck {
+					log.Printf("轮次未变，为玩家 %s 执行摸牌", currentPlayer.Name)
+					h.drawForRealPlayer_needsLock(room)
+				} else {
+					log.Printf("轮次已从 %d 变为 %d，取消为玩家 %s 的自动摸牌", currentTurnAtCheck, room.CurrentTurn, currentPlayer.Name)
+				}
+			}()
+		} else {
+			log.Printf("没有检测到可执行动作，立即为玩家 %s 执行摸牌", currentPlayer.Name)
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			h.drawForRealPlayer_needsLock(room)
+		}
+		return
+	}
+
+	// Bot 的逻辑
+	if strings.HasPrefix(currentPlayer.ID, "bot_") {
 		go func() {
 			log.Printf("Bot %s 的回合已开始，等待出牌...", currentPlayer.Name)
 			time.Sleep(time.Duration(1000+rand.Intn(1000)) * time.Millisecond)
@@ -288,12 +315,105 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room) {
 
 				actionTaken := h.botsReactToDiscard(room, tileToDiscard, discarderPosition)
 				if !actionTaken {
-					h.CheckAndPlayBotTurn(room)
+					hasHumanAction := h.HasHumanAction(room, tileToDiscard, discarderPosition)
+					h.CheckAndPlayBotTurn(room, hasHumanAction)
 				}
 			} else {
 				h.mu.Unlock()
 			}
 		}()
+	}
+}
+
+// drawForRealPlayer_needsLock 为真实玩家自动发牌（需要持有锁）
+func (h *Hub) drawForRealPlayer_needsLock(room *game.Room) {
+	if room == nil || room.Game == nil || !room.GameStarted {
+		return
+	}
+
+	if room.CurrentTurn < 0 || room.CurrentTurn >= len(room.Players) {
+		return
+	}
+
+	currentPlayer := room.Players[room.CurrentTurn]
+
+	// 确认是真实玩家
+	if strings.HasPrefix(currentPlayer.ID, "bot_") {
+		return
+	}
+
+	// 只有在正常轮次（手牌16张）才摸牌
+	if len(currentPlayer.Hand) == 16 {
+		drawnTile := room.Game.DrawTile()
+		if drawnTile != "" {
+			log.Printf("玩家 %s 摸到了 %s", currentPlayer.Name, drawnTile)
+			currentPlayer.Hand = append(currentPlayer.Hand, drawnTile)
+
+			// 广播摸牌事件
+			h.BroadcastDrawTile(room, currentPlayer.ID, drawnTile)
+
+			// 記錄摸牌後的手牌狀態
+			game.LogPlayerHand(currentPlayer, "摸牌: "+drawnTile)
+		}
+	}
+}
+
+// HasHumanAction 检查是否有任何人类玩家可以对弃牌做出反应
+func (h *Hub) HasHumanAction(room *game.Room, discardedTile string, discarderPosition int) bool {
+	if room == nil || room.Game == nil {
+		return false
+	}
+
+	for _, p := range room.Players {
+		// 只检查人类玩家，且不是出牌者自己
+		if strings.HasPrefix(p.ID, "bot_") || p.Position == discarderPosition {
+			continue
+		}
+
+		// 检查碰或杠
+		if room.Game.CanPong(p.Hand, discardedTile) {
+			return true
+		}
+
+		// 检查吃（只能是上家）
+		isPreviousPlayer := (p.Position + 3) % 4 == discarderPosition
+		if isPreviousPlayer {
+			if chowCombinations := room.Game.CanChow(p.Hand, discardedTile); len(chowCombinations) > 0 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// BroadcastDrawTile 广播摸牌事件
+func (h *Hub) BroadcastDrawTile(room *game.Room, playerID, tile string) {
+	message := map[string]interface{}{
+		"type": "player_action",
+		"data": map[string]interface{}{
+			"playerId":    playerID,
+			"action":      "draw",
+			"tile":        tile,
+			"currentTurn": room.CurrentTurn,
+		},
+	}
+
+	msgBytes, _ := json.Marshal(message)
+
+	log.Printf("广播玩家摸牌: %s 摸 %s (当前轮次: %d)", playerID, tile, room.CurrentTurn)
+
+	// 向所有玩家发送
+	for _, clientInterface := range room.Clients {
+		client, ok := clientInterface.(*Client)
+		if !ok {
+			continue
+		}
+		select {
+		case client.Send <- msgBytes:
+		default:
+			log.Printf("警告：客户端 %s 的发送缓冲区已满，摸牌消息被丢弃", client.UserName)
+		}
 	}
 }
 
@@ -385,7 +505,7 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 			} else {
 				h.BroadcastPlayerAction(room, bestBot.ID, actionToBroadcast, discardedTile)
 			}
-			h.CheckAndPlayBotTurn(room) // Now trigger the bot's own turn
+			h.CheckAndPlayBotTurn(room, false) // Now trigger the bot's own turn, no delay
 			return true
 		}
 	}

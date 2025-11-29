@@ -17,5 +17,13 @@ export default defineConfig({
   build: {
     outDir: '../dist/public',
     emptyOutDir: true
+  },
+  test: {
+    environment: 'happy-dom',
+    globals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html']
+    }
   }
 });
