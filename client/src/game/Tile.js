@@ -11,6 +11,8 @@ export class Tile {
     this.container = new Container();
     this.baseSprite = null; // 牌底
     this.sprite = null; // 牌面
+    this.isHovered = false; // 追蹤懸停狀態
+    this.hoverOffset = 15; // 懸停時上移的像素
 
     this.create();
   }
@@ -42,6 +44,11 @@ export class Tile {
     this.sprite.on('pointerover', () => this.onHover());
     this.sprite.on('pointerout', () => this.onHoverOut());
 
+    // 針對筒子微調
+    if (this.type.startsWith('tong-')) {
+      this.sprite.y = 8; // 往下移8個像素
+    }
+
     this.container.addChild(this.sprite);
   }
 
@@ -51,15 +58,19 @@ export class Tile {
   }
 
   onHover() {
-    // 鼠标悬停 - 牌上移
-    if (this.faceUp) {
-      this.sprite.y = -10;
+    // 鼠标悬停 - 整張牌上移
+    if (this.faceUp && !this.isHovered) {
+      this.container.y -= this.hoverOffset;
+      this.isHovered = true;
     }
   }
 
   onHoverOut() {
     // 鼠标离开 - 恢复位置
-    this.sprite.y = 0;
+    if (this.faceUp && this.isHovered) {
+      this.container.y += this.hoverOffset;
+      this.isHovered = false;
+    }
   }
 
   emit(event, data) {
@@ -80,8 +91,14 @@ export class Tile {
   }
 
   setPosition(x, y) {
-    this.container.x = x;
-    this.container.y = y;
+    // 如果正在懸停，需要考慮偏移量
+    if (this.isHovered) {
+      this.container.x = x;
+      this.container.y = y - this.hoverOffset;
+    } else {
+      this.container.x = x;
+      this.container.y = y;
+    }
   }
 
   setRotation(angle) {

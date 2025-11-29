@@ -14,6 +14,8 @@ export class Player {
     this.container = new Container();
     this.tiles = [];
     this.discardedTiles = [];
+    this.melds = []; // 吃/碰/槓的牌組 [{type: 'chow'|'pong'|'kong', tiles: [...]}]
+    this.meldsContainer = new Container(); // 用於顯示吃/碰/槓牌組的容器
     this.name = '';
     this.score = 1000;
     this.isInteractive = false; // 是否可以交互（轮到自己）
@@ -21,6 +23,7 @@ export class Player {
     this.infoText = null;
 
     this.createInfoDisplay();
+    this.container.addChild(this.meldsContainer);
   }
 
   createInfoDisplay() {
@@ -54,7 +57,7 @@ export class Player {
     switch (this.position) {
       case 'bottom':
         bg.x = this.screenWidth / 2 - 60;
-        bg.y = this.screenHeight - 170;  // 更靠近底部（从 200 改为 170）
+        bg.y = this.screenHeight - 250; // Move up
         break;
       case 'right':
         bg.x = this.screenWidth - 140;
@@ -62,10 +65,10 @@ export class Player {
         break;
       case 'top':
         bg.x = this.screenWidth / 2 - 60;
-        bg.y = 10;  // 更靠近顶部（从 20 改为 10）
+        bg.y = 10;
         break;
       case 'left':
-        bg.x = 10;  // 更靠近左边（从 20 改为 10）
+        bg.x = 10;
         bg.y = this.screenHeight / 2 - 30;
         break;
     }
@@ -177,7 +180,7 @@ export class Player {
 
         tile.setPosition(
           startX + index * (tileWidth + spacing),
-          this.screenHeight - 120  // 更靠近底部（从 150 改为 120）
+          this.screenHeight - 180  // 更靠近底部
         );
         break;
 
@@ -368,6 +371,120 @@ export class Player {
         // 恢復透明度
         tile.container.alpha = 1.0;
       });
+    }
+  }
+
+  /**
+   * 添加吃/碰/槓牌組
+   * @param {Object} meldData - {type: 'chow'|'pong'|'kong', tiles: [...]}
+   * @param {Object} tileAssets - 牌面素材
+   */
+  async addMeld(meldData, tileAssets) {
+    // Note: meldData keys from the server are capitalized (Type, Tiles), but local ones might be lowercase.
+    const meldType = meldData.Type || meldData.type;
+    const meldTiles = meldData.Tiles || meldData.tiles;
+
+    // Handle promotion from pong to kong to prevent duplicate melds
+    if (meldType === 'kong_promoted') {
+      const tile = meldTiles[0];
+      const pongIndex = this.melds.findIndex(m => {
+        const mType = m.Type || m.type;
+        const mTiles = m.Tiles || m.tiles;
+        return mType === 'pong' && mTiles[0] === tile;
+      });
+
+      if (pongIndex !== -1) {
+        // Replace the existing pong with the new promoted kong data
+        this.melds[pongIndex] = meldData;
+        console.log(`✅ Player ${this.id} promoted pong to kong for tile: ${tile}`);
+      } else {
+        // This case indicates a logic error upstream, but we add the meld to avoid data loss.
+        console.error(`Could not find a pong to promote for tile ${tile}. Adding kong as a new meld.`);
+        this.melds.push(meldData);
+      }
+    } else {
+      // For chow, pong, or other new kong types, just add the new meld
+      this.melds.push(meldData);
+    }
+
+    await this.displayMelds(tileAssets);
+  }
+
+  /**
+   * 顯示所有吃/碰/槓牌組
+   */
+  async displayMelds(tileAssets) {
+    this.meldsContainer.removeChildren();
+
+    const tileWidth = 60;
+    const tileHeight = 80;
+    const groupSpacing = 20; // 增加牌組間距
+    let currentOffset = 0;
+
+    const { Sprite, Container, Assets } = await import('pixi.js');
+    const baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
+
+    for (const meld of this.melds) {
+      const meldGroup = new Container();
+
+      // Create tiles with bases
+      for (let i = 0; i < meld.tiles.length; i++) {
+        const tileType = meld.tiles[i];
+        const tileContainer = new Container();
+        const baseSprite = new Sprite(baseTexture);
+        tileContainer.addChild(baseSprite);
+
+        const texture = tileAssets[tileType] || tileAssets['back'];
+        const tileSprite = new Sprite(texture);
+        if (tileType.startsWith('tong-')) {
+            tileSprite.y = 5;
+        }
+        tileContainer.addChild(tileSprite);
+        
+        const isKongTile = (meld.type === 'kong' || meld.type === 'kong_promoted') && i === 3;
+
+        if (isKongTile) {
+            tileContainer.x = tileWidth + 5; // Use middle tile's position
+            tileContainer.y = -tileHeight * 0.1;
+        } else {
+            tileContainer.x = i * (tileWidth + 5); // Add spacing
+        }
+
+        meldGroup.addChild(tileContainer);
+      }
+      
+      const groupWidth = (meld.tiles.length === 4 ? 3 : meld.tiles.length) * (tileWidth + 5);
+
+      switch (this.position) {
+        case 'bottom':
+          meldGroup.scale.set(0.8);
+          meldGroup.x = this.screenWidth - 180 - currentOffset;
+          meldGroup.y = this.screenHeight - 120;
+          currentOffset += groupWidth * 0.8 + groupSpacing;
+          break;
+        case 'right':
+          meldGroup.scale.set(0.7);
+          meldGroup.x = this.screenWidth - 80;
+          meldGroup.y = 150 + currentOffset;
+          meldGroup.rotation = Math.PI / 2;
+          currentOffset += groupWidth * 0.7 + groupSpacing;
+          break;
+        case 'top':
+           meldGroup.scale.set(0.8);
+          meldGroup.x = 150 + currentOffset;
+          meldGroup.y = 100;
+          meldGroup.rotation = Math.PI;
+          currentOffset += groupWidth * 0.8 + groupSpacing;
+          break;
+        case 'left':
+          meldGroup.scale.set(0.7);
+          meldGroup.x = 80;
+          meldGroup.y = this.screenHeight - 150 - currentOffset;
+          meldGroup.rotation = -Math.PI / 2;
+          currentOffset += groupWidth * 0.7 + groupSpacing;
+          break;
+      }
+      this.meldsContainer.addChild(meldGroup);
     }
   }
 

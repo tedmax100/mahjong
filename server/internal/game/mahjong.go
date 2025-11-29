@@ -141,6 +141,16 @@ func (g *MahjongGame) DrawTile() string {
 	return ""
 }
 
+// DrawTileFromEnd 从牌山尾部摸一张牌（用于补杠）
+func (g *MahjongGame) DrawTileFromEnd() string {
+	if len(g.Deck) > 0 {
+		tile := g.Deck[len(g.Deck)-1]
+		g.Deck = g.Deck[:len(g.Deck)-1]
+		return tile
+	}
+	return ""
+}
+
 // DrawTileWithFlowerReplacement 摸牌（自动处理花牌补牌）
 func (g *MahjongGame) DrawTileWithFlowerReplacement(player *Player) string {
 	// 检查是否流局
@@ -218,6 +228,29 @@ func (g *MahjongGame) CanKong(hand []string, tile string) bool {
 		}
 	}
 	return count >= 3
+}
+
+// CanExposedKong 检查是否可以明杠（包含加杠）
+func (g *MahjongGame) CanExposedKong(player *Player, tile string) bool {
+	// 检查手牌中是否有三张
+	handCount := 0
+	for _, t := range player.Hand {
+		if t == tile {
+			handCount++
+		}
+	}
+	if handCount >= 3 {
+		return true
+	}
+
+	// 检查是否已有碰牌，可以加杠
+	for _, meld := range player.Melds {
+		if meld.Type == "pong" && meld.Tiles[0] == tile {
+			return true
+		}
+	}
+
+	return false
 }
 
 // CanChow 检查是否可以吃牌（只能吃上家打出的牌）
@@ -417,4 +450,141 @@ func parseTile(tile string) (string, int) {
 	typ := tile[:len(tile)-2]
 	num := int(tile[len(tile)-1] - '0')
 	return typ, num
+}
+
+// TingResult holds the result of a Ting check.
+type TingResult struct {
+	IsTing       bool
+	WinningTiles []string
+}
+
+// getUniqueTileTypes returns a slice of all 34 unique tile types.
+func (g *MahjongGame) getUniqueTileTypes() []string {
+	return []string{
+		"wan-1", "wan-2", "wan-3", "wan-4", "wan-5", "wan-6", "wan-7", "wan-8", "wan-9",
+		"tong-1", "tong-2", "tong-3", "tong-4", "tong-5", "tong-6", "tong-7", "tong-8", "tong-9",
+		"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5", "tiao-6", "tiao-7", "tiao-8", "tiao-9",
+		"dong", "nan", "xi", "bei",
+		"zhong", "fa", "bai",
+	}
+}
+
+// CheckTing determines if a hand is one tile away from winning (Ting).
+func (g *MahjongGame) CheckTing(hand []string, melds []Meld) TingResult {
+	// A hand must have a specific number of tiles to be in a Ting state.
+	// For a 16-tile hand, it's 4 sets + 1 pair = 17 tiles.
+	// A Ting hand has 16 tiles (or 13, 10, 7, 4), which is (N*3 + 1).
+	// This check is a simplification and might not cover all cases, but is good for a start.
+	if len(hand)%3 != 1 {
+		return TingResult{IsTing: false}
+	}
+
+	winningTiles := make([]string, 0)
+	checkedTiles := make(map[string]bool)
+
+	allTileTypes := g.getUniqueTileTypes()
+
+	for _, potentialTile := range allTileTypes {
+		// Avoid re-checking the same tile
+		if checkedTiles[potentialTile] {
+			continue
+		}
+
+		tempHand := append([]string{}, hand...) // Create a copy
+		tempHand = append(tempHand, potentialTile)
+
+		if g.CanHu(tempHand, melds) {
+			winningTiles = append(winningTiles, potentialTile)
+		}
+		checkedTiles[potentialTile] = true
+	}
+
+	return TingResult{
+		IsTing:       len(winningTiles) > 0,
+		WinningTiles: winningTiles,
+	}
+}
+
+
+// ChooseDiscardAI 为Bot选择要打出的牌
+func (g *MahjongGame) ChooseDiscardAI(hand []string) string {
+	if len(hand) == 0 {
+		return ""
+	}
+
+	tileCounts := make(map[string]int)
+	for _, tile := range hand {
+		tileCounts[tile]++
+	}
+
+	// 评估每张牌的价值，分数越低越优先打出
+	// 简单的AI：孤张 > 边张 > 中张
+	// 字牌孤张最优先
+	var bestTileToDiscard string
+	lowestScore := 1000
+
+	// 检查孤立的字牌
+	for _, tile := range hand {
+		if isHonorTile(tile) && tileCounts[tile] == 1 {
+			if 10 < lowestScore {
+				lowestScore = 10
+				bestTileToDiscard = tile
+			}
+		}
+	}
+	if bestTileToDiscard != "" {
+		return bestTileToDiscard
+	}
+
+	// 检查孤立的幺九牌 (1和9)
+	for _, tile := range hand {
+		typ, num := parseTile(tile)
+		if num == 1 || num == 9 {
+			if tileCounts[tile] == 1 {
+				// 检查邻近牌
+				hasNeighbor := false
+				if num == 1 && (tileCounts[tileID(typ, 2)] > 0) {
+					hasNeighbor = true
+				}
+				if num == 9 && (tileCounts[tileID(typ, 8)] > 0) {
+					hasNeighbor = true
+				}
+
+				if !hasNeighbor && 20 < lowestScore {
+					lowestScore = 20
+					bestTileToDiscard = tile
+				}
+			}
+		}
+	}
+	if bestTileToDiscard != "" {
+		return bestTileToDiscard
+	}
+
+	// 检查其他孤立的牌
+	for _, tile := range hand {
+		typ, num := parseTile(tile)
+		if num > 1 && num < 9 {
+			if tileCounts[tile] == 1 {
+				hasNeighbor := (tileCounts[tileID(typ, num-1)] > 0) || (tileCounts[tileID(typ, num+1)] > 0)
+				if !hasNeighbor && 30 < lowestScore {
+					lowestScore = 30
+					bestTileToDiscard = tile
+				}
+			}
+		}
+	}
+	if bestTileToDiscard != "" {
+		return bestTileToDiscard
+	}
+
+	// 如果没有孤张，则打出一张不成对的牌
+	for _, tile := range hand {
+		if tileCounts[tile] == 1 {
+			return tile
+		}
+	}
+
+	// 如果都是对子或刻子，打出最后一张
+	return hand[len(hand)-1]
 }

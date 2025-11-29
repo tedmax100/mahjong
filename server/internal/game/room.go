@@ -4,16 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"reflect"
+	"sort"
 )
 
 // Room 代表一个游戏房间
 type Room struct {
-	ID          string
-	Players     []*Player
-	Clients     map[string]interface{} // 存储WebSocket客户端
-	Game        *MahjongGame
-	GameStarted bool
-	CurrentTurn int // 当前轮到谁（0-3）
+	ID              string
+	Players         []*Player
+	Clients         map[string]interface{} // 存储WebSocket客户端
+	Game            *MahjongGame
+	GameStarted     bool
+	CurrentTurn     int // 当前轮到谁（0-3）
+	LastDiscardPlayer int // 最後打牌的玩家位置（用於檢查吃牌資格）
 }
 
 // Player 代表一个玩家
@@ -25,6 +28,8 @@ type Player struct {
 	Score    int
 	Melds    []Meld   // 已展示的牌组（碰、杠等）
 	Flowers  []string // 花牌
+	IsTing   bool     // 玩家是否已听牌
+	WinningTiles []string // 听牌所胡的牌
 }
 
 // NewRoom 创建新房间
@@ -188,6 +193,9 @@ func (r *Room) HandleDiscard(userID, tile string) {
 		}
 	}
 
+	// 記錄最後打牌的玩家（用於檢查吃牌資格）
+	r.LastDiscardPlayer = player.Position
+
 	// 切换到下一个玩家
 	r.NextTurn()
 	log.Printf("轮到下一位玩家（位置: %d）", r.CurrentTurn)
@@ -272,9 +280,9 @@ func (r *Room) HandleChow(userID, tile string, chowTiles []string) bool {
 	// 检查是否是上家打出的牌
 	// 台湾麻将规则：只能吃上家的牌
 	previousPlayer := (player.Position + 3) % 4 // 上家位置
-	if r.CurrentTurn != previousPlayer {
-		log.Printf("玩家 %s 只能吃上家的牌（当前出牌者位置: %d，上家位置: %d）",
-			player.Name, r.CurrentTurn, previousPlayer)
+	if r.LastDiscardPlayer != previousPlayer {
+		log.Printf("玩家 %s 只能吃上家的牌（最後出牌者位置: %d，上家位置: %d）",
+			player.Name, r.LastDiscardPlayer, previousPlayer)
 		return false
 	}
 
@@ -339,29 +347,16 @@ func isSameCombination(combo1, combo2 []string) bool {
 	if len(combo1) != len(combo2) {
 		return false
 	}
-
 	// 创建副本并排序
 	c1 := make([]string, len(combo1))
-	c2 := make([]string, len(combo2))
 	copy(c1, combo1)
+	sort.Strings(c1)
+
+	c2 := make([]string, len(combo2))
 	copy(c2, combo2)
+	sort.Strings(c2)
 
-	// 简单的排序和比较
-	for i := 0; i < len(c1); i++ {
-		found := false
-		for j := 0; j < len(c2); j++ {
-			if c1[i] == c2[j] {
-				found = true
-				c2[j] = "" // 标记已匹配
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-
-	return true
+	return reflect.DeepEqual(c1, c2)
 }
 
 // HandleKong 处理杠牌
@@ -416,40 +411,55 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
 		})
 
 	} else {
-		// 明杠：手牌中有3张，加上别人打出的1张
-		if !r.Game.CanKong(player.Hand, tile) {
+		// 明杠：手牌中有3张，或已碰出，加上别人打出的1张
+		if !r.Game.CanExposedKong(player, tile) {
 			log.Printf("玩家 %s 无法明杠 %s", player.Name, tile)
 			return false
 		}
 
-		log.Printf("玩家 %s 明杠 %s", player.Name, tile)
-
-		// 从手牌中移除3张
-		removed := 0
-		for i := len(player.Hand) - 1; i >= 0 && removed < 3; i-- {
-			if player.Hand[i] == tile {
-				player.Hand = append(player.Hand[:i], player.Hand[i+1:]...)
-				removed++
+		// 判断是加杠还是明杠
+		isPromotedKong := false
+		for i, meld := range player.Melds {
+			if meld.Type == "pong" && meld.Tiles[0] == tile {
+				log.Printf("玩家 %s 加杠 %s", player.Name, tile)
+				player.Melds[i].Type = "kong_promoted"
+				player.Melds[i].Tiles = append(player.Melds[i].Tiles, tile)
+				isPromotedKong = true
+				break
 			}
+		}
+
+		if !isPromotedKong {
+			log.Printf("玩家 %s 明杠 %s", player.Name, tile)
+			// 从手牌中移除3张
+			removed := 0
+			for i := len(player.Hand) - 1; i >= 0 && removed < 3; i-- {
+				if player.Hand[i] == tile {
+					player.Hand = append(player.Hand[:i], player.Hand[i+1:]...)
+					removed++
+				}
+			}
+			// 添加到已展示的牌组
+			player.Melds = append(player.Melds, Meld{
+				Type:  "kong_exposed",
+				Tiles: []string{tile, tile, tile, tile},
+			})
 		}
 
 		// 从弃牌堆中移除最后一张
 		if len(r.Game.DiscardPile) > 0 {
 			r.Game.DiscardPile = r.Game.DiscardPile[:len(r.Game.DiscardPile)-1]
 		}
-
-		// 添加到已展示的牌组
-		player.Melds = append(player.Melds, Meld{
-			Type:  "kong_exposed",
-			Tiles: []string{tile, tile, tile, tile},
-		})
 	}
 
 	// 杠牌后需要补牌
 	if len(r.Game.Deck) > 0 {
-		drawnTile := r.Game.DrawTile()
-		player.Hand = append(player.Hand, drawnTile)
-		log.Printf("玩家 %s 杠牌后补牌: %s", player.Name, drawnTile)
+		// 杠牌补牌需要从牌尾拿
+		drawnTile := r.Game.DrawTileFromEnd()
+		if drawnTile != "" {
+			player.Hand = append(player.Hand, drawnTile)
+			log.Printf("玩家 %s 杠牌后补牌: %s", player.Name, drawnTile)
+		}
 	}
 
 	// 杠牌后轮到该玩家出牌
