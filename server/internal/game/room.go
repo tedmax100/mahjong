@@ -240,7 +240,7 @@ func (r *Room) GetDealTilesMessage(playerIndex int) []byte {
 }
 
 // HandleDiscard 处理出牌
-func (r *Room) HandleDiscard(userID, tile string) {
+func (r *Room) HandleDiscard(userID, tile string) bool {
 	// 找到玩家
 	var player *Player
 	for _, p := range r.Players {
@@ -252,13 +252,27 @@ func (r *Room) HandleDiscard(userID, tile string) {
 
 	if player == nil {
 		log.Printf("未找到玩家: %s", userID)
-		return
+		return false
 	}
 
 	// 检查是否轮到该玩家
 	if player.Position != r.CurrentTurn {
 		log.Printf("还没轮到玩家 %s（当前回合: %d，玩家位置: %d）", player.Name, r.CurrentTurn, player.Position)
-		return
+		return false
+	}
+
+	// 检查是否正在等待动作回应（如胡、碰、杠等）
+	if r.IsWaitingForActions {
+		log.Printf("❌ 玩家 %s 无法打牌：正在等待动作回应（请选择胡/碰/杠/过）", player.Name)
+		return false
+	}
+
+	// 检查手牌数量是否正确（应该有17张牌才能打牌）
+	totalTiles := len(player.Hand) + len(player.Melds)*3
+	if totalTiles != 17 {
+		log.Printf("❌ 玩家 %s 手牌数量错误！总牌数 %d（手牌 %d + 吃碰槓 %d 組），预期 17 张，拒绝打牌",
+			player.Name, totalTiles, len(player.Hand), len(player.Melds))
+		return false
 	}
 
 	log.Printf("玩家 %s 打出 %s", player.Name, tile)
@@ -280,7 +294,7 @@ func (r *Room) HandleDiscard(userID, tile string) {
 		if r.Game.CheckDraw() {
 			log.Printf("流局！牌山剩余 %d 张", r.Game.GetRemainingTiles())
 			r.GameStarted = false
-			return
+			return true // 返回 true 表示流局
 		}
 	}
 
@@ -295,6 +309,8 @@ func (r *Room) HandleDiscard(userID, tile string) {
 	// TODO: 當實作完整優先權處理後，這裡應該等待其他玩家響應後再切換
 	r.NextTurn()
 	log.Printf("轮到下一位玩家（位置: %d）", r.CurrentTurn)
+
+	return false // 返回 false 表示没有流局
 }
 
 // NextTurn 切换到下一个玩家

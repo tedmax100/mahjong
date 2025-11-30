@@ -157,9 +157,10 @@ func TestFlowerTilesInInitialDeal(t *testing.T) {
 	}
 
 	room.StartGame()
+	room.DealTiles() // 發牌
 
 	t.Run("發牌時遇到花牌應該自動補牌", func(t *testing.T) {
-		// 發牌已經在 StartGame 中完成
+		// 發牌已經完成
 		// 檢查是否有玩家摸到花牌
 		totalFlowers := 0
 		for _, player := range room.Players {

@@ -259,8 +259,8 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 	if !strings.HasPrefix(currentPlayer.ID, "bot_") {
 		if withDelay {
 			go func() {
-				log.Printf("检测到玩家 %s (位置 %d) 有可执行动作，开始 15 秒等待...", currentPlayer.Name, currentTurnAtCheck)
-				time.Sleep(15 * time.Second)
+				log.Printf("检测到玩家 %s (位置 %d) 有可执行动作，开始 30 秒等待...", currentPlayer.Name, currentTurnAtCheck)
+				time.Sleep(30 * time.Second)
 				h.mu.Lock()
 				defer h.mu.Unlock()
 				log.Printf("玩家 %s 的等待时间结束。当前轮次: %d, 期望轮次: %d", currentPlayer.Name, room.CurrentTurn, currentTurnAtCheck)
@@ -328,8 +328,14 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 
 				log.Printf("Bot %s 自动打出 %s", currentPlayer.Name, tileToDiscard)
 
-				room.HandleDiscard(currentPlayer.ID, tileToDiscard)
+				isDraw := room.HandleDiscard(currentPlayer.ID, tileToDiscard)
 				h.BroadcastPlayerAction(room, currentPlayer.ID, "discard", tileToDiscard)
+
+				// 检查是否流局
+				if isDraw {
+					h.BroadcastGameDraw(room)
+					return
+				}
 
 				actionTaken := h.botsReactToDiscard(room, tileToDiscard, discarderPosition)
 				if !actionTaken {
@@ -363,9 +369,13 @@ func (h *Hub) drawForRealPlayer_needsLock(room *game.Room) {
 	// 計算總牌數（手牌 + 已展示的吃碰槓）
 	totalTiles := len(currentPlayer.Hand) + len(currentPlayer.Melds)*3
 
-	// 只有在正常轮次（總牌數 16 張）才摸牌
-	// 如果剛吃/碰/槓完（總牌數 17 張），不摸牌直接等待出牌
-	if totalTiles == 16 {
+	// 判斷是否需要摸牌：
+	// - 總牌數 15 或 16：需要摸牌（玩家已打牌，輪到回合需要摸牌）
+	// - 總牌數 17：剛吃/碰/槓完，不摸牌直接等待出牌
+	if totalTiles == 17 {
+		log.Printf("玩家 %s 剛吃/碰/槓完，不摸牌等待出牌（手牌 %d 張 + 吃碰槓 %d 組）",
+			currentPlayer.Name, len(currentPlayer.Hand), len(currentPlayer.Melds))
+	} else if totalTiles == 16 || totalTiles == 15 {
 		// 記錄摸牌前的花牌數量
 		flowerCountBefore := len(currentPlayer.Flowers)
 
@@ -390,11 +400,9 @@ func (h *Hub) drawForRealPlayer_needsLock(room *game.Room) {
 			// 記錄摸牌後的手牌狀態
 			game.LogPlayerHand(currentPlayer, "摸牌: "+drawnTile)
 		}
-	} else if totalTiles == 17 {
-		log.Printf("玩家 %s 剛吃/碰/槓完，不摸牌等待出牌（手牌 %d 張 + 吃碰槓 %d 組）",
-			currentPlayer.Name, len(currentPlayer.Hand), len(currentPlayer.Melds))
-	} else if totalTiles < 16 {
-		log.Printf("警告：玩家 %s 牌數異常！總牌數 %d（手牌 %d + 吃碰槓 %d 組），預期 16 或 17",
+	} else {
+		// 總牌數 < 15 或 > 17 才是真正的異常
+		log.Printf("警告：玩家 %s 牌數異常！總牌數 %d（手牌 %d + 吃碰槓 %d 組），預期 15-17",
 			currentPlayer.Name, totalTiles, len(currentPlayer.Hand), len(currentPlayer.Melds))
 	}
 }
@@ -430,19 +438,26 @@ func (h *Hub) HasHumanAction(room *game.Room, discardedTile string, discarderPos
 
 // BroadcastDrawTile 广播摸牌事件
 func (h *Hub) BroadcastDrawTile(room *game.Room, playerID, tile string) {
+	// 获取剩余牌数
+	remainingTiles := 0
+	if room.Game != nil {
+		remainingTiles = room.Game.GetRemainingTiles()
+	}
+
 	message := map[string]interface{}{
 		"type": "player_action",
 		"data": map[string]interface{}{
-			"playerId":    playerID,
-			"action":      "draw",
-			"tile":        tile,
-			"currentTurn": room.CurrentTurn,
+			"playerId":       playerID,
+			"action":         "draw",
+			"tile":           tile,
+			"currentTurn":    room.CurrentTurn,
+			"remainingTiles": remainingTiles,
 		},
 	}
 
 	msgBytes, _ := json.Marshal(message)
 
-	log.Printf("广播玩家摸牌: %s 摸 %s (当前轮次: %d)", playerID, tile, room.CurrentTurn)
+	log.Printf("广播玩家摸牌: %s 摸 %s (当前轮次: %d, 剩余: %d)", playerID, tile, room.CurrentTurn, remainingTiles)
 
 	// 向所有玩家发送
 	for _, clientInterface := range room.Clients {
@@ -454,6 +469,39 @@ func (h *Hub) BroadcastDrawTile(room *game.Room, playerID, tile string) {
 		case client.Send <- msgBytes:
 		default:
 			log.Printf("警告：客户端 %s 的发送缓冲区已满，摸牌消息被丢弃", client.UserName)
+		}
+	}
+}
+
+// BroadcastGameDraw 广播流局事件
+func (h *Hub) BroadcastGameDraw(room *game.Room) {
+	// 获取剩余牌数
+	remainingTiles := 0
+	if room.Game != nil {
+		remainingTiles = room.Game.GetRemainingTiles()
+	}
+
+	message := map[string]interface{}{
+		"type": "game_draw",
+		"data": map[string]interface{}{
+			"remainingTiles": remainingTiles,
+		},
+	}
+
+	msgBytes, _ := json.Marshal(message)
+
+	log.Printf("广播流局事件，剩余牌数: %d", remainingTiles)
+
+	// 向所有玩家发送
+	for _, clientInterface := range room.Clients {
+		client, ok := clientInterface.(*Client)
+		if !ok {
+			continue
+		}
+		select {
+		case client.Send <- msgBytes:
+		default:
+			log.Printf("警告：客户端 %s 的发送缓冲区已满，流局消息被丢弃", client.UserName)
 		}
 	}
 }

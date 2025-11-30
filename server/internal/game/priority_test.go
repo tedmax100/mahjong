@@ -42,19 +42,20 @@ func TestActionPriority(t *testing.T) {
 		// 設置玩家2的手牌，使其可以碰東
 		room.Players[1].Hand = []string{"dong", "dong", "wan-1", "wan-2"}
 
-		// 設置玩家3的手牌，使其可以胡東（簡單的胡牌組合）
-		// 假設玩家3已經有4組面子，只差一張東就能胡
-		room.Players[2].Hand = []string{"dong"}
+		// 設置玩家3的手牌為已經胡牌的狀態（5組面子+1對將 = 17張）
+		// 5組碰 + 2張wan-5作為將牌
+		room.Players[2].Hand = []string{"wan-5", "wan-5"} // 一對將
 		room.Players[2].Melds = []Meld{
 			{Type: "pong", Tiles: []string{"wan-1", "wan-1", "wan-1"}},
 			{Type: "pong", Tiles: []string{"wan-2", "wan-2", "wan-2"}},
 			{Type: "pong", Tiles: []string{"wan-3", "wan-3", "wan-3"}},
 			{Type: "pong", Tiles: []string{"wan-4", "wan-4", "wan-4"}},
+			{Type: "pong", Tiles: []string{"dong", "dong", "dong"}},
 		}
 
 		// 玩家2想碰
 		room.AddPendingAction("player2", "pong", "dong", nil)
-		// 玩家3想胡
+		// 玩家3想胡（玩家3已經胡牌了）
 		room.AddPendingAction("player3", "hu", "dong", nil)
 
 		// 處理動作
@@ -180,13 +181,14 @@ func TestPriorityOrder(t *testing.T) {
 	// 設置玩家3的手牌，使其可以槓萬5
 	room.Players[2].Hand = []string{"wan-5", "wan-5", "wan-5", "tong-3"}
 
-	// 設置玩家4的手牌，使其可以胡萬5
-	room.Players[3].Hand = []string{"wan-5"}
+	// 設置玩家4的手牌，使其可以胡（已經胡牌的狀態 = 5組面子 + 1對眼 = 17張）
+	room.Players[3].Hand = []string{"wan-5", "wan-5"} // 需要2張作為將牌
 	room.Players[3].Melds = []Meld{
 		{Type: "pong", Tiles: []string{"dong", "dong", "dong"}},
 		{Type: "pong", Tiles: []string{"nan", "nan", "nan"}},
 		{Type: "pong", Tiles: []string{"xi", "xi", "xi"}},
 		{Type: "pong", Tiles: []string{"bei", "bei", "bei"}},
+		{Type: "pong", Tiles: []string{"zhong", "zhong", "zhong"}},
 	}
 
 	// 同時添加所有四種動作

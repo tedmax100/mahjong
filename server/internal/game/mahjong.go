@@ -300,13 +300,13 @@ func (g *MahjongGame) CanChow(hand []string, tile string) [][]string {
 
 // CanHu 检查是否可以胡牌
 func (g *MahjongGame) CanHu(hand []string, melds []Meld) bool {
-	// 台湾16张麻将：5组牌（4组顺子/刻子 + 1对眼）
+	// 台湾16张麻将：胡牌牌型 = 5组面子（顺子/刻子） + 1对眼 = 17张牌
 	// 已展示的牌组（碰、杠）
 	meldCount := len(melds)
 
 	// 需要在手牌中找到剩余的组合
-	// 总共需要5组：4组顺子/刻子 + 1对眼
-	needGroups := 4 - meldCount
+	// 总共需要5组面子 + 1对眼
+	needGroups := 5 - meldCount
 
 	// 手牌数量检查
 	expectedHandSize := needGroups*3 + 2 // 剩余组数*3 + 1对眼

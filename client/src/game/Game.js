@@ -469,7 +469,12 @@ export class Game {
   handlePlayerAction(data) {
     console.log('玩家动作:', data);
 
-    const { playerId, action, tile, currentTurn } = data;
+    const { playerId, action, tile, currentTurn, remainingTiles } = data;
+
+    // 更新剩余牌数（如果服务器发送了这个信息）
+    if (remainingTiles !== undefined) {
+      this.updateRemainingTiles(remainingTiles);
+    }
 
     // 更新当前轮次
     if (currentTurn !== undefined) {
@@ -496,6 +501,9 @@ export class Game {
         break;
       case 'hu':
         this.handleHu(playerId, tile);
+        break;
+      case 'ting':
+        this.handleTing(playerId, data);
         break;
     }
   }
@@ -940,6 +948,37 @@ export class Game {
     }
   }
 
+  /**
+   * 處理聽牌廣播
+   */
+  handleTing(playerId, data) {
+    console.log(`玩家 ${playerId} 宣告聽牌`, data);
+
+    // 找到該玩家
+    const player = this.players.find(p => p.userId === playerId);
+    if (!player) {
+      console.error('未找到玩家:', playerId);
+      return;
+    }
+
+    // 標記玩家已聽牌
+    player.isTing = true;
+    if (data.winningTiles) {
+      player.winningTiles = data.winningTiles;
+    }
+
+    // 顯示聽牌UI
+    player.showTingStatus();
+
+    // 如果是自己，顯示提示
+    if (player === this.players[this.myPosition]) {
+      this.showAnnouncement('聽牌！', 2000);
+    } else {
+      // 其他玩家聽牌，也顯示提示
+      this.showAnnouncement(`${player.name} 聽牌！`, 2000);
+    }
+  }
+
   showAnnouncement(text, duration = 3000) {
     this.announcementText.text = text;
     this.announcementText.visible = true;
@@ -1120,17 +1159,57 @@ export class Game {
   /**
    * 处理流局（荒牌）
    */
-  handleGameDraw() {
+  async handleGameDraw(data) {
+    console.log('游戏流局，无人胜出', data);
+
     // 禁用所有玩家交互
     this.players.forEach(player => {
       player.setInteractive(false);
     });
 
-    // 显示流局消息
-    const drawText = new Text({
-      text: '流局\n海底剩余不足8张',
+    // 创建流局容器
+    const drawContainer = new Container();
+    drawContainer.zIndex = 10000;
+
+    // 加载并显示流局图片
+    try {
+      const liujuTexture = await Assets.load('/assets/ui/liuju.png');
+      const liujuSprite = new Sprite(liujuTexture);
+
+      // 设置图片居中
+      liujuSprite.anchor.set(0.5);
+      liujuSprite.x = this.app.screen.width / 2;
+      liujuSprite.y = this.app.screen.height / 2 - 50; // 稍微往上偏移，为倒计时留空间
+
+      // 可以调整图片大小
+      liujuSprite.scale.set(0.8);
+
+      drawContainer.addChild(liujuSprite);
+    } catch (error) {
+      console.error('加载流局图片失败:', error);
+      // 如果图片加载失败，显示文本
+      const drawText = new Text({
+        text: '流局',
+        style: {
+          fontSize: 72,
+          fill: 0xFFD700,
+          fontWeight: 'bold',
+          align: 'center',
+          stroke: 0x8B4513,
+          strokeThickness: 6
+        }
+      });
+      drawText.anchor.set(0.5);
+      drawText.x = this.app.screen.width / 2;
+      drawText.y = this.app.screen.height / 2 - 50;
+      drawContainer.addChild(drawText);
+    }
+
+    // 添加倒计时文本
+    const countdownText = new Text({
+      text: '5秒后开始新局',
       style: {
-        fontSize: 48,
+        fontSize: 36,
         fill: 0xFFFFFF,
         fontWeight: 'bold',
         align: 'center',
@@ -1138,14 +1217,31 @@ export class Game {
         strokeThickness: 4
       }
     });
+    countdownText.anchor.set(0.5);
+    countdownText.x = this.app.screen.width / 2;
+    countdownText.y = this.app.screen.height / 2 + 100;
+    drawContainer.addChild(countdownText);
 
-    drawText.anchor.set(0.5);
-    drawText.x = this.app.screen.width / 2;
-    drawText.y = this.app.screen.height / 2;
+    this.container.addChild(drawContainer);
 
-    this.container.addChild(drawText);
+    // 倒计时逻辑
+    let countdown = 5;
+    const countdownInterval = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        countdownText.text = `${countdown}秒后开始新局`;
+      } else {
+        clearInterval(countdownInterval);
 
-    console.log('游戏流局，无人胜出');
+        // 移除流局提示
+        this.container.removeChild(drawContainer);
+
+        // TODO: 开始新的一局（需要服务器支持）
+        console.log('准备开始新的一局...');
+        // 这里可以发送消息给服务器请求开始新一局
+        // 或者等待服务器主动发送新一局的消息
+      }
+    }, 1000);
   }
 
   /**
@@ -1166,6 +1262,20 @@ export class Game {
     if (this.canHu(myHand, tile)) {
       actions.push('hu');
       // TODO: 添加胡牌的牌組高亮
+    }
+
+    // 如果已宣告聽牌，只能胡牌，不能吃碰槓
+    if (myPlayer.isTing) {
+      console.log('⚠️ 已宣告聽牌，只能胡牌');
+      // 如果有可執行的動作（只會是胡），顯示按鈕
+      if (actions.length > 0) {
+        actions.push('cancel'); // 總是添加取消按鈕
+        this.pendingActions = actions;
+        this.actionButtons.show(actions);
+        myPlayer.highlightTileGroups(highlightGroups);
+        console.log(`可執行的動作: ${actions.join(', ')}`);
+      }
+      return;
     }
 
     // 檢查是否可以槓
@@ -1495,8 +1605,23 @@ export class Game {
       }
     }
 
-    // 如果不能自摸，檢查是否聽牌
-    if (!actions.includes('hu')) {
+    // 如果已宣告聽牌
+    if (myPlayer.isTing) {
+      // 如果不能胡牌，自動打出剛摸到的牌
+      if (!actions.includes('hu') && myPlayer.lastDrawnTile) {
+        console.log(`⚠️ 已聽牌且無法胡牌，自動打出: ${myPlayer.lastDrawnTile}`);
+        // 延遲1秒後自動打出，讓玩家看到摸到的牌
+        setTimeout(() => {
+          if (this.ws) {
+            this.ws.sendAction('discard', { tile: myPlayer.lastDrawnTile });
+          }
+        }, 1000);
+        return; // 不需要顯示按鈕
+      }
+    }
+
+    // 如果不能自摸且未宣告聽牌，檢查是否聽牌
+    if (!actions.includes('hu') && !myPlayer.isTing) {
       const readyTiles = this.checkReadyHand(myHand);
       if (readyTiles.length > 0) {
         actions.push('ready');
@@ -1627,23 +1752,16 @@ export class Game {
     const myPlayer = this.players[this.myPosition];
     if (!myPlayer) return;
 
-    // 檢查聽哪些牌
-    const myHand = myPlayer.tiles.map(t => t.type);
-    const readyTiles = this.checkReadyHand(myHand);
+    // 標記玩家已宣告聽牌（在本地先標記）
+    myPlayer.isTing = true;
 
-    if (readyTiles.length > 0) {
-      console.log(`🎯 聽牌宣告成功！聽: ${readyTiles.join(', ')}`);
-
-      // 發送聽牌通知到服務器（如果需要）
-      if (this.ws) {
-        this.ws.sendAction('ting', {
-          readyTiles: readyTiles
-        });
-      }
-
-      // 顯示提示訊息
-      this.showAnnouncement('聽牌！', 2000);
+    // 發送聽牌通知到服務器
+    if (this.ws) {
+      this.ws.sendAction('declare_ting', {});
     }
+
+    // 顯示提示訊息
+    this.showAnnouncement('聽牌！', 2000);
 
     // 隱藏按鈕
     this.actionButtons.hide();

@@ -19,8 +19,12 @@ export class Player {
     this.name = '';
     this.score = 1000;
     this.isInteractive = false; // 是否可以交互（轮到自己）
+    this.isTing = false; // 是否已宣告聽牌
+    this.winningTiles = []; // 聽的牌
+    this.lastDrawnTile = null; // 最後摸到的牌（用於聽牌後限制打牌）
 
     this.infoText = null;
+    this.tingStatusText = null; // 聽牌狀態文字
 
     this.createInfoDisplay();
     this.container.addChild(this.meldsContainer);
@@ -227,6 +231,15 @@ export class Player {
       return;
     }
 
+    // 如果已宣告聽牌，只能打剛摸到的牌
+    if (this.isTing) {
+      if (tile.type !== this.lastDrawnTile) {
+        console.log('已宣告聽牌，只能打剛摸到的牌！');
+        // TODO: 顯示提示訊息給玩家
+        return;
+      }
+    }
+
     // 触发出牌事件（由Game类处理）
     if (this.onDiscard) {
       this.onDiscard(tile.type);
@@ -275,6 +288,9 @@ export class Player {
    * 加入一張新牌到手牌（摸牌）
    */
   async addTile(tileType, tileAssets) {
+    // 記錄最後摸到的牌（用於聽牌後限制打牌）
+    this.lastDrawnTile = tileType;
+
     // 先排序：將新牌加入並排序
     const allTileTypes = [...this.tiles.map(t => t.type), tileType];
     const sortedTypes = this.sortTiles(allTileTypes);
@@ -311,7 +327,7 @@ export class Player {
       this.positionTile(tile, index);
     });
 
-    console.log(`✅ 加入新牌完成，手牌數: ${this.tiles.length}`);
+    console.log(`✅ 加入新牌完成，手牌數: ${this.tiles.length}, 最後摸牌: ${this.lastDrawnTile}`);
   }
 
   /**
@@ -488,6 +504,62 @@ export class Player {
     }
   }
 
+  /**
+   * 顯示聽牌狀態
+   */
+  showTingStatus() {
+    // 如果已經有聽牌狀態文字，先移除
+    if (this.tingStatusText) {
+      this.container.removeChild(this.tingStatusText);
+    }
+
+    // 創建聽牌狀態文字
+    this.tingStatusText = new Text({
+      text: '聽',
+      style: {
+        fontSize: 32,
+        fill: 0xFF0000, // 紅色
+        fontWeight: 'bold',
+        stroke: 0xFFFFFF,
+        strokeThickness: 3
+      }
+    });
+    this.tingStatusText.anchor.set(0.5);
+
+    // 根據位置設置聽牌圖示位置
+    switch (this.position) {
+      case 'bottom':
+        this.tingStatusText.x = this.screenWidth / 2;
+        this.tingStatusText.y = this.screenHeight - 120;
+        break;
+      case 'right':
+        this.tingStatusText.x = this.screenWidth - 60;
+        this.tingStatusText.y = this.screenHeight / 2;
+        break;
+      case 'top':
+        this.tingStatusText.x = this.screenWidth / 2;
+        this.tingStatusText.y = 80;
+        break;
+      case 'left':
+        this.tingStatusText.x = 60;
+        this.tingStatusText.y = this.screenHeight / 2;
+        break;
+    }
+
+    this.container.addChild(this.tingStatusText);
+    console.log(`✅ 顯示聽牌狀態: ${this.name || this.id}`);
+  }
+
+  /**
+   * 隱藏聽牌狀態
+   */
+  hideTingStatus() {
+    if (this.tingStatusText) {
+      this.container.removeChild(this.tingStatusText);
+      this.tingStatusText = null;
+    }
+  }
+
   resize(width, height) {
     this.screenWidth = width;
     this.screenHeight = height;
@@ -500,5 +572,10 @@ export class Player {
     this.tiles.forEach((tile, index) => {
       this.positionTile(tile, index);
     });
+
+    // 重新顯示聽牌狀態（如果有）
+    if (this.isTing) {
+      this.showTingStatus();
+    }
   }
 }

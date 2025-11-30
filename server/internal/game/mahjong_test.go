@@ -11,23 +11,24 @@ func TestCanHu(t *testing.T) {
 	}
 	game := NewMahjongGame(players)
 
-	// 测试1: 简单的胡牌（4组刻子+1对眼）
+	// 测试1: 简单的胡牌（5组刻子+1对眼 = 17张）
 	hand1 := []string{
 		"wan-1", "wan-1", "wan-1", // 刻子
 		"wan-2", "wan-2", "wan-2", // 刻子
 		"wan-3", "wan-3", "wan-3", // 刻子
 		"wan-4", "wan-4", "wan-4", // 刻子
-		"wan-5", "wan-5", // 对眼
+		"wan-5", "wan-5", "wan-5", // 刻子
+		"wan-6", "wan-6", // 对眼
 	}
-	// Note: CanHu is not fully implemented, this test might not be accurate.
 	if !game.CanHu(hand1, []Meld{}) {
 		t.Errorf("应该能胡牌，但判断为不能胡")
 	}
 
-	// 测试2: 简单的顺子胡牌
+	// 测试2: 简单的顺子胡牌（5组顺子+1对眼 = 17张）
 	hand2 := []string{
 		"wan-1", "wan-2", "wan-3", // 顺子
 		"wan-4", "wan-5", "wan-6", // 顺子
+		"wan-7", "wan-8", "wan-9", // 顺子
 		"tong-1", "tong-2", "tong-3", // 顺子
 		"tiao-7", "tiao-8", "tiao-9", // 顺子
 		"dong", "dong", // 对眼
@@ -48,10 +49,11 @@ func TestCanHu(t *testing.T) {
 		t.Errorf("不应该能胡牌，但判断为能胡")
 	}
 
-	// 测试4: 有碰的情况（2组已展示+手牌2组+1对眼）
+	// 测试4: 有碰的情况（2组已展示+手牌3组+1对眼 = 17张）
 	hand4 := []string{
 		"wan-1", "wan-2", "wan-3", // 顺子
 		"wan-4", "wan-5", "wan-6", // 顺子
+		"wan-7", "wan-8", "wan-9", // 顺子
 		"dong", "dong", // 对眼
 	}
 	melds4 := []Meld{

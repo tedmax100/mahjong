@@ -145,8 +145,14 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 		if !ok {
 			return
 		}
-		c.Room.HandleDiscard(c.UserID, tile)
+		isDraw := c.Room.HandleDiscard(c.UserID, tile)
 		c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "discard", tile)
+
+		// 检查是否流局
+		if isDraw {
+			c.Hub.BroadcastGameDraw(c.Room)
+			return
+		}
 
 		// 获取出牌者的位置
 		var discarderPosition int
@@ -509,13 +515,17 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 					// 处理出牌
 
-					c.Room.HandleDiscard(c.UserID, tile)
+					isDraw := c.Room.HandleDiscard(c.UserID, tile)
 
 					// 广播听牌动作
 
 					c.Hub.BroadcastPlayerTingAction(c.Room, c.UserID, tile)
 
-		
+					// 检查是否流局
+					if isDraw {
+						c.Hub.BroadcastGameDraw(c.Room)
+						return
+					}
 
 					// 检查是否有Bot响应
 
@@ -537,7 +547,52 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 				}
 
-		
+
+			case "declare_ting":
+				// 宣告聽牌（不打牌，只標記狀態）
+				var player *game.Player
+				for _, p := range c.Room.Players {
+					if p.ID == c.UserID {
+						player = p
+						break
+					}
+				}
+
+				if player == nil {
+					return
+				}
+
+				// 檢查當前手牌是否聽牌
+				tingResult := c.Room.Game.CheckTing(player.Hand, player.Melds)
+				if tingResult.IsTing {
+					log.Printf("玩家 %s 宣告聽牌", c.UserName)
+					player.IsTing = true
+					player.WinningTiles = tingResult.WinningTiles
+
+					// 廣播聽牌狀態給所有玩家
+					message := map[string]interface{}{
+						"type": "player_action",
+						"data": map[string]interface{}{
+							"playerId":     c.UserID,
+							"action":       "ting",
+							"winningTiles": player.WinningTiles,
+						},
+					}
+					msgBytes, _ := json.Marshal(message)
+					for _, clientInterface := range c.Room.Clients {
+						client, ok := clientInterface.(*Client)
+						if !ok {
+							continue
+						}
+						select {
+						case client.Send <- msgBytes:
+						default:
+							log.Printf("发送聽牌消息失败")
+						}
+					}
+				} else {
+					log.Printf("玩家 %s 嘗試宣告聽牌失敗，當前手牌不是聽牌", c.UserName)
+				}
 
 			case "hu":
 
