@@ -2,6 +2,9 @@ package game
 
 import (
 	"math/rand"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -317,6 +320,7 @@ func (g *MahjongGame) CanHu(hand []string, melds []Meld) bool {
 	// 复制手牌进行判断
 	tiles := make([]string, len(hand))
 	copy(tiles, hand)
+	sortTiles(tiles)
 
 	return canFormWinningHand(tiles, needGroups, true)
 }
@@ -450,6 +454,56 @@ func parseTile(tile string) (string, int) {
 	typ := tile[:len(tile)-2]
 	num := int(tile[len(tile)-1] - '0')
 	return typ, num
+}
+
+// tileValue returns a sortable value for a tile.
+func tileValue(tile string) int {
+	parts := strings.Split(tile, "-")
+	suit := parts[0]
+	num := 0
+	if len(parts) > 1 {
+		num, _ = strconv.Atoi(parts[1])
+	}
+
+	suitOrder := 0
+	switch suit {
+	case "wan":
+		suitOrder = 1
+	case "tong":
+		suitOrder = 2
+	case "tiao":
+		suitOrder = 3
+	case "dong":
+		suitOrder = 4
+		num = 1
+	case "nan":
+		suitOrder = 4
+		num = 2
+	case "xi":
+		suitOrder = 4
+		num = 3
+	case "bei":
+		suitOrder = 4
+		num = 4
+	case "zhong":
+		suitOrder = 5
+		num = 1
+	case "fa":
+		suitOrder = 5
+		num = 2
+	case "bai":
+		suitOrder = 5
+		num = 3
+	}
+
+	return suitOrder*10 + num
+}
+
+// sortTiles sorts a slice of tiles.
+func sortTiles(tiles []string) {
+	sort.Slice(tiles, func(i, j int) bool {
+		return tileValue(tiles[i]) < tileValue(tiles[j])
+	})
 }
 
 // TingResult holds the result of a Ting check.

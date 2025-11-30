@@ -157,8 +157,8 @@ export class Player {
 
   positionTile(tile, index) {
     // 手牌包含牌底，实际占用空间更大
-    const tileWidth = 75;  // 增加宽度考虑牌底（从60改为75）
-    const tileHeight = 95; // 增加高度考虑牌底（从80改为95）
+    const tileWidth = 42.1875;  // 縮小至56.25%（原75）
+    const tileHeight = 53.4375; // 縮小至56.25%（原95）
 
     // 動態調整間距：根據牌的數量和螢幕寬度
     const totalTiles = this.tiles.length;
@@ -174,10 +174,10 @@ export class Player {
 
         if (totalSpacingWidth > 0) {
           // 有足夠空間，平均分配間距
-          spacing = Math.min(totalSpacingWidth / (totalTiles - 1 || 1), 10); // 最大 10px
+          spacing = Math.min(totalSpacingWidth / (totalTiles - 1 || 1), 15); // 增加最大間距至15px
         } else {
-          // 空間不足，縮小間距甚至重疊
-          spacing = (availableWidth / totalTiles) - tileWidth;
+          // 空間不足，縮小間距但不重疊
+          spacing = Math.max((availableWidth / totalTiles) - tileWidth, 2); // 最小2px間距
         }
 
         const startX = this.screenWidth / 2 - (totalTiles * tileWidth + (totalTiles - 1) * spacing) / 2;
@@ -186,38 +186,39 @@ export class Player {
           startX + index * (tileWidth + spacing),
           this.screenHeight - 180  // 更靠近底部
         );
+        tile.setScale(0.75); // 縮小牌底和牌面至75%
         break;
 
       case 'right':
         // 右侧 - 垂直排列
-        spacing = 8; // 右側固定間距
+        spacing = 12; // 增加間距避免重疊
         tile.setPosition(
           this.screenWidth - 70,  // 更靠近右边（从 100 改为 70）
-          this.screenHeight / 2 - (totalTiles * (tileHeight * 0.8 + spacing)) / 2 + index * (tileHeight * 0.8 + spacing)
+          this.screenHeight / 2 - (totalTiles * (tileHeight + spacing)) / 2 + index * (tileHeight + spacing)
         );
         tile.setRotation(Math.PI / 2);
-        tile.setScale(0.8);
+        tile.setScale(0.6); // 縮小牌底和牌面至75% (0.8 * 0.75 = 0.6)
         break;
 
       case 'top':
         // 顶部 - 水平排列（背面）
-        spacing = 8; // 上方固定間距
+        spacing = 12; // 增加間距避免重疊
         tile.setPosition(
-          this.screenWidth / 2 - (totalTiles * (tileWidth * 0.8 + spacing)) / 2 + index * (tileWidth * 0.8 + spacing),
+          this.screenWidth / 2 - (totalTiles * (tileWidth + spacing)) / 2 + index * (tileWidth + spacing),
           30  // 更靠近顶部（从 50 改为 30）
         );
-        tile.setScale(0.8);
+        tile.setScale(0.6); // 縮小牌底和牌面至75% (0.8 * 0.75 = 0.6)
         break;
 
       case 'left':
         // 左侧 - 垂直排列
-        spacing = 8; // 左側固定間距
+        spacing = 12; // 增加間距避免重疊
         tile.setPosition(
           30,  // 更靠近左边（从 50 改为 30）
-          this.screenHeight / 2 - (totalTiles * (tileHeight * 0.8 + spacing)) / 2 + index * (tileHeight * 0.8 + spacing)
+          this.screenHeight / 2 - (totalTiles * (tileHeight + spacing)) / 2 + index * (tileHeight + spacing)
         );
         tile.setRotation(-Math.PI / 2);
-        tile.setScale(0.8);
+        tile.setScale(0.6); // 縮小牌底和牌面至75% (0.8 * 0.75 = 0.6)
         break;
     }
   }
@@ -377,6 +378,38 @@ export class Player {
   }
 
   /**
+   * 高亮顯示指定的牌
+   * @param {Array<string>} tilesToHighlight - 要高亮的牌的類型列表
+   */
+  highlightTiles(tilesToHighlight) {
+    // 先重置所有牌的位置
+    this.clearHighlight();
+
+    if (!tilesToHighlight || tilesToHighlight.length === 0) {
+      return;
+    }
+
+    const highlightSet = new Set(tilesToHighlight);
+
+    // 對於底部玩家，將可高亮的牌往上移動
+    if (this.position === 'bottom') {
+      this.tiles.forEach((tile) => {
+        if (highlightSet.has(tile.type)) {
+          // 往上移動 20 像素
+          tile.container.y -= 20;
+          // 添加發光效果
+          tile.container.alpha = 1.0;
+        } else {
+          // 其他牌變暗
+          tile.container.alpha = 0.5;
+        }
+      });
+    }
+
+    console.log(`✨ 高亮顯示 ${highlightSet.size} 張牌`);
+  }
+
+  /**
    * 清除高亮效果
    */
   clearHighlight() {
@@ -442,25 +475,38 @@ export class Player {
 
     for (const meld of this.melds) {
       const meldGroup = new Container();
+      const meldType = meld.Type || meld.type;
+      const meldTiles = meld.Tiles || meld.tiles;
 
       // Create tiles with bases
-      for (let i = 0; i < meld.tiles.length; i++) {
-        const tileType = meld.tiles[i];
+      for (let i = 0; i < meldTiles.length; i++) {
+        const tileType = meldTiles[i];
         const tileContainer = new Container();
         const baseSprite = new Sprite(baseTexture);
         tileContainer.addChild(baseSprite);
 
-        const texture = tileAssets[tileType] || tileAssets['back'];
+        // For concealed kong, two tiles are face down.
+        let texture;
+        if (meldType === 'kong_concealed' && (i === 0 || i === 3)) {
+            texture = tileAssets['back'];
+        } else {
+            texture = tileAssets[tileType] || tileAssets['back'];
+        }
+        
         const tileSprite = new Sprite(texture);
         if (tileType.startsWith('tong-')) {
             tileSprite.y = 5;
         }
         tileContainer.addChild(tileSprite);
         
-        const isKongTile = (meld.type === 'kong' || meld.type === 'kong_promoted') && i === 3;
+        const isKong = meldType && meldType.includes('kong');
+        const isFourthTile = i === 3;
 
-        if (isKongTile) {
-            tileContainer.x = tileWidth + 5; // Use middle tile's position
+        if (isKong && isFourthTile) {
+            // For promoted kong, place on top of one of the existing 3 tiles.
+            // For concealed kong, place on top of the middle ones.
+            const baseTileIndex = 1;
+            tileContainer.x = baseTileIndex * (tileWidth + 5);
             tileContainer.y = -tileHeight * 0.1;
         } else {
             tileContainer.x = i * (tileWidth + 5); // Add spacing
@@ -469,7 +515,7 @@ export class Player {
         meldGroup.addChild(tileContainer);
       }
       
-      const groupWidth = (meld.tiles.length === 4 ? 3 : meld.tiles.length) * (tileWidth + 5);
+      const groupWidth = (meldTiles.length === 4 ? 3 : meldTiles.length) * (tileWidth + 5);
 
       switch (this.position) {
         case 'bottom':
@@ -577,5 +623,21 @@ export class Player {
     if (this.isTing) {
       this.showTingStatus();
     }
+  }
+
+  reset() {
+    // 清除手牌
+    this.tiles.forEach(tile => tile.destroy());
+    this.tiles = [];
+
+    // 清除吃碰槓
+    this.meldsContainer.removeChildren();
+    this.melds = [];
+
+    // 重置狀態
+    this.isTing = false;
+    this.winningTiles = [];
+    this.lastDrawnTile = null;
+    this.hideTingStatus();
   }
 }

@@ -29,7 +29,10 @@ func TestHandleDiscardReturnsDrawStatus(t *testing.T) {
 		}
 
 		// 给玩家一些手牌
-		player.Hand = []string{"wan-1", "wan-2", "wan-3"}
+		player.Hand = []string{
+			"wan-1", "wan-1", "wan-1", "wan-2", "wan-2", "wan-2", "wan-3", "wan-3", "wan-3",
+			"wan-4", "wan-4", "wan-4", "wan-5", "wan-5", "wan-5", "wan-6", "wan-7",
+		}
 
 		isDraw := room.HandleDiscard(player.ID, "wan-1")
 		if isDraw {
@@ -53,7 +56,10 @@ func TestHandleDiscardReturnsDrawStatus(t *testing.T) {
 
 		player := drawRoom.Players[0]
 		drawRoom.CurrentTurn = 0
-		player.Hand = []string{"wan-1", "wan-2", "wan-3"}
+		player.Hand = []string{
+			"wan-1", "wan-1", "wan-1", "wan-2", "wan-2", "wan-2", "wan-3", "wan-3", "wan-3",
+			"wan-4", "wan-4", "wan-4", "wan-5", "wan-5", "wan-5", "wan-6", "wan-7",
+		}
 
 		// 确认牌山剩余 <= 8
 		if drawRoom.Game.GetRemainingTiles() > 8 {
@@ -261,7 +267,10 @@ func TestGameStateAfterDraw(t *testing.T) {
 
 	player := room.Players[0]
 	room.CurrentTurn = 0
-	player.Hand = []string{"wan-1", "wan-2", "wan-3"}
+	player.Hand = []string{
+		"wan-1", "wan-1", "wan-1", "wan-2", "wan-2", "wan-2", "wan-3", "wan-3", "wan-3",
+		"wan-4", "wan-4", "wan-4", "wan-5", "wan-5", "wan-5", "wan-6", "wan-7",
+	}
 
 	t.Run("流局后游戏应该停止", func(t *testing.T) {
 		// 触发流局
@@ -291,7 +300,10 @@ func TestGameStateAfterDraw(t *testing.T) {
 
 		p := newRoom.Players[0]
 		newRoom.CurrentTurn = 0
-		p.Hand = []string{"wan-1", "wan-2", "wan-3"}
+		p.Hand = []string{
+			"wan-1", "wan-1", "wan-1", "wan-2", "wan-2", "wan-2", "wan-3", "wan-3", "wan-3",
+			"wan-4", "wan-4", "wan-4", "wan-5", "wan-5", "wan-5", "wan-6", "wan-7",
+		}
 
 		// 打出一张牌触发流局
 		newRoom.HandleDiscard(p.ID, "wan-1")

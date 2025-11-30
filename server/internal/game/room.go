@@ -42,22 +42,54 @@ type Room struct {
 	LastDiscardPlayer int // 最後打牌的玩家位置（用於檢查吃牌資格）
 	LastDiscardTile   string // 最後打出的牌
 	PendingActions    []PendingAction // 待處理的動作請求
-	ActionTimeout     *time.Timer // 動作超時計時器
-	ActionMutex       sync.Mutex // 保護 PendingActions 的互斥鎖
-	IsWaitingForActions bool // 是否正在等待玩家動作回應
-}
+		ActionTimeout       *time.Timer // 動作超時計時器
+		ActionMutex       sync.Mutex // 保護 PendingActions 的互斥鎖
+		IsWaitingForActions bool // 是否正在等待玩家動作回應
+		noResponseTimer *time.Timer
+		timerMu         sync.Mutex
+	}
+	
+	// Player 代表一个玩家
+	type Player struct {
+		ID       string
+		Name     string
+		Position int // 0=东, 1=南, 2=西, 3=北
+		Hand     []string
+		Score    int
+		Melds    []Meld   // 已展示的牌组（碰、杠等）
+		Flowers  []string // 花牌
+		IsTing   bool     // 玩家是否已听牌
+		WinningTiles []string // 听牌所胡的牌
+	}
+	
+	// StartNoResponseTimer starts a timer that fires if no player action is received.
+	func (r *Room) StartNoResponseTimer(d time.Duration, cb func()) {
+		r.timerMu.Lock()
+		defer r.timerMu.Unlock()
+		// Stop any existing timer
+		if r.noResponseTimer != nil {
+			r.noResponseTimer.Stop()
+		}
+		r.noResponseTimer = time.AfterFunc(d, cb)
+	}
+	
+	// StopNoResponseTimer stops the no-response timer.
+	func (r *Room) StopNoResponseTimer() {
+		r.timerMu.Lock()
+		defer r.timerMu.Unlock()
+		if r.noResponseTimer != nil {
+			r.noResponseTimer.Stop()
+			r.noResponseTimer = nil
+		}
+	}
 
-// Player 代表一个玩家
-type Player struct {
-	ID       string
-	Name     string
-	Position int // 0=东, 1=南, 2=西, 3=北
-	Hand     []string
-	Score    int
-	Melds    []Meld   // 已展示的牌组（碰、杠等）
-	Flowers  []string // 花牌
-	IsTing   bool     // 玩家是否已听牌
-	WinningTiles []string // 听牌所胡的牌
+// GetTotalTiles 計算玩家的總牌數（手牌 + 吃碰槓）
+func (p *Player) GetTotalTiles() int {
+	total := len(p.Hand)
+	for _, meld := range p.Melds {
+		total += len(meld.Tiles)
+	}
+	return total
 }
 
 // LogPlayerHand 記錄單個玩家的手牌狀態（用於 debug）
@@ -87,8 +119,7 @@ func LogPlayerHand(player *Player, action string) {
 	if len(melds) > 0 {
 		log.Printf("   吃碰槓: %v", melds)
 	}
-	totalTiles := len(sortedHand) + len(player.Melds)*3
-	log.Printf("   總牌數: %d張", totalTiles)
+	log.Printf("   總牌數: %d張", player.GetTotalTiles())
 }
 
 // LogAllPlayersHands 記錄所有玩家的手牌狀態
@@ -267,10 +298,10 @@ func (r *Room) HandleDiscard(userID, tile string) bool {
 		return false
 	}
 
-	// 检查手牌数量是否正确（应该有17张牌才能打牌）
-	totalTiles := len(player.Hand) + len(player.Melds)*3
-	if totalTiles != 17 {
-		log.Printf("❌ 玩家 %s 手牌数量错误！总牌数 %d（手牌 %d + 吃碰槓 %d 組），预期 17 张，拒绝打牌",
+	// 检查手牌数量是否正确（应该有17张牌才能打牌，槓後補牌可能是18張）
+	totalTiles := player.GetTotalTiles()
+	if totalTiles != 17 && totalTiles != 18 {
+		log.Printf("❌ 玩家 %s 手牌数量错误！总牌数 %d（手牌 %d + 吃碰槓 %d 組），预期 17或18 张，拒绝打牌",
 			player.Name, totalTiles, len(player.Hand), len(player.Melds))
 		return false
 	}
@@ -478,7 +509,7 @@ func isSameCombination(combo1, combo2 []string) bool {
 }
 
 // HandleKong 处理杠牌
-func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
+func (r *Room) HandleKong(userID, tile string, isConcealed bool) (bool, string) {
 	// 找到玩家
 	var player *Player
 	for _, p := range r.Players {
@@ -490,12 +521,14 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
 
 	if player == nil {
 		log.Printf("未找到玩家: %s", userID)
-		return false
+		return false, ""
 	}
 
 	if r.Game == nil {
-		return false
+		return false, ""
 	}
+
+	var drawnTile string
 
 	if isConcealed {
 		// 暗杠：手牌中有4张相同的牌
@@ -508,7 +541,7 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
 
 		if count < 4 {
 			log.Printf("玩家 %s 无法暗杠 %s（手牌不足4张）", player.Name, tile)
-			return false
+			return false, ""
 		}
 
 		log.Printf("玩家 %s 暗杠 %s", player.Name, tile)
@@ -532,7 +565,7 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
 		// 明杠：手牌中有3张，或已碰出，加上别人打出的1张
 		if !r.Game.CanExposedKong(player, tile) {
 			log.Printf("玩家 %s 无法明杠 %s", player.Name, tile)
-			return false
+			return false, ""
 		}
 
 		// 判断是加杠还是明杠
@@ -573,7 +606,7 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
 	// 杠牌后需要补牌
 	if len(r.Game.Deck) > 0 {
 		// 杠牌补牌需要从牌尾拿
-		drawnTile := r.Game.DrawTileFromEnd()
+		drawnTile = r.Game.DrawTileFromEnd()
 		if drawnTile != "" {
 			player.Hand = append(player.Hand, drawnTile)
 			log.Printf("玩家 %s 杠牌后补牌: %s", player.Name, drawnTile)
@@ -591,7 +624,7 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) bool {
 	}
 	LogPlayerHand(player, "槓牌: "+tile+" ("+kongType+")")
 
-	return true
+	return true, drawnTile
 }
 
 // HandleHu 处理胡牌
@@ -827,4 +860,38 @@ func (r *Room) GetPendingActionCount() int {
 	r.ActionMutex.Lock()
 	defer r.ActionMutex.Unlock()
 	return len(r.PendingActions)
+}
+
+// NextRound prepares the room for the next round of the game.
+func (r *Room) NextRound() {
+	if r.Game == nil {
+		// If there's no game, start a new one from scratch
+		r.StartGame()
+		return
+	}
+
+	// Advance the dealer to the next player
+	currentDealer := r.Game.Dealer
+	nextDealer := (currentDealer + 1) % len(r.Players)
+
+	// Reset player hands, melds, and flowers
+	for _, p := range r.Players {
+		p.Hand = make([]string, 0, 17)
+		p.Melds = make([]Meld, 0)
+		p.Flowers = make([]string, 0)
+		p.IsTing = false
+		p.WinningTiles = nil
+	}
+
+	// Create a new game with the same players and the new dealer
+	newGame := NewMahjongGame(r.Players)
+	newGame.Dealer = nextDealer
+	r.Game = newGame
+
+	r.GameStarted = true
+	r.CurrentTurn = r.Game.Dealer // The new dealer starts
+	r.LastDiscardPlayer = -1
+	r.LastDiscardTile = ""
+
+	log.Printf("房间 %s 开始新的一局，庄家是: %s (位置 %d)", r.ID, r.Players[r.Game.Dealer].Name, r.Game.Dealer)
 }

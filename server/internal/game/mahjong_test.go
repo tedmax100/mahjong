@@ -491,3 +491,38 @@ func TestHandleKong_PromotedKongFromDiscard(t *testing.T) {
 		t.Errorf("It should be player A's turn after kong, but got turn %d.", room.CurrentTurn)
 	}
 }
+
+// TestCheckTing_UnsortedHand tests the CheckTing function with an unsorted hand
+func TestCheckTing_UnsortedHand(t *testing.T) {
+	players := []*Player{
+		{ID: "1", Name: "Player1"},
+	}
+	game := NewMahjongGame(players)
+
+	// This hand is unsorted and is waiting for "tong-5" to form a pair,
+	// while "wan-1", "wan-2", "wan-3" will form a chow.
+	hand := []string{"wan-3", "wan-1", "tong-5", "wan-2"}
+	melds := []Meld{
+		{Type: "pong", Tiles: []string{"tiao-1", "tiao-1", "tiao-1"}},
+		{Type: "pong", Tiles: []string{"tiao-2", "tiao-2", "tiao-2"}},
+		{Type: "pong", Tiles: []string{"tiao-3", "tiao-3", "tiao-3"}},
+		{Type: "pong", Tiles: []string{"tiao-4", "tiao-4", "tiao-4"}},
+	}
+
+	result := game.CheckTing(hand, melds)
+
+	if !result.IsTing {
+		t.Errorf("Hand should be in Ting state, but CheckTing returned false.")
+	}
+
+	found := false
+	for _, tile := range result.WinningTiles {
+		if tile == "tong-5" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected winning tile 'tong-5', but it was not found in %v", result.WinningTiles)
+	}
+}

@@ -228,8 +228,20 @@ class MahjongApp {
       case 'player_action':
         this.game.handlePlayerAction(message.data);
         break;
+      case 'ting_result':
+        this.game.handleTingResult(message.data);
+        break;
+      case 'game_win':
+        this.game.handleGameWin(message.data);
+        break;
+      case 'game_draw':
+        this.game.handleGameDraw(message.data);
+        break;
       case 'game_over':
         this.game.gameOver(message.data);
+        break;
+      case 'possible_actions':
+        this.game.handlePossibleActions(message.data);
         break;
       default:
         console.warn('未知消息类型:', message.type);

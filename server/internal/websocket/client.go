@@ -183,177 +183,1165 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		
 
-			case "chow":
-
-				// 处理吃牌
-
-				tile, ok := data["tile"].(string)
-
-				if !ok {
-
-					return
-
-				}
+						case "chow":
 
 		
 
-				// 获取吃牌组合
+		
 
-				var chowTiles []string
-
-				if chowTilesInterface, ok := data["chowTiles"].([]interface{}); ok {
-
-					for _, t := range chowTilesInterface {
-
-						if tileStr, ok := t.(string); ok {
-
-							chowTiles = append(chowTiles, tileStr)
-
-						}
-
-					}
-
-				}
+							c.Room.StopNoResponseTimer()
 
 		
 
-				if len(chowTiles) != 3 {
+		
 
-					log.Printf("吃牌组合无效，长度: %d", len(chowTiles))
-
-					return
-
-				}
+							// 处理吃牌
 
 		
 
-				success := c.Room.HandleChow(c.UserID, tile, chowTiles)
+		
 
-				if success {
-
-					// 广播玩家吃牌动作（需要包含完整的组合信息）
-
-					c.Hub.BroadcastChowAction(c.Room, c.UserID, tile, chowTiles)
-
-				}
+			
 
 		
 
-			case "pong":
+		
 
-				// 处理碰牌
-
-				tile, ok := data["tile"].(string)
-
-				if !ok {
-
-					return
-
-				}
-
-				// 只有成功碰牌才廣播
-
-				success := c.Room.HandlePong(c.UserID, tile)
-
-				if success {
-
-					// 广播玩家碰牌动作
-
-					c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "pong", tile)
-
-				}
+							tile, ok := data["tile"].(string)
 
 		
 
-			case "kong":
+		
 
-				// 处理杠牌
-
-				tile, ok := data["tile"].(string)
-
-				if !ok {
-
-					return
-
-				}
-
-				isConcealed := false
-
-				if concealed, ok := data["concealed"].(bool); ok {
-
-					isConcealed = concealed
-
-				}
-
-				success := c.Room.HandleKong(c.UserID, tile, isConcealed)
-
-				if success {
-
-					// 杠牌成功后，找到杠牌的玩家和牌组
-
-					var player *game.Player
-
-					for _, p := range c.Room.Players {
-
-						if p.ID == c.UserID {
-
-							player = p
-
-							break
-
-						}
-
-					}
+			
 
 		
 
-					if player != nil {
+		
 
-						var kongMeld game.Meld
+							if !ok {
 
-						// 找到对应的杠牌组
+		
 
-						for _, meld := range player.Melds {
+		
 
-							isKong := (meld.Type == "kong_exposed" || meld.Type == "kong_concealed" || meld.Type == "kong_promoted")
+			
 
-							// 假设杠的牌是唯一的，或者最近的一个
+		
 
-							if isKong && meld.Tiles[0] == tile {
+		
 
-								kongMeld = meld
+								return
 
-								break // 找到就跳出
+		
+
+		
+
+			
+
+		
+
+		
 
 							}
 
-						}
+		
 
 		
 
-						if kongMeld.Type != "" {
-
-							c.Hub.BroadcastKongAction(c.Room, c.UserID, kongMeld)
-
-						} else {
-
-							// Fallback
-
-							log.Printf("找不到杠牌组，使用旧版广播: %s", tile)
-
-							c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "kong", tile)
-
-						}
-
-					}
-
-				}
+					
 
 		
 
-			case "check_ting":
+		
 
-				// 检查听牌
+			
+
+		
+
+		
+
+							// 获取吃牌组合
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							var chowTiles []string
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							if chowTilesInterface, ok := data["chowTiles"].([]interface{}); ok {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								for _, t := range chowTilesInterface {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+									if tileStr, ok := t.(string); ok {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+										chowTiles = append(chowTiles, tileStr)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+									}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+					
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							if len(chowTiles) != 3 {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								log.Printf("吃牌组合无效，长度: %d", len(chowTiles))
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								return
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+					
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							success := c.Room.HandleChow(c.UserID, tile, chowTiles)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							if success {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								// 广播玩家吃牌动作（需要包含完整的组合信息）
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								c.Hub.BroadcastChowAction(c.Room, c.UserID, tile, chowTiles)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+					
+
+		
+
+		
+
+			
+
+		
+
+		
+
+						case "pong":
+
+		
+
+		
+
+							c.Room.StopNoResponseTimer()
+
+		
+
+		
+
+							// 处理碰牌
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							tile, ok := data["tile"].(string)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							if !ok {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								return
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							// 只有成功碰牌才廣播
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							success := c.Room.HandlePong(c.UserID, tile)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							if success {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								// 广播玩家碰牌动作
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "pong", tile)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+					
+
+		
+
+		
+
+			
+
+		
+
+		
+
+						case "kong":
+
+		
+
+		
+
+							c.Room.StopNoResponseTimer()
+
+		
+
+		
+
+							// 处理杠牌
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							tile, ok := data["tile"].(string)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							if !ok {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+								return
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							}
+
+		
+
+		
+
+							isConcealed := false
+
+		
+
+		
+
+			
+
+		
+
+		
+
+											if concealed, ok := data["concealed"].(bool); ok {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							
+
+		
+
+		
+
+			
+
+		
+
+		
+
+												isConcealed = concealed
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							
+
+		
+
+		
+
+			
+
+		
+
+		
+
+											}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+											success, drawnTile := c.Room.HandleKong(c.UserID, tile, isConcealed)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							
+
+		
+
+		
+
+			
+
+		
+
+		
+
+											if success {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+												// 杠牌成功后，找到杠牌的玩家和牌组
+
+		
+
+		
+
+			
+
+		
+
+		
+
+												var player *game.Player
+
+		
+
+		
+
+			
+
+		
+
+		
+
+												for _, p := range c.Room.Players {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													if p.ID == c.UserID {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														player = p
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														break
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+												}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+												if player != nil {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													var kongMeld game.Meld
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													// 找到对应的杠牌组
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													for _, meld := range player.Melds {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														isKong := (meld.Type == "kong_exposed" || meld.Type == "kong_concealed" || meld.Type == "kong_promoted")
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														// 假设杠的牌是唯一的，或者最近的一个
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														if isKong && meld.Tiles[0] == tile {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+															kongMeld = meld
+
+		
+
+		
+
+			
+
+		
+
+		
+
+															break // 找到就跳出
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													if kongMeld.Type != "" {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														c.Hub.BroadcastKongAction(c.Room, c.UserID, kongMeld)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													} else {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														log.Printf("找不到杠牌组，使用旧版广播: %s", tile)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "kong", tile)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													// 广播补牌
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													if drawnTile != "" {
+
+		
+
+		
+
+			
+
+		
+
+		
+
+														c.Hub.BroadcastDrawTile(c.Room, c.UserID, drawnTile)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+													}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+												}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+											}
+
+		
+
+		
+
+			
+
+		
+
+		
+
+			
+
+		
+
+		
+
+			
+
+		
+
+		
+
+						case "pass":
+
+		
+
+		
+
+							c.Room.StopNoResponseTimer()
+
+		
+
+		
+
+							// 处理"过"动作（玩家选择不执行吃/碰/槓/胡）
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							tile, _ := data["tile"].(string)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							log.Printf("玩家 %s 选择过，不执行动作 (tile: %s)", c.UserName, tile)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							// 不需要做任何特殊处理，游戏将继续正常流程
+
+		
+
+		
+
+							// 輪到下一個玩家
+
+		
+
+		
+
+							c.Hub.CheckAndPlayBotTurn(c.Room, false)
+
+		
+
+		
+
+			
+
+		
+
+		
+
+			
+
+		
+
+		
+
+						case "check_ting":
+
+		
+
+		
+
+			
+
+		
+
+		
+
+							// 检查听牌
 
 				if c.Room.Game == nil {
 

@@ -120,18 +120,7 @@ func (h *Hub) unregisterClient(client *Client) {
 // broadcastRoomUpdate 广播房间状态更新
 func (h *Hub) broadcastRoomUpdate(room *game.Room) {
 	message := room.GetRoomUpdateMessage()
-
-	for _, clientInterface := range room.Clients {
-		client, ok := clientInterface.(*Client)
-		if !ok {
-			continue
-		}
-		select {
-		case client.Send <- message:
-		default:
-			log.Printf("警告：客户端 %s 的发送缓冲区已满，消息被丢弃", client.UserName)
-		}
-	}
+	h.broadcast(room, message)
 }
 
 // startGame 开始游戏
@@ -259,8 +248,8 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 	if !strings.HasPrefix(currentPlayer.ID, "bot_") {
 		if withDelay {
 			go func() {
-				log.Printf("检测到玩家 %s (位置 %d) 有可执行动作，开始 30 秒等待...", currentPlayer.Name, currentTurnAtCheck)
-				time.Sleep(30 * time.Second)
+				log.Printf("检测到玩家 %s (位置 %d) 有可执行动作，开始 10 秒等待...", currentPlayer.Name, currentTurnAtCheck)
+				time.Sleep(10 * time.Second)
 				h.mu.Lock()
 				defer h.mu.Unlock()
 				log.Printf("玩家 %s 的等待时间结束。当前轮次: %d, 期望轮次: %d", currentPlayer.Name, room.CurrentTurn, currentTurnAtCheck)
@@ -339,8 +328,29 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 
 				actionTaken := h.botsReactToDiscard(room, tileToDiscard, discarderPosition)
 				if !actionTaken {
+					// 广播可执行动作给真实玩家
+					h.BroadcastPossibleActions(room, tileToDiscard, discarderPosition)
+
 					hasHumanAction := h.HasHumanAction(room, tileToDiscard, discarderPosition)
-					h.CheckAndPlayBotTurn(room, hasHumanAction)
+
+					// 如果有真实玩家可以执行动作，等待10秒后再继续
+					if hasHumanAction {
+						log.Printf("等待真实玩家响应可执行动作，10秒后自动继续...")
+						currentTurnSnapshot := room.CurrentTurn
+						room.StartNoResponseTimer(10*time.Second, func() {
+							h.mu.Lock()
+							defer h.mu.Unlock()
+							// 检查轮次是否改变（玩家是否已经执行了动作）
+							if room.CurrentTurn == currentTurnSnapshot {
+								log.Printf("真实玩家未响应，继续游戏")
+								// 确保在继续游戏前停止定时器
+								room.StopNoResponseTimer()
+								h.CheckAndPlayBotTurn(room, false)
+							}
+						})
+					} else {
+						h.CheckAndPlayBotTurn(room, false)
+					}
 				}
 			} else {
 				h.mu.Unlock()
@@ -421,6 +431,9 @@ func (h *Hub) HasHumanAction(room *game.Room, discardedTile string, discarderPos
 
 		// 检查碰或杠
 		if room.Game.CanPong(p.Hand, discardedTile) {
+			return true
+		}
+		if room.Game.CanExposedKong(p, discardedTile) {
 			return true
 		}
 
@@ -522,8 +535,15 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 	h.mu.RUnlock()
 
 	for _, p := range playersCopy {
-		if p.Position == discarderPosition || (len(p.ID) > 4 && p.ID[:4] != "bot_") {
+		if p.Position == discarderPosition || !strings.HasPrefix(p.ID, "bot_") {
 			continue
+		}
+
+		// 如果 Bot 已经听牌，则只检查是否可以胡牌
+		if p.IsTing {
+			// TODO: 实现胡牌检查
+			// if room.Game.CanHu(...) { bestAction = "hu"; bestBot = p; }
+			continue // 跳过其他动作检查
 		}
 
 		// Simplified action checking...
@@ -560,9 +580,10 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 		
 		h.mu.Lock()
 		log.Printf("Bot %s 决定执行动作: %s on %s", bestBot.Name, bestAction, discardedTile)
+		var drawnTile string
 		switch bestAction {
 		case "kong":
-			success = room.HandleKong(bestBot.ID, discardedTile, false)
+			success, drawnTile = room.HandleKong(bestBot.ID, discardedTile, false)
 			actionToBroadcast = "kong"
 		case "pong":
 			success = room.HandlePong(bestBot.ID, discardedTile)
@@ -590,6 +611,10 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 				} else {
 					// Fallback
 					h.BroadcastPlayerAction(room, bestBot.ID, "kong", discardedTile)
+				}
+				// 广播补牌
+				if drawnTile != "" {
+					h.BroadcastDrawTile(room, bestBot.ID, drawnTile)
 				}
 			} else {
 				h.BroadcastPlayerAction(room, bestBot.ID, actionToBroadcast, discardedTile)
@@ -756,7 +781,6 @@ func (h *Hub) BroadcastFlowerTiles(room *game.Room, playerID string, flowers []s
 
 	log.Printf("广播玩家花牌: %s 摸到花牌 %v", playerID, flowers)
 
-	// 向所有玩家发送
 	for _, clientInterface := range room.Clients {
 		client, ok := clientInterface.(*Client)
 		if !ok {
@@ -769,3 +793,145 @@ func (h *Hub) BroadcastFlowerTiles(room *game.Room, playerID string, flowers []s
 		}
 	}
 }
+
+// broadcast is a helper to send a message to all clients in a room
+func (h *Hub) broadcast(room *game.Room, message []byte) {
+	for _, clientInterface := range room.Clients {
+		client, ok := clientInterface.(*Client)
+		if !ok {
+			continue
+		}
+		select {
+		case client.Send <- message:
+		default:
+			log.Printf("警告：客户端 %s 的发送缓冲区已满，消息被丢弃", client.UserName)
+		}
+	}
+}
+
+// BroadcastPossibleActions 广播可执行动作给玩家
+func (h *Hub) BroadcastPossibleActions(room *game.Room, discardedTile string, discarderPosition int) {
+	for _, player := range room.Players {
+		// 跳过Bot和出牌者自己
+		if strings.HasPrefix(player.ID, "bot_") || player.Position == discarderPosition {
+			continue
+		}
+
+		// 检测可执行动作
+		possibleActions := make(map[string]interface{})
+
+		if player.IsTing {
+			// 听牌状态下只检查是否可以胡牌
+			if room.Game.CanHu(player.Hand, player.Melds) {
+				possibleActions["hu"] = true
+			}
+		} else {
+			// 非听牌状态下检查所有动作
+			// 检查碰
+			if room.Game.CanPong(player.Hand, discardedTile) {
+				possibleActions["pong"] = true
+			}
+
+			// 检查吃（只能吃上家的牌）
+			isPreviousPlayer := (player.Position + 3) % 4 == discarderPosition
+			if isPreviousPlayer {
+				chowCombinations := room.Game.CanChow(player.Hand, discardedTile)
+				if len(chowCombinations) > 0 {
+					possibleActions["chow"] = chowCombinations
+				}
+			}
+
+			// 检查槓（明槓）
+			if room.Game.CanExposedKong(player, discardedTile) {
+				possibleActions["kong"] = true
+			}
+
+			// 检查胡
+			if room.Game.CanHu(player.Hand, player.Melds) {
+				possibleActions["hu"] = true
+			}
+		}
+
+		// 如果有可执行动作，广播给该玩家
+		if len(possibleActions) > 0 {
+			message := map[string]interface{}{
+				"type": "possible_actions",
+				"data": map[string]interface{}{
+					"playerId": player.ID,
+					"tile":     discardedTile,
+					"actions":  possibleActions,
+					"timeout":  10, // 10秒超时
+				},
+			}
+
+			msgBytes, _ := json.Marshal(message)
+
+			// 只发送给该玩家
+			for _, clientInterface := range room.Clients {
+				client, ok := clientInterface.(*Client)
+				if !ok || client.UserID != player.ID {
+					continue
+				}
+				select {
+				case client.Send <- msgBytes:
+					log.Printf("广播可执行动作给玩家 %s: %v", player.Name, possibleActions)
+				default:
+					log.Printf("警告：无法发送可执行动作给玩家 %s", player.Name)
+				}
+			}
+		}
+	}
+}
+
+// BroadcastGameWin 广播游戏胜利事件并准备下一局
+func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *game.WinResult) {
+	var winnerName string
+	for _, p := range room.Players {
+		if p.ID == winnerID {
+			winnerName = p.Name
+			break
+		}
+	}
+
+	message := map[string]interface{}{
+		"type": "game_win",
+		"data": map[string]interface{}{
+			"winnerId":    winnerID,
+			"winnerName":  winnerName,
+			"winResult":   result,
+			"countdown":   8, // 告知前端倒计时秒数
+		},
+	}
+
+	msgBytes, _ := json.Marshal(message)
+	log.Printf("广播游戏胜利: 玩家 %s (%s) 胡牌", winnerName, winnerID)
+	h.broadcast(room, msgBytes)
+
+	// 8秒后开始新的一局
+	go func() {
+		time.Sleep(8 * time.Second)
+
+		h.mu.Lock()
+		// 检查游戏是否还未开始新的一局
+		if !room.GameStarted {
+			log.Printf("8秒倒计时结束，开始新的一局...")
+			room.NextRound()
+		} else {
+			log.Printf("新的一局已在倒计时期间开始，取消自动开始")
+			h.mu.Unlock()
+			return
+		}
+		h.mu.Unlock()
+
+		// 发牌
+		h.dealTiles(room)
+
+		// 发送游戏开始消息（通知新回合）
+		startMessage := room.GetGameStartMessage()
+		h.broadcast(room, startMessage)
+
+		// 检查Bot回合
+		h.CheckAndPlayBotTurn(room, false)
+	}()
+}
+

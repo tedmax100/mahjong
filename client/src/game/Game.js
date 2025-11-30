@@ -38,6 +38,9 @@ export class Game {
     this.actionButtons = null;
     this.lastDiscardedTile = null; // 最後被打出的牌
     this.pendingActions = []; // 可執行的動作列表
+    this.possibleTingDiscards = {};
+    this.isDeclaringTing = false;
+    this.selfKongOptions = [];
 
     // 游戏公告
     this.announcementText = null;
@@ -72,7 +75,7 @@ export class Game {
   logAllPlayersHands(action = '') {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`📊 ${action || '當前遊戲狀態'}`);
-    console.log(`${'='.repeat(60)}`);
+    console.log(`${'='.repeat(60)}\n`);
     this.players.forEach((player, index) => {
       this.logPlayerHand(index, '');
     });
@@ -227,30 +230,25 @@ export class Game {
   handlePlayerDiscard(tileType) {
     console.log('玩家打出:', tileType);
 
-    // 通过WebSocket发送出牌消息
-    if (this.ws) {
-      this.ws.sendAction('discard', { tile: tileType });
-    }
-
-    // 出牌後延遲檢查聽牌狀態（給伺服器時間更新狀態）
-    setTimeout(() => {
-      const myPlayer = this.players[this.myPosition];
-      if (myPlayer && myPlayer.tiles) {
-        const myHand = myPlayer.tiles.map(t => t.type);
-        const meldCount = myPlayer.melds ? myPlayer.melds.length : 0;
-
-        console.log(`🎴 出牌後檢查聽牌 - 手牌數: ${myHand.length}, 面子數: ${meldCount}`, myHand);
-
-        // 檢查是否聽牌
-        const readyTiles = this.checkReadyHand(myHand);
-        if (readyTiles.length > 0) {
-          console.log(`🎯 聽牌！聽: ${readyTiles.join(', ')}（共${readyTiles.length}張）`);
-          // 顯示聽牌按鈕
-          this.actionButtons.show(['ready', 'cancel']);
-          this.pendingActions = ['ready'];
+    if (this.isDeclaringTing) {
+        if (this.possibleTingDiscards[tileType]) {
+            console.log(`聽牌，打出: ${tileType}`);
+            this.ws.sendAction('ting', { tile: tileType });
+            this.isDeclaringTing = false;
+            const myPlayer = this.players[this.myPosition];
+            if (myPlayer) {
+              myPlayer.clearHighlight();
+            }
+        } else {
+            this.showAnnouncement('這張牌不能打出以聽牌！', 2000);
+            return;
         }
-      }
-    }, 300);
+    } else {
+        // 通过WebSocket发送出牌消息
+        if (this.ws) {
+            this.ws.sendAction('discard', { tile: tileType });
+        }
+    }
   }
 
   /**
@@ -469,7 +467,7 @@ export class Game {
   handlePlayerAction(data) {
     console.log('玩家动作:', data);
 
-    const { playerId, action, tile, currentTurn, remainingTiles } = data;
+    const {playerId, action, tile, currentTurn, remainingTiles} = data;
 
     // 更新剩余牌数（如果服务器发送了这个信息）
     if (remainingTiles !== undefined) {
@@ -571,7 +569,7 @@ export class Game {
     discardContainer.addChild(tileSprite);
 
     // 设置弃牌大小（參考圖片樣式，縮小一點）
-    const scale = 0.6;
+    const scale = 0.45; // 縮小牌底和牌面至75% (0.6 * 0.75 = 0.45)
     discardContainer.scale.set(scale);
 
     // 计算弃牌位置（在中央区域，根据玩家位置排列）
@@ -579,9 +577,9 @@ export class Game {
     const centerY = this.app.screen.height / 2;
     // 使用实际的牌底尺寸来计算间距（牌底比牌面稍大）
     // 弃牌包含牌底和牌面，实际占用空间更大
-    const tileWidth = 95 * scale;  // 再次增加宽度避免重叠（从80改为95）
-    const tileHeight = 115 * scale; // 再次增加高度避免重叠（从100改为115）
-    const spacing = 10; // 进一步增加间距（从8改为10）
+    const tileWidth = 53.4375 * scale;  // 縮小至56.25%（原95）
+    const tileHeight = 64.6875 * scale; // 縮小至56.25%（原115）
+    const spacing = 18; // 增加間距避免重疊
 
     // 计算该玩家已经打出的牌数
     const playerDiscards = this.discardedTiles.filter(d => d.playerPosition === playerPosition);
@@ -656,6 +654,7 @@ export class Game {
       // 如果是自己打的牌，清除動作按鈕
       this.actionButtons.hide();
       this.pendingActions = [];
+      this.possibleTingDiscards = {};
       const myPlayer = this.players[this.myPosition];
       if (myPlayer) {
         myPlayer.clearHighlight();
@@ -779,6 +778,7 @@ export class Game {
     // 清除動作按鈕
     this.actionButtons.hide();
     this.pendingActions = [];
+    this.possibleTingDiscards = {};
     const myPlayer = this.players[this.myPosition];
     if (myPlayer) {
       myPlayer.clearHighlight();
@@ -844,6 +844,7 @@ export class Game {
     // 清除動作按鈕（因為這張牌已經被碰了）
     this.actionButtons.hide();
     this.pendingActions = [];
+    this.possibleTingDiscards = {};
     const myPlayer = this.players[this.myPosition];
     if (myPlayer) {
       myPlayer.clearHighlight();
@@ -926,6 +927,7 @@ export class Game {
     // 清除動作按鈕
     this.actionButtons.hide();
     this.pendingActions = [];
+    this.possibleTingDiscards = {};
     const myPlayer = this.players[this.myPosition];
     if (myPlayer) {
       myPlayer.clearHighlight();
@@ -933,19 +935,7 @@ export class Game {
   }
 
   handleHu(playerId, tile) {
-    // 处理胡牌
-    console.log(`玩家 ${playerId} 胡了 ${tile}`);
-    const player = this.players.find(p => p.userId === playerId);
-    const winnerName = player ? player.name : '一个玩家';
-    this.showAnnouncement(`${winnerName} 胡!`, 5000);
-
-    // 清除動作按鈕（因為有人胡牌了）
-    this.actionButtons.hide();
-    this.pendingActions = [];
-    const myPlayer = this.players[this.myPosition];
-    if (myPlayer) {
-      myPlayer.clearHighlight();
-    }
+    // This is now handled by handleGameWin
   }
 
   /**
@@ -982,6 +972,7 @@ export class Game {
   showAnnouncement(text, duration = 3000) {
     this.announcementText.text = text;
     this.announcementText.visible = true;
+    this.announcementText.eventMode = 'none'; // Prevent text from blocking clicks
 
     if (this.announcementTimeout) {
       clearTimeout(this.announcementTimeout);
@@ -1027,8 +1018,8 @@ export class Game {
   createWalls() {
     const centerX = this.app.screen.width / 2;
     const centerY = this.app.screen.height / 2;
-    const tileWidth = 60;
-    const tileHeight = 80;
+    const tileWidth = 33.75;  // 縮小至56.25%（原60）
+    const tileHeight = 45;    // 縮小至56.25%（原80）
 
     // 根據螢幕大小計算牌山位置（緊貼牌桌邊緣）
     // 牌桌是 92% 大小，所以边缘在 46% 的位置，牌山应该在稍微内侧
@@ -1072,7 +1063,7 @@ export class Game {
           tile.anchor.set(0.5);
 
           // 水平排列
-          tile.x = (i - tilesPerSide / 2) * (tileWidth * 0.5 + 2);
+          tile.x = (i - tilesPerSide / 2) * (tileWidth * 0.5 + 5); // 增加間距避免重疊
           tile.y = -layer * 5; // 第二層稍微往上偏移，製造堆疊效果
 
           sideContainer.addChild(tile);
@@ -1149,597 +1140,21 @@ export class Game {
       console.log(`🎲 剩餘牌數更新: ${this.remainingTiles}張`);
     }
 
-    // 台湾麻将规则：海底剩余8张时流局
-    if (this.remainingTiles <= 8 && this.remainingTiles > 0) {
-      console.log('🚫 海底剩余8张，流局！');
-      this.handleGameDraw(); // 触发流局
-    }
+    // The server will handle the draw condition and send a message
   }
 
-  /**
-   * 处理流局（荒牌）
-   */
-  async handleGameDraw(data) {
-    console.log('游戏流局，无人胜出', data);
-
-    // 禁用所有玩家交互
-    this.players.forEach(player => {
-      player.setInteractive(false);
-    });
-
-    // 创建流局容器
-    const drawContainer = new Container();
-    drawContainer.zIndex = 10000;
-
-    // 加载并显示流局图片
-    try {
-      const liujuTexture = await Assets.load('/assets/ui/liuju.png');
-      const liujuSprite = new Sprite(liujuTexture);
-
-      // 设置图片居中
-      liujuSprite.anchor.set(0.5);
-      liujuSprite.x = this.app.screen.width / 2;
-      liujuSprite.y = this.app.screen.height / 2 - 50; // 稍微往上偏移，为倒计时留空间
-
-      // 可以调整图片大小
-      liujuSprite.scale.set(0.8);
-
-      drawContainer.addChild(liujuSprite);
-    } catch (error) {
-      console.error('加载流局图片失败:', error);
-      // 如果图片加载失败，显示文本
-      const drawText = new Text({
-        text: '流局',
-        style: {
-          fontSize: 72,
-          fill: 0xFFD700,
-          fontWeight: 'bold',
-          align: 'center',
-          stroke: 0x8B4513,
-          strokeThickness: 6
-        }
-      });
-      drawText.anchor.set(0.5);
-      drawText.x = this.app.screen.width / 2;
-      drawText.y = this.app.screen.height / 2 - 50;
-      drawContainer.addChild(drawText);
-    }
-
-    // 添加倒计时文本
-    const countdownText = new Text({
-      text: '5秒后开始新局',
-      style: {
-        fontSize: 36,
-        fill: 0xFFFFFF,
-        fontWeight: 'bold',
-        align: 'center',
-        stroke: 0x000000,
-        strokeThickness: 4
-      }
-    });
-    countdownText.anchor.set(0.5);
-    countdownText.x = this.app.screen.width / 2;
-    countdownText.y = this.app.screen.height / 2 + 100;
-    drawContainer.addChild(countdownText);
-
-    this.container.addChild(drawContainer);
-
-    // 倒计时逻辑
-    let countdown = 5;
-    const countdownInterval = setInterval(() => {
-      countdown--;
-      if (countdown > 0) {
-        countdownText.text = `${countdown}秒后开始新局`;
-      } else {
-        clearInterval(countdownInterval);
-
-        // 移除流局提示
-        this.container.removeChild(drawContainer);
-
-        // TODO: 开始新的一局（需要服务器支持）
-        console.log('准备开始新的一局...');
-        // 这里可以发送消息给服务器请求开始新一局
-        // 或者等待服务器主动发送新一局的消息
-      }
-    }, 1000);
-  }
-
-  /**
-   * 檢查可執行的動作（碰、吃、槓、胡）
-   */
-  checkPossibleActions(tile, discardPlayerPosition) {
-    const myPlayer = this.players[this.myPosition];
-    if (!myPlayer || !myPlayer.tiles) {
-      return;
-    }
-
-    const myHand = myPlayer.tiles.map(t => t.type);
-    console.log(`🎴 檢查動作 - 棄牌: ${tile}, 我的手牌:`, myHand);
-    const actions = [];
-    const highlightGroups = []; // 存儲所有可以高亮的牌組
-
-    // 檢查是否可以胡牌（優先級最高）
-    if (this.canHu(myHand, tile)) {
-      actions.push('hu');
-      // TODO: 添加胡牌的牌組高亮
-    }
-
-    // 如果已宣告聽牌，只能胡牌，不能吃碰槓
-    if (myPlayer.isTing) {
-      console.log('⚠️ 已宣告聽牌，只能胡牌');
-      // 如果有可執行的動作（只會是胡），顯示按鈕
-      if (actions.length > 0) {
-        actions.push('cancel'); // 總是添加取消按鈕
-        this.pendingActions = actions;
-        this.actionButtons.show(actions);
-        myPlayer.highlightTileGroups(highlightGroups);
-        console.log(`可執行的動作: ${actions.join(', ')}`);
-      }
-      return;
-    }
-
-    // 檢查是否可以槓
-    if (this.canKong(myHand, tile)) {
-      actions.push('kong');
-      // 槓牌：需要3張相同的牌
-      const kongGroup = myHand.filter(t => t === tile);
-      if (kongGroup.length >= 3) {
-        highlightGroups.push(kongGroup.slice(0, 3));
-      }
-    }
-
-    // 檢查是否可以碰
-    if (this.canPong(myHand, tile)) {
-      actions.push('pong');
-      // 碰牌：需要2張相同的牌
-      const pongGroup = myHand.filter(t => t === tile);
-      if (pongGroup.length >= 2) {
-        highlightGroups.push(pongGroup.slice(0, 2));
-      }
-    }
-
-    // 檢查是否可以吃（只能吃上家的牌）
-    const previousPlayer = (this.myPosition + 3) % 4; // 上家位置
-    if (discardPlayerPosition === previousPlayer) {
-      const canChowResult = this.canChow(myHand, tile);
-      console.log(`🍜 吃牌檢查 - 上家: ${previousPlayer}, 棄牌者: ${discardPlayerPosition}, 可以吃: ${canChowResult}`);
-      if (canChowResult) {
-        actions.push('chow');
-        // 吃牌：可能有多種組合
-        const chowCombinations = this.getChowCombinations(myHand, tile);
-        console.log(`🍜 吃牌組合:`, chowCombinations);
-        chowCombinations.forEach(combo => {
-          // 只高亮手牌中的牌（不包含要吃的牌）
-          const handTiles = combo.filter(t => t !== tile);
-          if (handTiles.length > 0) {
-            highlightGroups.push(handTiles);
-          }
-        });
-      }
-    }
-
-    // 如果有可執行的動作，顯示按鈕並高亮牌組
-    if (actions.length > 0) {
-      actions.push('cancel'); // 總是添加取消按鈕
-      this.pendingActions = actions;
-      this.actionButtons.show(actions);
-
-      // 高亮顯示可組合的牌
-      myPlayer.highlightTileGroups(highlightGroups);
-
-      console.log(`可執行的動作: ${actions.join(', ')}`);
-      console.log(`高亮牌組數量: ${highlightGroups.length}`);
-    } else {
-      // 沒有可執行的動作時，隱藏按鈕並清除高亮
-      this.actionButtons.hide();
-      this.pendingActions = [];
-      myPlayer.clearHighlight();
-    }
-  }
-
-  /**
-   * 檢查是否可以碰
-   */
-  canPong(hand, tile) {
-    let count = 0;
-    for (const t of hand) {
-      if (t === tile) {
-        count++;
-      }
-    }
-    return count >= 2;
-  }
-
-  /**
-   * 檢查是否可以槓
-   */
-  canKong(hand, tile) {
-    let count = 0;
-    for (const t of hand) {
-      if (t === tile) {
-        count++;
-      }
-    }
-    return count >= 3;
-  }
-
-  /**
-   * 檢查是否可以吃
-   */
-  canChow(hand, tile) {
-    // 字牌不能吃
-    const honors = ['dong', 'nan', 'xi', 'bei', 'zhong', 'fa', 'bai'];
-    if (honors.includes(tile)) {
-      return false;
-    }
-
-    // 解析牌的類型和數字
-    const parseTile = (t) => {
-      const match = t.match(/^(wan|tong|tiao)-(\d)$/);
-      if (!match) return null;
-      return { suit: match[1], num: parseInt(match[2]) };
-    };
-
-    const parsed = parseTile(tile);
-    if (!parsed) return false;
-
-    const { suit, num } = parsed;
-
-    // 檢查三種可能的順子組合
-    // 1. tile + tile+1 + tile+2
-    if (num <= 7) {
-      const tile2 = `${suit}-${num + 1}`;
-      const tile3 = `${suit}-${num + 2}`;
-      if (hand.includes(tile2) && hand.includes(tile3)) {
-        return true;
-      }
-    }
-
-    // 2. tile-1 + tile + tile+1
-    if (num >= 2 && num <= 8) {
-      const tile1 = `${suit}-${num - 1}`;
-      const tile3 = `${suit}-${num + 1}`;
-      if (hand.includes(tile1) && hand.includes(tile3)) {
-        return true;
-      }
-    }
-
-    // 3. tile-2 + tile-1 + tile
-    if (num >= 3) {
-      const tile1 = `${suit}-${num - 2}`;
-      const tile2 = `${suit}-${num - 1}`;
-      if (hand.includes(tile1) && hand.includes(tile2)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * 檢查是否可以胡牌（簡化版）
-   */
-  /**
-   * 檢查是否可以胡牌
-   * @param {Array<string>} hand - 手牌陣列
-   * @param {string} tile - 要檢查的牌（可能是摸的或別人打的）
-   * @param {number} meldCount - 已經吃碰槓的組數（默認為當前玩家的melds數量）
-   * @returns {boolean}
-   */
-  canHu(hand, tile, meldCount = null) {
-    // 獲取已有的吃碰槓組數
-    if (meldCount === null) {
-      const myPlayer = this.players[this.myPosition];
-      meldCount = myPlayer ? myPlayer.melds.length : 0;
-    }
-
-    // 將要胡的牌加入手牌（創建副本，不修改原手牌）
-    const fullHand = [...hand, tile];
-
-    // 台灣16張麻將：總共需要 5組面子 + 1對將 = 17張（包含胡的那張）
-    // 如果有吃碰槓，每組算一個面子，手牌相應減少
-    const requiredMelds = 5 - meldCount;
-    const requiredTiles = requiredMelds * 3 + 2; // N組面子(每組3張) + 1對將(2張)
-
-    if (fullHand.length !== requiredTiles) {
-      return false;
-    }
-
-    // 統計手牌
-    const tileCount = {};
-    fullHand.forEach(t => {
-      tileCount[t] = (tileCount[t] || 0) + 1;
-    });
-
-    // 嘗試找出所有可能的將（對子）
-    for (const [tile, count] of Object.entries(tileCount)) {
-      if (count >= 2) {
-        // 嘗試將這張牌作為將
-        const remainingTiles = { ...tileCount };
-        remainingTiles[tile] -= 2;
-
-        // 檢查剩餘的牌是否能組成所需數量的面子
-        if (this.canFormMelds(remainingTiles, requiredMelds)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * 檢查剩餘的牌是否能組成指定數量的面子（順子或刻子）
-   * @param {Object} tileCount - 牌的統計 {牌名: 數量}
-   * @param {number} meldsNeeded - 需要的面子數量
-   * @returns {boolean}
-   */
-  canFormMelds(tileCount, meldsNeeded) {
-    // 深度複製，避免修改原始數據
-    const tiles = { ...tileCount };
-
-    // 移除數量為0的牌
-    Object.keys(tiles).forEach(key => {
-      if (tiles[key] === 0) delete tiles[key];
-    });
-
-    // 如果沒有剩餘牌且不需要更多面子，則成功
-    if (Object.keys(tiles).length === 0 && meldsNeeded === 0) {
-      return true;
-    }
-
-    // 如果還需要面子但沒有牌了，或不需要面子但還有牌，則失敗
-    if (Object.keys(tiles).length === 0 || meldsNeeded === 0) {
-      return false;
-    }
-
-    // 獲取第一張牌
-    const firstTile = Object.keys(tiles).sort()[0];
-    const count = tiles[firstTile];
-
-    // 嘗試用這張牌組成刻子
-    if (count >= 3) {
-      const newTiles = { ...tiles };
-      newTiles[firstTile] -= 3;
-      if (newTiles[firstTile] === 0) delete newTiles[firstTile];
-
-      if (this.canFormMelds(newTiles, meldsNeeded - 1)) {
-        return true;
-      }
-    }
-
-    // 嘗試用這張牌組成順子（只有數字牌可以）
-    const match = firstTile.match(/^(wan|tong|tiao)-(\d)$/);
-    if (match) {
-      const suit = match[1];
-      const num = parseInt(match[2]);
-
-      // 檢查是否能組成順子 [n, n+1, n+2]
-      if (num <= 7) {
-        const tile2 = `${suit}-${num + 1}`;
-        const tile3 = `${suit}-${num + 2}`;
-
-        if (tiles[tile2] >= 1 && tiles[tile3] >= 1) {
-          const newTiles = { ...tiles };
-          newTiles[firstTile] -= 1;
-          newTiles[tile2] -= 1;
-          newTiles[tile3] -= 1;
-
-          if (newTiles[firstTile] === 0) delete newTiles[firstTile];
-          if (newTiles[tile2] === 0) delete newTiles[tile2];
-          if (newTiles[tile3] === 0) delete newTiles[tile3];
-
-          if (this.canFormMelds(newTiles, meldsNeeded - 1)) {
-            return true;
-          }
-        }
-      }
-    }
-
-    // 如果都不行，則無法組成
-    return false;
-  }
-
-  /**
-   * 檢查是否聽牌（差一張就能胡）
-   * @param {Array<string>} hand - 手牌陣列
-   * @returns {Array<string>} 聽的牌列表
-   */
-  checkReadyHand(hand) {
-    const myPlayer = this.players[this.myPosition];
-    const meldCount = myPlayer ? myPlayer.melds.length : 0;
-
-    // 檢查所有可能的牌（萬筒條 1-9，東南西北中發白）
-    const allPossibleTiles = [];
-
-    // 萬筒條 1-9
-    ['wan', 'tong', 'tiao'].forEach(suit => {
-      for (let num = 1; num <= 9; num++) {
-        allPossibleTiles.push(`${suit}-${num}`);
-      }
-    });
-
-    // 字牌
-    ['dong', 'nan', 'xi', 'bei', 'zhong', 'fa', 'bai'].forEach(tile => {
-      allPossibleTiles.push(tile);
-    });
-
-    // 測試每張牌，看加入後是否能胡
-    const readyTiles = [];
-    for (const tile of allPossibleTiles) {
-      if (this.canHu(hand, tile, meldCount)) {
-        readyTiles.push(tile);
-      }
-    }
-
-    return readyTiles;
-  }
-
-  /**
-   * 檢查自己摸牌後可以執行的動作（自摸、聽牌、暗槓）
-   */
-  checkSelfActions() {
-    const myPlayer = this.players[this.myPosition];
-    if (!myPlayer || !myPlayer.tiles || this.myPosition !== this.currentTurn) {
-      return;
-    }
-
-    const myHand = myPlayer.tiles.map(t => t.type);
+  handleTingResult(data) {
+    this.possibleTingDiscards = data;
     const actions = [];
 
-    console.log(`🎴 檢查自己的動作 - 手牌數: ${myHand.length}`, myHand);
-
-    // 檢查是否可以自摸（手牌中任意一張都可能是剛摸的）
-    // 由於我們不知道哪張是剛摸的，檢查是否已經胡牌
-    for (const tile of myHand) {
-      const handWithoutTile = myHand.filter((t, i) => {
-        // 只移除一張
-        const firstIndex = myHand.indexOf(tile);
-        return i !== firstIndex;
-      });
-
-      if (this.canHu(handWithoutTile, tile)) {
-        actions.push('hu');
-        console.log(`✅ 可以自摸！胡牌: ${tile}`);
-        break; // 找到一個就夠了
-      }
-    }
-
-    // 如果已宣告聽牌
-    if (myPlayer.isTing) {
-      // 如果不能胡牌，自動打出剛摸到的牌
-      if (!actions.includes('hu') && myPlayer.lastDrawnTile) {
-        console.log(`⚠️ 已聽牌且無法胡牌，自動打出: ${myPlayer.lastDrawnTile}`);
-        // 延遲1秒後自動打出，讓玩家看到摸到的牌
-        setTimeout(() => {
-          if (this.ws) {
-            this.ws.sendAction('discard', { tile: myPlayer.lastDrawnTile });
-          }
-        }, 1000);
-        return; // 不需要顯示按鈕
-      }
-    }
-
-    // 如果不能自摸且未宣告聽牌，檢查是否聽牌
-    if (!actions.includes('hu') && !myPlayer.isTing) {
-      const readyTiles = this.checkReadyHand(myHand);
-      if (readyTiles.length > 0) {
+    if (Object.keys(this.possibleTingDiscards).length > 0) {
         actions.push('ready');
-        console.log(`🎯 聽牌！聽: ${readyTiles.join(', ')}（共${readyTiles.length}張）`);
-      }
+        console.log('🎯 聽牌！可打出的牌:', Object.keys(this.possibleTingDiscards));
     }
 
-    // 顯示動作按鈕
     if (actions.length > 0) {
       this.actionButtons.show([...actions, 'cancel']);
       this.pendingActions = actions;
-    }
-  }
-
-  /**
-   * 處理碰牌動作
-   */
-  handlePongAction() {
-    console.log('執行碰牌');
-    if (this.ws && this.lastDiscardedTile) {
-      this.ws.sendAction('pong', { tile: this.lastDiscardedTile });
-    }
-
-    // 清除牌組高亮
-    const myPlayer = this.players[this.myPosition];
-    if (myPlayer) {
-      myPlayer.clearHighlight();
-    }
-  }
-
-  /**
-   * 處理吃牌動作
-   */
-  handleChowAction() {
-    console.log('執行吃牌');
-
-    // 需要讓玩家選擇吃牌組合
-    // 這裡先使用第一個可能的組合
-    const myHand = this.players[this.myPosition].tiles.map(t => t.type);
-    const combinations = this.getChowCombinations(myHand, this.lastDiscardedTile);
-
-    if (combinations.length > 0 && this.ws) {
-      // 如果有多個組合，這裡簡化處理，使用第一個
-      // TODO: 可以添加UI讓玩家選擇
-      this.ws.sendAction('chow', {
-        tile: this.lastDiscardedTile,
-        chowTiles: combinations[0]
-      });
-    }
-
-    // 清除牌組高亮
-    const myPlayer = this.players[this.myPosition];
-    if (myPlayer) {
-      myPlayer.clearHighlight();
-    }
-  }
-
-  /**
-   * 獲取所有可能的吃牌組合
-   */
-  getChowCombinations(hand, tile) {
-    const combinations = [];
-
-    const parseTile = (t) => {
-      const match = t.match(/^(wan|tong|tiao)-(\d)$/);
-      if (!match) return null;
-      return { suit: match[1], num: parseInt(match[2]) };
-    };
-
-    const parsed = parseTile(tile);
-    if (!parsed) return combinations;
-
-    const { suit, num } = parsed;
-
-    // 檢查三種可能的順子組合
-    if (num <= 7) {
-      const tile2 = `${suit}-${num + 1}`;
-      const tile3 = `${suit}-${num + 2}`;
-      if (hand.includes(tile2) && hand.includes(tile3)) {
-        combinations.push([tile, tile2, tile3]);
-      }
-    }
-
-    if (num >= 2 && num <= 8) {
-      const tile1 = `${suit}-${num - 1}`;
-      const tile3 = `${suit}-${num + 1}`;
-      if (hand.includes(tile1) && hand.includes(tile3)) {
-        combinations.push([tile1, tile, tile3]);
-      }
-    }
-
-    if (num >= 3) {
-      const tile1 = `${suit}-${num - 2}`;
-      const tile2 = `${suit}-${num - 1}`;
-      if (hand.includes(tile1) && hand.includes(tile2)) {
-        combinations.push([tile1, tile2, tile]);
-      }
-    }
-
-    return combinations;
-  }
-
-  /**
-   * 處理槓牌動作
-   */
-  handleKongAction() {
-    console.log('執行槓牌');
-    if (this.ws && this.lastDiscardedTile) {
-      this.ws.sendAction('kong', {
-        tile: this.lastDiscardedTile,
-        isConcealed: false // 明槓
-      });
-    }
-
-    // 清除牌組高亮
-    const myPlayer = this.players[this.myPosition];
-    if (myPlayer) {
-      myPlayer.clearHighlight();
     }
   }
 
@@ -1752,20 +1167,131 @@ export class Game {
     const myPlayer = this.players[this.myPosition];
     if (!myPlayer) return;
 
-    // 標記玩家已宣告聽牌（在本地先標記）
-    myPlayer.isTing = true;
+    this.isDeclaringTing = true;
 
-    // 發送聽牌通知到服務器
-    if (this.ws) {
-      this.ws.sendAction('declare_ting', {});
+    const validDiscards = Object.keys(this.possibleTingDiscards);
+    myPlayer.highlightTiles(validDiscards);
+    myPlayer.setInteractive(true); // 确保玩家在选择听牌时可交互
+    
+    this.showAnnouncement('請選擇一張牌打出以聽牌', 3000);
+    this.actionButtons.hide();
+  }
+
+  /**
+   * 處理碰牌動作
+   */
+  handlePongAction() {
+    console.log('執行碰牌');
+    if (this.lastDiscardedTile) {
+      this.sendAction('pong', this.lastDiscardedTile);
+    }
+  }
+
+  /**
+   * 處理吃牌動作
+   */
+  /**
+   * 處理吃牌動作
+   */
+  handleChowAction() {
+    console.log('執行吃牌');
+    if (this.lastDiscardedTile && this.pendingActions.chow) {
+      if (this.pendingActions.chow.length > 1) {
+        // 如果有多個吃牌組合，提示玩家選擇
+        this.promptChowSelection(this.pendingActions.chow);
+      } else if (this.pendingActions.chow.length === 1) {
+        // 只有一個組合，直接執行
+        const combination = this.pendingActions.chow[0];
+        this.sendAction('chow', this.lastDiscardedTile, combination);
+      }
+    }
+  }
+
+  /**
+   * 提示玩家選擇吃牌組合
+   * @param {Array<Array<string>>} combinations - 可用的吃牌組合
+   */
+  promptChowSelection(combinations) {
+    this.actionButtons.hide(); // 隱藏主操作按鈕
+
+    const selectionContainer = new Container();
+    selectionContainer.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
+    selectionContainer.zIndex = 2000; // 確保在最上層
+    this.container.addChild(selectionContainer);
+
+    const bg = new Graphics();
+    bg.roundRect(-100, -20, 200, combinations.length * 40 + 40, 10);
+    bg.fill({ color: 0x000000, alpha: 0.8 });
+    selectionContainer.addChild(bg);
+
+    combinations.forEach((combo, index) => {
+        const comboText = new Text({
+          text: combo.join(' '),
+          style: {
+            fontSize: 24,
+            fill: 0xFFFFFF,
+            align: 'center',
+          }
+        });
+        comboText.anchor.set(0.5);
+        comboText.y = (index * 40);
+        comboText.eventMode = 'static';
+        comboText.cursor = 'pointer';
+
+        comboText.on('pointerdown', () => {
+            this.sendAction('chow', this.lastDiscardedTile, combo);
+            this.container.removeChild(selectionContainer);
+        });
+        selectionContainer.addChild(comboText);
+    });
+  }
+
+  /**
+   * 處理槓牌動作
+   */
+  handleKongAction() {
+    console.log('執行槓牌');
+    
+    let tileToKong = null;
+    let isConcealed = false;
+
+    // Case 1: Self-drawn kong (promoted or concealed)
+    if (this.selfKongOptions && this.selfKongOptions.length > 0) {
+        // UI should let user choose if multiple options. For now, take the first.
+        tileToKong = this.selfKongOptions[0];
+        
+        const myPlayer = this.players[this.myPosition];
+        const hand = myPlayer.tiles.map(t => t.type);
+        const handCounts = {};
+        for (const tile of hand) {
+            handCounts[tile] = (handCounts[tile] || 0) + 1;
+        }
+
+        if (handCounts[tileToKong] === 4) {
+            isConcealed = true;
+        }
+    } 
+    // Case 2: Kong on a discard
+    else if (this.pendingActions && this.pendingActions.kong) {
+        tileToKong = this.lastDiscardedTile;
+        isConcealed = false; // Cannot be concealed if it's from a discard
     }
 
-    // 顯示提示訊息
-    this.showAnnouncement('聽牌！', 2000);
-
-    // 隱藏按鈕
-    this.actionButtons.hide();
-    this.pendingActions = [];
+    if (tileToKong) {
+      console.log(`準備發送槓牌動作: ${tileToKong}, 暗槓: ${isConcealed}`);
+      this.ws.sendAction('kong', { tile: tileToKong, concealed: isConcealed });
+      
+      // 清理所有待处理动作状态
+      this.selfKongOptions = [];
+      this.pendingActions = {};
+      this.actionButtons.hide();
+      if (this.actionTimeout) {
+          clearTimeout(this.actionTimeout);
+          this.actionTimeout = null;
+      }
+    } else {
+        console.error("無法確定要槓哪張牌");
+    }
   }
 
   /**
@@ -1784,7 +1310,8 @@ export class Game {
     // 如果沒有 lastDiscardedTile，說明是自摸
     if (!this.lastDiscardedTile || this.currentTurn === this.myPosition) {
       isSelfDrawn = true;
-      // 找出胡的是哪張牌（檢查手牌中的每張）
+      // Find the winning tile from hand (server will verify)
+      // This is a simplified client-side check
       for (const tile of myHand) {
         const handWithoutTile = myHand.filter((t, i) => {
           const firstIndex = myHand.indexOf(tile);
@@ -1815,12 +1342,22 @@ export class Game {
   }
 
   /**
-   * 處理取消動作
+   * 處理取消動作（過）
    */
   handleCancelAction() {
-    console.log('取消動作');
-    this.actionButtons.hide();
-    this.pendingActions = [];
+    console.log('取消動作（過）');
+
+    // 发送过的动作到服务器
+    if (this.lastDiscardedTile) {
+      this.sendAction('pass', this.lastDiscardedTile);
+    } else {
+      // 如果没有 lastDiscardedTile，只是隐藏按钮
+      this.actionButtons.hide();
+      this.pendingActions = [];
+    }
+
+    this.possibleTingDiscards = {};
+    this.isDeclaringTing = false;
 
     // 清除牌組高亮
     const myPlayer = this.players[this.myPosition];
@@ -1847,5 +1384,268 @@ export class Game {
     if (this.actionButtons) {
       this.actionButtons.resize(width, height);
     }
+  }
+  
+  /**
+   * 处理游戏胜利
+   */
+  handleGameWin(data) {
+    console.log('游戏胜利', data);
+    const { winnerName, winResult, countdown } = data;
+    const { HandTypes, TotalTai, BaseScore } = winResult;
+
+    // 构建牌型描述
+    const handTypesStr = HandTypes.map(ht => `${ht.Name} (${ht.Tai}台)`).join(' ');
+    const title = `恭喜 ${winnerName} 胡牌！`;
+    const details = `${handTypesStr}\n总计: ${TotalTai}台, 得分: ${BaseScore}`;
+
+    this.showEndRoundScreen(title, details, countdown);
+  }
+
+  /**
+   * 处理流局（荒牌）
+   */
+  handleGameDraw(data) {
+    console.log('游戏流局，无人胜出', data);
+    const { countdown } = data;
+    this.showEndRoundScreen('流局', '无人胜出', countdown);
+  }
+
+  /**
+   * 检查可执行的对手动作（吃/碰/槓/胡）
+   * 注：现在由服务器端检测并通过 handlePossibleActions 通知
+   */
+  checkPossibleActions(tile, playerPosition) {
+    // 服务器端已经检测并广播，这里不需要客户端检查
+    console.log('checkPossibleActions 调用（由服务器端处理）');
+  }
+
+  /**
+   * 检查自己可以执行的动作（暗槓/听牌/自摸）
+   */
+  checkSelfActions() {
+    // 1. 发送听牌检查请求
+    if (this.ws) {
+      console.log('向伺服器發送聽牌檢查請求');
+      this.ws.sendAction('check_ting');
+    }
+
+    // 2. 本地检查暗槓/加槓
+    const myPlayer = this.players[this.myPosition];
+    if (!myPlayer) return;
+
+    this.selfKongOptions = [];
+    const hand = myPlayer.tiles.map(t => t.type);
+
+    // 检查加槓
+    const pongMelds = myPlayer.melds.filter(m => (m.type === 'pong' || m.Type === 'pong'));
+    for (const tileInHand of new Set(hand)) {
+        for (const meld of pongMelds) {
+            const meldTiles = meld.tiles || meld.Tiles;
+            if (meldTiles[0] === tileInHand) {
+                if (!this.selfKongOptions.includes(tileInHand)) {
+                    this.selfKongOptions.push(tileInHand);
+                }
+            }
+        }
+    }
+
+    // 检查暗槓
+    const handCounts = {};
+    for (const tile of hand) {
+        handCounts[tile] = (handCounts[tile] || 0) + 1;
+    }
+    for (const tile in handCounts) {
+        if (handCounts[tile] === 4) {
+            if (!this.selfKongOptions.includes(tile)) {
+                this.selfKongOptions.push(tile);
+            }
+        }
+    }
+    
+    // 如果有可用的槓牌選項，显示按钮
+    // 注意：这可能会覆盖由听牌检查显示的按钮，这是一个已知的UI限制
+    if (this.selfKongOptions.length > 0) {
+        console.log("发现可执行的个人槓牌:", this.selfKongOptions);
+        this.actionButtons.show(['kong', 'cancel']);
+    }
+
+    // TODO: 在此處加入檢查自摸等其他動作
+  }
+
+  /**
+   * 处理可执行动作通知
+   */
+  handlePossibleActions(data) {
+    const { playerId, tile, actions, timeout } = data;
+    console.log('收到可执行动作通知:', { playerId, tile, actions, timeout });
+
+    // 检查是否是当前玩家（使用 userId 而不是 id）
+    const myPlayer = this.players[this.myPosition];
+    console.log('DEBUG: myPlayer.userId =', myPlayer?.userId, 'playerId =', playerId, '是否相等?', myPlayer?.userId === playerId);
+
+    if (!myPlayer || myPlayer.userId !== playerId) {
+      console.log('不是当前玩家的动作，忽略 - myPlayer.userId:', myPlayer?.userId, 'expected:', playerId);
+      return;
+    }
+
+    // 保存最后打出的牌和可执行动作
+    this.lastDiscardedTile = tile;
+    this.pendingActions = actions;
+
+    // 确定要显示的按钮
+    const buttonsToShow = [];
+    if (actions.pong) buttonsToShow.push('pong');
+    if (actions.chow) buttonsToShow.push('chow');
+    if (actions.kong) buttonsToShow.push('kong');
+    if (actions.hu) buttonsToShow.push('hu');
+    buttonsToShow.push('cancel'); // 总是显示"过"按钮
+
+    console.log('显示动作按钮:', buttonsToShow);
+
+    // 显示按钮
+    if (this.actionButtons) {
+      this.actionButtons.show(buttonsToShow);
+    }
+
+    // 清除之前的超时
+    if (this.actionTimeout) {
+      clearTimeout(this.actionTimeout);
+    }
+
+    // 设置超时自动过
+    this.actionTimeout = setTimeout(() => {
+      console.log('动作选择超时，自动过');
+      this.sendAction('pass', tile);
+      if (this.actionButtons) {
+        this.actionButtons.hide();
+      }
+    }, timeout * 1000);
+  }
+
+  /**
+   * 发送动作选择到服务器
+   */
+  sendAction(action, tile, combination = null) {
+    const data = {
+      tile: tile
+    };
+
+    if (combination) {
+      if (action === 'chow') {
+        data.chowTiles = combination;
+      } else {
+        data.combination = combination;
+      }
+    }
+
+    const message = {
+      type: 'action',
+      action: action,
+      data: data
+    };
+
+    console.log('发送动作:', message);
+    this.ws.send(message);
+
+    // 清除超时
+    if (this.actionTimeout) {
+      clearTimeout(this.actionTimeout);
+      this.actionTimeout = null;
+    }
+
+    // 隐藏按钮
+    if (this.actionButtons) {
+      this.actionButtons.hide();
+    }
+  }
+
+  /**
+   * 显示回合结束画面（胡牌或流局）
+   */
+  async showEndRoundScreen(title, details, countdown) {
+    // 禁用所有玩家交互
+    this.players.forEach(player => {
+      player.setInteractive(false);
+    });
+    this.actionButtons.hide();
+
+    const endScreenContainer = new Container();
+    endScreenContainer.zIndex = 10000;
+
+    // 半透明背景
+    const bg = new Graphics();
+    bg.rect(0, 0, this.app.screen.width, this.app.screen.height);
+    bg.fill({ color: 0x000000, alpha: 0.7 });
+    endScreenContainer.addChild(bg);
+
+    // 标题（例如 "恭喜..." 或 "流局"）
+    const titleText = new Text({ text: title, style: {
+      fontSize: 60,
+      fill: 0xFFD700,
+      fontWeight: 'bold',
+      align: 'center',
+    }});
+    titleText.anchor.set(0.5);
+    titleText.x = this.app.screen.width / 2;
+    titleText.y = this.app.screen.height / 2 - 100;
+    endScreenContainer.addChild(titleText);
+
+    // 详情（例如牌型和分数）
+    const detailsText = new Text({ text: details, style: {
+      fontSize: 32,
+      fill: 0xFFFFFF,
+      align: 'center',
+      wordWrap: true,
+      wordWrapWidth: this.app.screen.width * 0.8,
+    }});
+    detailsText.anchor.set(0.5);
+    detailsText.x = this.app.screen.width / 2;
+    detailsText.y = this.app.screen.height / 2;
+    endScreenContainer.addChild(detailsText);
+
+    // 倒计时文本
+    const countdownText = new Text({
+      text: `${countdown}秒后开始新局`,
+      style: {
+        fontSize: 28,
+        fill: 0xCCCCCC,
+      }
+    });
+    countdownText.anchor.set(0.5);
+    countdownText.x = this.app.screen.width / 2;
+    countdownText.y = this.app.screen.height / 2 + 100;
+    endScreenContainer.addChild(countdownText);
+
+    this.container.addChild(endScreenContainer);
+
+    // 倒计时逻辑
+    let remaining = countdown;
+    const countdownInterval = setInterval(() => {
+      remaining--;
+      if (remaining > 0) {
+        countdownText.text = `${remaining}秒后开始新局`;
+      } else {
+        clearInterval(countdownInterval);
+        // 服务器会自动开始新的一局，客户端等待 game_start 消息
+        // 清理界面
+        this.container.removeChild(endScreenContainer);
+        this.resetForNewRound();
+      }
+    }, 1000);
+  }
+
+  /**
+   * 为新的一局重置UI
+   */
+  resetForNewRound() {
+    // 清空弃牌
+    this.discardContainer.removeChildren();
+    this.discardedTiles = [];
+
+    // 重置所有玩家
+    this.players.forEach(p => p.reset());
+
+    console.log("UI已重置，准备新的一局");
   }
 }
