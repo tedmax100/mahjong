@@ -301,6 +301,68 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 						log.Printf("Bot %s 的花牌: %v", currentPlayer.Name, currentPlayer.Flowers)
 						// TODO: 廣播花牌給前端
 					}
+
+					// 檢查 Bot 是否已聽牌
+					if currentPlayer.IsTing {
+						// 檢查是否自摸（摸到的牌是否在聽牌列表中）
+						isSelfDrawn := false
+						for _, winTile := range currentPlayer.WinningTiles {
+							if winTile == drawnTile {
+								isSelfDrawn = true
+								break
+							}
+						}
+
+						if isSelfDrawn {
+							// 自摸！廣播胡牌
+							log.Printf("Bot %s 自摸 %s！", currentPlayer.Name, drawnTile)
+							// TODO: 廣播胡牌事件
+							// h.mu.Unlock()
+							// h.BroadcastGameWin(room, currentPlayer.ID, drawnTile, true)
+							// return
+						} else {
+							// 不是自摸，自動打出摸到的牌，保持聽牌狀態
+							log.Printf("Bot %s 聽牌中，自動打出 %s", currentPlayer.Name, drawnTile)
+
+							discarderPosition := currentPlayer.Position
+							h.mu.Unlock()
+
+							// 處理出牌（HandleDiscard 會自己移除手牌）
+							isDraw := room.HandleDiscard(currentPlayer.ID, drawnTile)
+							h.BroadcastPlayerAction(room, currentPlayer.ID, "discard", drawnTile)
+
+							// 檢查是否流局
+							if isDraw {
+								h.BroadcastGameDraw(room)
+								return
+							}
+
+							actionTaken := h.botsReactToDiscard(room, drawnTile, discarderPosition)
+							if !actionTaken {
+								h.BroadcastPossibleActions(room, drawnTile, discarderPosition)
+								hasHumanAction := h.HasHumanAction(room, drawnTile, discarderPosition)
+								if hasHumanAction {
+									log.Printf("等待真實玩家響應可執行動作，10秒後自動繼續...")
+									currentTurnSnapshot := room.CurrentTurn
+									room.StartNoResponseTimer(10*time.Second, func() {
+										h.mu.Lock()
+										shouldContinue := room.CurrentTurn == currentTurnSnapshot
+										if shouldContinue {
+											log.Printf("真實玩家未響應，繼續遊戲")
+											room.StopNoResponseTimer()
+										}
+										h.mu.Unlock()
+										if shouldContinue {
+											h.CheckAndPlayBotTurn(room, false)
+										}
+									})
+								} else {
+									h.CheckAndPlayBotTurn(room, false)
+								}
+							}
+							return
+						}
+					}
 				}
 			} else if totalTiles == 17 {
 				log.Printf("Bot %s 剛吃/碰/槓完，不摸牌直接出牌（手牌 %d 張 + 吃碰槓 %d 組）",
@@ -339,12 +401,16 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 						currentTurnSnapshot := room.CurrentTurn
 						room.StartNoResponseTimer(10*time.Second, func() {
 							h.mu.Lock()
-							defer h.mu.Unlock()
 							// 检查轮次是否改变（玩家是否已经执行了动作）
-							if room.CurrentTurn == currentTurnSnapshot {
+							shouldContinue := room.CurrentTurn == currentTurnSnapshot
+							if shouldContinue {
 								log.Printf("真实玩家未响应，继续游戏")
 								// 确保在继续游戏前停止定时器
 								room.StopNoResponseTimer()
+							}
+							h.mu.Unlock()
+							// 在锁外调用 CheckAndPlayBotTurn，避免死锁
+							if shouldContinue {
 								h.CheckAndPlayBotTurn(room, false)
 							}
 						})
@@ -409,6 +475,69 @@ func (h *Hub) drawForRealPlayer_needsLock(room *game.Room) {
 
 			// 記錄摸牌後的手牌狀態
 			game.LogPlayerHand(currentPlayer, "摸牌: "+drawnTile)
+
+			// 檢查玩家是否已聽牌
+			if currentPlayer.IsTing {
+				// 檢查是否自摸（摸到的牌是否在聽牌列表中）
+				isSelfDrawn := false
+				for _, winTile := range currentPlayer.WinningTiles {
+					if winTile == drawnTile {
+						isSelfDrawn = true
+						break
+					}
+				}
+
+				if isSelfDrawn {
+					// 自摸！廣播胡牌
+					log.Printf("玩家 %s 自摸 %s！", currentPlayer.Name, drawnTile)
+					// TODO: 廣播胡牌事件
+					// h.BroadcastGameWin(room, currentPlayer.ID, drawnTile, true)
+				} else {
+					// 不是自摸，自動打出摸到的牌，保持聽牌狀態
+					log.Printf("玩家 %s 聽牌中，自動打出 %s", currentPlayer.Name, drawnTile)
+
+					// 處理出牌（HandleDiscard 會自己移除手牌）
+					isDraw := room.HandleDiscard(currentPlayer.ID, drawnTile)
+
+					// 廣播出牌動作
+					h.BroadcastPlayerAction(room, currentPlayer.ID, "discard", drawnTile)
+
+					// 檢查是否流局
+					if isDraw {
+						h.BroadcastGameDraw(room)
+						return
+					}
+
+					// 檢查是否有Bot響應
+					actionTaken := h.botsReactToDiscard(room, drawnTile, currentPlayer.Position)
+					if !actionTaken {
+						// 廣播可執行動作給真實玩家
+						h.BroadcastPossibleActions(room, drawnTile, currentPlayer.Position)
+
+						hasHumanAction := h.HasHumanAction(room, drawnTile, currentPlayer.Position)
+
+						// 如果有真實玩家可以執行動作，等待10秒後再繼續
+						if hasHumanAction {
+							log.Printf("等待真實玩家響應可執行動作，10秒後自動繼續...")
+							currentTurnSnapshot := room.CurrentTurn
+							room.StartNoResponseTimer(10*time.Second, func() {
+								h.mu.Lock()
+								shouldContinue := room.CurrentTurn == currentTurnSnapshot
+								if shouldContinue {
+									log.Printf("真實玩家未響應，繼續遊戲")
+									room.StopNoResponseTimer()
+								}
+								h.mu.Unlock()
+								if shouldContinue {
+									h.CheckAndPlayBotTurn(room, false)
+								}
+							})
+						} else {
+							h.CheckAndPlayBotTurn(room, false)
+						}
+					}
+				}
+			}
 		}
 	} else {
 		// 總牌數 < 15 或 > 17 才是真正的異常
@@ -427,6 +556,23 @@ func (h *Hub) HasHumanAction(room *game.Room, discardedTile string, discarderPos
 		// 只检查人类玩家，且不是出牌者自己
 		if strings.HasPrefix(p.ID, "bot_") || p.Position == discarderPosition {
 			continue
+		}
+
+		// 如果玩家听牌，只检查胡牌
+		if p.IsTing {
+			tempHand := append([]string{}, p.Hand...)
+			tempHand = append(tempHand, discardedTile)
+			if room.Game.CanHu(tempHand, p.Melds) {
+				return true
+			}
+			continue // 听牌后不检查其他动作
+		}
+
+		// 检查胡牌
+		tempHand := append([]string{}, p.Hand...)
+		tempHand = append(tempHand, discardedTile)
+		if room.Game.CanHu(tempHand, p.Melds) {
+			return true
 		}
 
 		// 检查碰或杠
@@ -498,6 +644,7 @@ func (h *Hub) BroadcastGameDraw(room *game.Room) {
 		"type": "game_draw",
 		"data": map[string]interface{}{
 			"remainingTiles": remainingTiles,
+			"countdown":      5, // 5秒倒计时
 		},
 	}
 
@@ -541,9 +688,22 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 
 		// 如果 Bot 已经听牌，则只检查是否可以胡牌
 		if p.IsTing {
-			// TODO: 实现胡牌检查
-			// if room.Game.CanHu(...) { bestAction = "hu"; bestBot = p; }
+			tempHand := append([]string{}, p.Hand...)
+			tempHand = append(tempHand, discardedTile)
+			if room.Game.CanHu(tempHand, p.Melds) {
+				bestAction = "hu"
+				bestBot = p
+			}
 			continue // 跳过其他动作检查
+		}
+
+		// 检查胡牌（优先级最高）
+		tempHand := append([]string{}, p.Hand...)
+		tempHand = append(tempHand, discardedTile)
+		if room.Game.CanHu(tempHand, p.Melds) {
+			bestAction = "hu"
+			bestBot = p
+			continue // 胡牌优先级最高，直接跳出继续
 		}
 
 		// Simplified action checking...
@@ -582,6 +742,14 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 		log.Printf("Bot %s 决定执行动作: %s on %s", bestBot.Name, bestAction, discardedTile)
 		var drawnTile string
 		switch bestAction {
+		case "hu":
+			// Bot 胡牌（别人打出的牌）
+			winResult := room.HandleHu(bestBot.ID, discardedTile, false)
+			h.mu.Unlock()
+			if winResult != nil {
+				h.BroadcastGameWin(room, bestBot.ID, winResult)
+			}
+			return true
 		case "kong":
 			success, drawnTile = room.HandleKong(bestBot.ID, discardedTile, false)
 			actionToBroadcast = "kong"
@@ -822,7 +990,10 @@ func (h *Hub) BroadcastPossibleActions(room *game.Room, discardedTile string, di
 
 		if player.IsTing {
 			// 听牌状态下只检查是否可以胡牌
-			if room.Game.CanHu(player.Hand, player.Melds) {
+			// 将打出的牌加入手牌进行检查
+			tempHand := append([]string{}, player.Hand...)
+			tempHand = append(tempHand, discardedTile)
+			if room.Game.CanHu(tempHand, player.Melds) {
 				possibleActions["hu"] = true
 			}
 		} else {
@@ -846,8 +1017,10 @@ func (h *Hub) BroadcastPossibleActions(room *game.Room, discardedTile string, di
 				possibleActions["kong"] = true
 			}
 
-			// 检查胡
-			if room.Game.CanHu(player.Hand, player.Melds) {
+			// 检查胡（将打出的牌加入手牌进行检查）
+			tempHand := append([]string{}, player.Hand...)
+			tempHand = append(tempHand, discardedTile)
+			if room.Game.CanHu(tempHand, player.Melds) {
 				possibleActions["hu"] = true
 			}
 		}

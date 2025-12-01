@@ -1505,7 +1505,10 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 					isDraw := c.Room.HandleDiscard(c.UserID, tile)
 
-					// 广播听牌动作
+					// 先广播出牌动作（让客户端移除手牌）
+					c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "discard", tile)
+
+					// 再广播听牌动作（显示听牌状态）
 
 					c.Hub.BroadcastPlayerTingAction(c.Room, c.UserID, tile)
 
@@ -1591,7 +1594,8 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 				if selfDrawn, ok := data["selfDrawn"].(bool); ok {
 			isSelfDrawn = selfDrawn
 		}
-		winResult := c.Room.HandleHu(c.UserID, isSelfDrawn)
+		tile, _ := data["tile"].(string)
+		winResult := c.Room.HandleHu(c.UserID, tile, isSelfDrawn)
 		if winResult != nil {
 			// 广播玩家胡牌动作
 			c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "hu", "")

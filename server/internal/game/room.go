@@ -299,10 +299,25 @@ func (r *Room) HandleDiscard(userID, tile string) bool {
 	}
 
 	// 检查手牌数量是否正确（应该有17张牌才能打牌，槓後補牌可能是18張）
+	// 每個槓（kong）比普通碰多1張牌，所以需要調整預期值
 	totalTiles := player.GetTotalTiles()
-	if totalTiles != 17 && totalTiles != 18 {
-		log.Printf("❌ 玩家 %s 手牌数量错误！总牌数 %d（手牌 %d + 吃碰槓 %d 組），预期 17或18 张，拒绝打牌",
-			player.Name, totalTiles, len(player.Hand), len(player.Melds))
+
+	// 計算槓的數量（每個槓多1張牌）
+	kongCount := 0
+	for _, meld := range player.Melds {
+		if meld.Type == "kong_concealed" || meld.Type == "kong_promoted" || meld.Type == "kong_exposed" {
+			kongCount++
+		}
+	}
+
+	// 基本預期：17或18張
+	// 每個槓額外增加1張
+	expectedMin := 17 + kongCount
+	expectedMax := 18 + kongCount
+
+	if totalTiles != expectedMin && totalTiles != expectedMax {
+		log.Printf("❌ 玩家 %s 手牌数量错误！总牌数 %d（手牌 %d + 吃碰槓 %d 組，其中 %d 個槓），预期 %d或%d 张，拒绝打牌",
+			player.Name, totalTiles, len(player.Hand), len(player.Melds), kongCount, expectedMin, expectedMax)
 		return false
 	}
 
@@ -628,7 +643,7 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) (bool, string) 
 }
 
 // HandleHu 处理胡牌
-func (r *Room) HandleHu(userID string, isSelfDrawn bool) *WinResult {
+func (r *Room) HandleHu(userID string, winTile string, isSelfDrawn bool) *WinResult {
 	// 找到玩家
 	var player *Player
 	for _, p := range r.Players {
@@ -647,19 +662,18 @@ func (r *Room) HandleHu(userID string, isSelfDrawn bool) *WinResult {
 		return nil
 	}
 
-	// 检查是否可以胡牌
-	if !r.Game.CanHu(player.Hand, player.Melds) {
-		log.Printf("玩家 %s 无法胡牌", player.Name)
+	// 检查是否可以胡牌（将胡牌的牌加入手牌进行检查）
+	tempHand := append([]string{}, player.Hand...)
+	tempHand = append(tempHand, winTile)
+	if !r.Game.CanHu(tempHand, player.Melds) {
+		log.Printf("玩家 %s 无法胡牌（手牌+%s）", player.Name, winTile)
 		return nil
 	}
 
-	log.Printf("玩家 %s 胡牌成功！", player.Name)
+	log.Printf("玩家 %s 胡牌成功！胡牌: %s", player.Name, winTile)
 
-	// 计算台数和得分
-	lastTile := ""
-	if len(player.Hand) > 0 {
-		lastTile = player.Hand[len(player.Hand)-1]
-	}
+	// 使用胡牌的牌作为 lastTile
+	lastTile := winTile
 
 	winResult := r.Game.CalculateScore(player, lastTile, isSelfDrawn)
 

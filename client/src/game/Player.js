@@ -254,6 +254,11 @@ export class Player {
     // 可以在这里添加视觉反馈，比如高亮手牌
     if (this.position === 'bottom') {
       this.tiles.forEach(tile => {
+        // 實際禁用/啟用牌面的交互性
+        if (tile.sprite) {
+          tile.sprite.eventMode = interactive ? 'static' : 'none';
+        }
+
         if (interactive) {
           tile.container.alpha = 1.0; // 完全不透明
         } else {
@@ -314,6 +319,11 @@ export class Player {
       // 只有底部玩家（自己）的牌可以点击
       if (this.position === 'bottom') {
         tile.on('click', (clickedTile) => this.onTileClick(clickedTile));
+
+        // 設置初始交互狀態
+        if (tile.sprite) {
+          tile.sprite.eventMode = this.isInteractive ? 'static' : 'none';
+        }
       }
 
       // 先加入到陣列
@@ -327,6 +337,11 @@ export class Player {
     this.tiles.forEach((tile, index) => {
       this.positionTile(tile, index);
     });
+
+    // 恢復聽牌狀態指示器（如果已宣告聽牌）
+    if (this.isTing) {
+      this.showTingStatus();
+    }
 
     console.log(`✅ 加入新牌完成，手牌數: ${this.tiles.length}, 最後摸牌: ${this.lastDrawnTile}`);
   }

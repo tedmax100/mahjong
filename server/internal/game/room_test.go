@@ -62,3 +62,200 @@ func TestNextRound(t *testing.T) {
 		t.Errorf("GameStarted should be true after NextRound")
 	}
 }
+
+// TestHandleDiscard_TileCountWithKongs 測試有槓時的牌數驗證
+func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
+	testCases := []struct {
+		name           string
+		handTiles      []string
+		melds          []Meld
+		kongCount      int
+		shouldSucceed  bool
+		description    string
+	}{
+		{
+			name: "無槓_17張手牌_應該成功",
+			handTiles: []string{
+				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
+				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
+				"tong-1", "tong-2", "tong-3", "tong-4", "tong-5",
+				"dong", "nan",
+			},
+			melds:         []Meld{},
+			kongCount:     0,
+			shouldSucceed: true,
+			description:   "正常情況，17張手牌，無吃碰槓",
+		},
+		{
+			name: "無槓_18張手牌_應該成功",
+			handTiles: []string{
+				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
+				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
+				"tong-1", "tong-2", "tong-3", "tong-4", "tong-5",
+				"dong", "nan", "xi",
+			},
+			melds:         []Meld{},
+			kongCount:     0,
+			shouldSucceed: true,
+			description:   "槓後補牌，18張手牌",
+		},
+		{
+			name: "1個槓_18張總牌_應該成功",
+			handTiles: []string{
+				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
+				"tiao-1", "tiao-2", "tiao-3", "tiao-4",
+				"tong-1", "tong-2", "tong-3", "tong-4", "tong-5",
+			},
+			melds: []Meld{
+				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
+			},
+			kongCount:     1,
+			shouldSucceed: true,
+			description:   "1個槓（4張）+ 14張手牌 = 18張（打牌前）",
+		},
+		{
+			name: "1個槓_19張總牌_應該成功",
+			handTiles: []string{
+				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
+				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
+				"tong-1", "tong-2", "tong-3", "tong-4", "tong-5",
+			},
+			melds: []Meld{
+				{Type: "kong_concealed", Tiles: []string{"dong", "dong", "dong", "dong"}},
+			},
+			kongCount:     1,
+			shouldSucceed: true,
+			description:   "1個槓 + 15張手牌 = 19張（槓後補牌，打牌前）",
+		},
+		{
+			name: "2個槓_19張總牌_應該成功",
+			handTiles: []string{
+				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
+				"tiao-1", "tiao-2", "tiao-3", "tiao-4",
+				"tong-1", "tong-2", "tong-3",
+			},
+			melds: []Meld{
+				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
+				{Type: "kong_concealed", Tiles: []string{"nan", "nan", "nan", "nan"}},
+			},
+			kongCount:     2,
+			shouldSucceed: true,
+			description:   "2個槓（8張）+ 11張手牌 = 19張（打牌前）",
+		},
+		{
+			name: "2個槓_20張總牌_應該成功",
+			handTiles: []string{
+				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
+				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
+				"tong-1", "tong-2",
+			},
+			melds: []Meld{
+				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
+				{Type: "kong_promoted", Tiles: []string{"nan", "nan", "nan", "nan"}},
+			},
+			kongCount:     2,
+			shouldSucceed: true,
+			description:   "2個槓 + 12張手牌 = 20張（槓後補牌，打牌前）",
+		},
+		{
+			name: "3個槓_20張總牌_應該成功",
+			handTiles: []string{
+				"wan-1", "wan-2", "wan-3", "wan-4",
+				"tiao-1", "tiao-2", "tiao-3", "tiao-4",
+			},
+			melds: []Meld{
+				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
+				{Type: "kong_concealed", Tiles: []string{"nan", "nan", "nan", "nan"}},
+				{Type: "kong_exposed", Tiles: []string{"xi", "xi", "xi", "xi"}},
+			},
+			kongCount:     3,
+			shouldSucceed: true,
+			description:   "3個槓（12張）+ 8張手牌 = 20張（打牌前）",
+		},
+		{
+			name: "1個槓_但牌數錯誤_應該失敗",
+			handTiles: []string{
+				"wan-1", "wan-2", "wan-3",
+			},
+			melds: []Meld{
+				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
+			},
+			kongCount:     1,
+			shouldSucceed: false,
+			description:   "只有7張總牌（3手牌+4槓），應該拒絕",
+		},
+		{
+			name: "2個槓_但牌數錯誤_應該失敗",
+			handTiles: []string{
+				"wan-1", "wan-2", "wan-3", "wan-4",
+			},
+			melds: []Meld{
+				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
+				{Type: "kong_concealed", Tiles: []string{"nan", "nan", "nan", "nan"}},
+			},
+			kongCount:     2,
+			shouldSucceed: false,
+			description:   "只有12張總牌（4手牌+8槓），預期19或20張，應該拒絕",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 創建房間
+			room := NewRoom("test-room")
+
+			// 添加玩家
+			room.AddPlayer("player1", "玩家1")
+			room.AddPlayer("player2", "玩家2")
+			room.AddPlayer("player3", "玩家3")
+			room.AddPlayer("player4", "玩家4")
+
+			room.StartGame()
+			// 不調用 DealTiles()，直接設置手牌
+
+			// 設置測試玩家的手牌和吃碰槓
+			player := room.Players[0]
+			player.Hand = tc.handTiles
+			player.Melds = tc.melds
+			room.CurrentTurn = 0
+
+			// 確保房間有 Game 實例
+			if room.Game == nil {
+				room.Game = NewMahjongGame(room.Players)
+			}
+
+			// 選擇一張手牌打出
+			if len(player.Hand) == 0 {
+				t.Skip("沒有手牌可以打出")
+				return
+			}
+			tileToDiscard := player.Hand[0]
+			initialHandCount := len(player.Hand)
+			initialTotalTiles := player.GetTotalTiles()
+
+			// 嘗試打牌（返回值表示是否流局，不是是否成功）
+			_ = room.HandleDiscard(player.ID, tileToDiscard)
+
+			// 檢查牌是否被移除（判斷是否成功）
+			tileWasRemoved := len(player.Hand) == initialHandCount-1
+			actualSuccess := tileWasRemoved
+
+			// 驗證結果
+			if tc.shouldSucceed && !actualSuccess {
+				t.Errorf("%s: 應該成功但失敗了。總牌數: %d, 槓數: %d, 預期: %d或%d",
+					tc.description, initialTotalTiles, tc.kongCount, 17+tc.kongCount, 18+tc.kongCount)
+			}
+
+			if !tc.shouldSucceed && actualSuccess {
+				t.Errorf("%s: 應該失敗但成功了。總牌數: %d, 槓數: %d",
+					tc.description, initialTotalTiles, tc.kongCount)
+			}
+
+			if tc.shouldSucceed && actualSuccess {
+				t.Logf("✓ %s - 成功", tc.description)
+			} else if !tc.shouldSucceed && !actualSuccess {
+				t.Logf("✓ %s - 正確拒絕", tc.description)
+			}
+		})
+	}
+}

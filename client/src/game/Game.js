@@ -510,7 +510,9 @@ export class Game {
     // 更新所有玩家的可交互状态
     this.players.forEach((player, index) => {
       const isMyTurn = (index === this.currentTurn && index === this.myPosition);
-      player.setInteractive(isMyTurn);
+      // 如果玩家已听牌，禁用交互（服务器会自动打牌）
+      const canInteract = isMyTurn && !player.isTing;
+      player.setInteractive(canInteract);
 
       // 如果輪到自己，檢查是否能聽牌或自摸
       if (isMyTurn) {
@@ -1211,39 +1213,127 @@ export class Game {
    * 提示玩家選擇吃牌組合
    * @param {Array<Array<string>>} combinations - 可用的吃牌組合
    */
-  promptChowSelection(combinations) {
+  async promptChowSelection(combinations) {
     this.actionButtons.hide(); // 隱藏主操作按鈕
 
-    const selectionContainer = new Container();
-    selectionContainer.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
-    selectionContainer.zIndex = 2000; // 確保在最上層
-    this.container.addChild(selectionContainer);
+    // 清理之前的選擇界面（如果存在）
+    this.clearChowSelection();
+
+    // 創建新的選擇容器並保存引用
+    this.chowSelectionContainer = new Container();
+    this.chowSelectionContainer.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
+    this.chowSelectionContainer.zIndex = 2000; // 確保在最上層
+    this.container.addChild(this.chowSelectionContainer);
+
+    // 載入牌底圖片
+    let baseTexture;
+    try {
+      baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
+    } catch (error) {
+      console.warn('無法載入牌底圖片', error);
+    }
+
+    // 計算每個組合的尺寸
+    const tileScale = 0.375; // 手牌的50% (0.75 * 0.5)
+    const tileWidth = 75 * tileScale;  // 原始牌寬
+    const tileHeight = 95 * tileScale; // 原始牌高
+    const tileSpacing = 5; // 同一組合內牌之間的間距
+    const comboSpacing = 20; // 不同組合之間的間距
+    const comboWidth = tileWidth * 3 + tileSpacing * 2; // 一組三張牌的總寬度
+
+    // 計算背景大小
+    const bgWidth = comboWidth + 40;
+    const bgHeight = combinations.length * (tileHeight + comboSpacing) + 20;
 
     const bg = new Graphics();
-    bg.roundRect(-100, -20, 200, combinations.length * 40 + 40, 10);
+    bg.roundRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 10);
     bg.fill({ color: 0x000000, alpha: 0.8 });
-    selectionContainer.addChild(bg);
+    bg.stroke({ width: 2, color: 0xFFD700 }); // 金色邊框
+    this.chowSelectionContainer.addChild(bg);
 
-    combinations.forEach((combo, index) => {
-        const comboText = new Text({
-          text: combo.join(' '),
-          style: {
-            fontSize: 24,
-            fill: 0xFFFFFF,
-            align: 'center',
-          }
-        });
-        comboText.anchor.set(0.5);
-        comboText.y = (index * 40);
-        comboText.eventMode = 'static';
-        comboText.cursor = 'pointer';
+    // 為每個組合創建牌的視覺呈現
+    for (let comboIndex = 0; comboIndex < combinations.length; comboIndex++) {
+      const combo = combinations[comboIndex];
+      const comboContainer = new Container();
 
-        comboText.on('pointerdown', () => {
-            this.sendAction('chow', this.lastDiscardedTile, combo);
-            this.container.removeChild(selectionContainer);
-        });
-        selectionContainer.addChild(comboText);
-    });
+      // 計算組合的 Y 位置（居中排列）
+      const comboY = -bgHeight / 2 + 10 + comboIndex * (tileHeight + comboSpacing) + tileHeight / 2;
+      comboContainer.y = comboY;
+
+      // 創建這個組合的三張牌
+      for (let tileIndex = 0; tileIndex < combo.length; tileIndex++) {
+        const tileType = combo[tileIndex];
+        const tileContainer = new Container();
+
+        // 添加牌底
+        if (baseTexture) {
+          const baseSprite = new Sprite(baseTexture);
+          baseSprite.anchor.set(0.5);
+          tileContainer.addChild(baseSprite);
+        }
+
+        // 添加牌面
+        const texture = this.tileAssets[tileType] || this.tileAssets['back'];
+        const tileSprite = new Sprite(texture);
+        tileSprite.anchor.set(0.5);
+        tileSprite.y = 5; // 調整牌面位置，讓它貼齊牌底下緣
+
+        // 針對筒子微調
+        if (tileType.startsWith('tong-')) {
+          tileSprite.y += 8; // 往下移8個像素
+        }
+
+        tileContainer.addChild(tileSprite);
+
+        // 設置牌的位置（水平排列，居中）
+        const startX = -(comboWidth / 2) + tileWidth / 2;
+        tileContainer.x = startX + tileIndex * (tileWidth + tileSpacing);
+        tileContainer.scale.set(tileScale);
+
+        comboContainer.addChild(tileContainer);
+      }
+
+      // 讓整個組合可點擊
+      comboContainer.eventMode = 'static';
+      comboContainer.cursor = 'pointer';
+
+      // 添加半透明背景以增強點擊區域
+      const clickArea = new Graphics();
+      clickArea.roundRect(-comboWidth / 2 - 5, -tileHeight / 2 - 5, comboWidth + 10, tileHeight + 10, 5);
+      clickArea.fill({ color: 0xFFFFFF, alpha: 0 });
+      comboContainer.addChildAt(clickArea, 0);
+
+      // 添加懸停效果
+      comboContainer.on('pointerover', () => {
+        clickArea.clear();
+        clickArea.roundRect(-comboWidth / 2 - 5, -tileHeight / 2 - 5, comboWidth + 10, tileHeight + 10, 5);
+        clickArea.fill({ color: 0xFFD700, alpha: 0.3 });
+      });
+
+      comboContainer.on('pointerout', () => {
+        clickArea.clear();
+        clickArea.roundRect(-comboWidth / 2 - 5, -tileHeight / 2 - 5, comboWidth + 10, tileHeight + 10, 5);
+        clickArea.fill({ color: 0xFFFFFF, alpha: 0 });
+      });
+
+      comboContainer.on('pointerdown', () => {
+        this.sendAction('chow', this.lastDiscardedTile, combo);
+        this.clearChowSelection();
+      });
+
+      this.chowSelectionContainer.addChild(comboContainer);
+    }
+  }
+
+  /**
+   * 清理吃牌選擇界面
+   */
+  clearChowSelection() {
+    if (this.chowSelectionContainer && this.chowSelectionContainer.parent) {
+      this.container.removeChild(this.chowSelectionContainer);
+      this.chowSelectionContainer.destroy({ children: true });
+      this.chowSelectionContainer = null;
+    }
   }
 
   /**
@@ -1347,6 +1437,9 @@ export class Game {
   handleCancelAction() {
     console.log('取消動作（過）');
 
+    // 清理吃牌選擇界面（如果存在）
+    this.clearChowSelection();
+
     // 发送过的动作到服务器
     if (this.lastDiscardedTile) {
       this.sendAction('pass', this.lastDiscardedTile);
@@ -1407,7 +1500,7 @@ export class Game {
    */
   handleGameDraw(data) {
     console.log('游戏流局，无人胜出', data);
-    const { countdown } = data;
+    const { countdown = 5 } = data; // 默认5秒倒计时
     this.showEndRoundScreen('流局', '无人胜出', countdown);
   }
 
@@ -1424,6 +1517,15 @@ export class Game {
    * 检查自己可以执行的动作（暗槓/听牌/自摸）
    */
   checkSelfActions() {
+    const myPlayer = this.players[this.myPosition];
+    if (!myPlayer) return;
+
+    // 如果已经听牌，不再检查其他动作
+    if (myPlayer.isTing) {
+      console.log('玩家已听牌，跳过动作检查');
+      return;
+    }
+
     // 1. 发送听牌检查请求
     if (this.ws) {
       console.log('向伺服器發送聽牌檢查請求');
@@ -1431,8 +1533,6 @@ export class Game {
     }
 
     // 2. 本地检查暗槓/加槓
-    const myPlayer = this.players[this.myPosition];
-    if (!myPlayer) return;
 
     this.selfKongOptions = [];
     const hand = myPlayer.tiles.map(t => t.type);
@@ -1520,6 +1620,8 @@ export class Game {
       if (this.actionButtons) {
         this.actionButtons.hide();
       }
+      // 清理吃牌選擇界面（如果存在）
+      this.clearChowSelection();
     }, timeout * 1000);
   }
 

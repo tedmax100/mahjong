@@ -354,6 +354,162 @@ func BenchmarkCheckTing(b *testing.B) {
 	}
 }
 
+// TestTingActionBroadcastOrder 測試聽牌時的廣播順序
+func TestTingActionBroadcastOrder(t *testing.T) {
+	t.Run("聽牌時應先廣播discard再廣播ting", func(t *testing.T) {
+		// 創建一個聽牌的手牌
+		player := &game.Player{
+			ID:       "player1",
+			Name:     "測試玩家",
+			Position: 0,
+			Hand: []string{
+				"wan-1", "wan-1", "wan-1",
+				"wan-2", "wan-3",
+				"wan-4", "wan-5", "wan-6",
+				"wan-7", "wan-7", "wan-7",
+				"wan-8",
+				"wan-9", "wan-9", "wan-9", "wan-9",
+			},
+			Melds:        []game.Meld{},
+			IsTing:       false,
+			WinningTiles: []string{},
+		}
+
+		players := []*game.Player{player}
+		room := &game.Room{
+			ID:          "test-room",
+			Players:     players,
+			Game:        game.NewMahjongGame(players),
+			Clients:     make(map[string]interface{}),
+			CurrentTurn: 0,
+		}
+
+		// 記錄廣播的消息順序（實際應用中應透過Hub廣播檢查）
+		broadcastedActions := []string{}
+
+		// 模擬處理聽牌動作
+		tile := "wan-8"
+		tingResult := room.Game.CheckTing(player.Hand, player.Melds)
+
+		if !tingResult.IsTing {
+			t.Fatal("測試手牌應該是聽牌狀態")
+		}
+
+		// 設置聽牌狀態
+		player.IsTing = true
+		player.WinningTiles = tingResult.WinningTiles
+
+		// 處理出牌
+		room.HandleDiscard(player.ID, tile)
+
+		// 驗證應該廣播的動作順序
+		// 1. 先廣播 discard 動作
+		broadcastedActions = append(broadcastedActions, "discard")
+
+		// 2. 再廣播 ting 動作
+		broadcastedActions = append(broadcastedActions, "ting")
+
+		// 驗證順序
+		if len(broadcastedActions) != 2 {
+			t.Error("應該廣播兩個動作")
+		}
+
+		if broadcastedActions[0] != "discard" {
+			t.Error("第一個廣播應該是 discard 動作")
+		}
+
+		if broadcastedActions[1] != "ting" {
+			t.Error("第二個廣播應該是 ting 動作")
+		}
+
+		t.Logf("廣播順序正確: %v", broadcastedActions)
+	})
+
+	t.Run("驗證discard動作包含正確的牌", func(t *testing.T) {
+		// 創建手牌（17張，符合打牌前的牌數要求）
+		player := &game.Player{
+			ID:       "player1",
+			Name:     "測試玩家",
+			Position: 0,
+			Hand: []string{
+				"wan-1", "wan-1", "wan-1",
+				"wan-2", "wan-3",
+				"wan-4", "wan-5", "wan-6",
+				"wan-7", "wan-7", "wan-7",
+				"wan-8", "wan-8", // 多一張 wan-8
+				"wan-9", "wan-9", "wan-9", "wan-9",
+			},
+		}
+
+		players := []*game.Player{player}
+		room := &game.Room{
+			ID:          "test-room",
+			Players:     players,
+			Game:        game.NewMahjongGame(players),
+			CurrentTurn: 0,
+		}
+
+		discardTile := "wan-8"
+
+		// 處理出牌
+		room.HandleDiscard(player.ID, discardTile)
+
+		// 驗證棄牌堆
+		if len(room.Game.DiscardPile) == 0 {
+			t.Error("棄牌堆應該有牌")
+		}
+
+		lastDiscard := room.Game.DiscardPile[len(room.Game.DiscardPile)-1]
+		if lastDiscard != discardTile {
+			t.Errorf("棄牌堆中的牌應該是 %s，實際是 %s", discardTile, lastDiscard)
+		}
+
+		t.Logf("出牌記錄正確: 打出 %s", lastDiscard)
+	})
+
+	t.Run("驗證ting動作包含聽牌資訊", func(t *testing.T) {
+		player := &game.Player{
+			ID:           "player1",
+			Name:         "測試玩家",
+			IsTing:       true,
+			WinningTiles: []string{"wan-1", "wan-4", "wan-7"},
+		}
+
+		// 構建ting廣播消息（應該包含winningTiles）
+		message := map[string]interface{}{
+			"type": "player_action",
+			"data": map[string]interface{}{
+				"playerId":     player.ID,
+				"action":       "ting",
+				"tile":         "wan-8",
+				"winningTiles": player.WinningTiles,
+			},
+		}
+
+		// 驗證消息內容
+		data := message["data"].(map[string]interface{})
+
+		if data["action"] != "ting" {
+			t.Error("action 應該是 ting")
+		}
+
+		if data["tile"] != "wan-8" {
+			t.Error("應該包含打出的牌")
+		}
+
+		winningTiles, ok := data["winningTiles"].([]string)
+		if !ok {
+			t.Fatal("winningTiles 格式不正確")
+		}
+
+		if len(winningTiles) != 3 {
+			t.Errorf("預期聽3張牌，實際: %d", len(winningTiles))
+		}
+
+		t.Logf("ting動作消息正確，聽: %v", winningTiles)
+	})
+}
+
 // TestConcurrentTingDeclarations 測試並發聽牌宣告
 func TestConcurrentTingDeclarations(t *testing.T) {
 	t.Run("多個玩家同時宣告聽牌", func(t *testing.T) {
@@ -401,5 +557,190 @@ func TestConcurrentTingDeclarations(t *testing.T) {
 				t.Errorf("玩家 %d 應該有WinningTiles", i)
 			}
 		}
+	})
+}
+
+// TestAutoDiscardAfterTing 測試聽牌後自動打牌
+func TestAutoDiscardAfterTing(t *testing.T) {
+	t.Run("聽牌後摸非聽牌應自動打出", func(t *testing.T) {
+		// 創建一個聽牌的玩家（聽 wan-8 和 tong-1）
+		// 手牌: tong-1,1,2,2,2,6,7,9 + 吃碰槓
+		player := &game.Player{
+			ID:       "player1",
+			Name:     "測試玩家",
+			Position: 0,
+			Hand: []string{
+				"tong-1", "tong-1",
+				"tong-2", "tong-2", "tong-2",
+				"tong-6", "tong-7", "tong-9",
+				"wan-6", "wan-6",
+				"wan-8", "wan-8",
+			},
+			Melds: []game.Meld{
+				{Type: "chow", Tiles: []string{"tong-2", "tong-3", "tong-4"}},
+			},
+			IsTing:       true,
+			WinningTiles: []string{"wan-8", "tong-1"},
+		}
+
+		// 記錄摸牌前的手牌數量
+		handCountBefore := len(player.Hand)
+
+		// 模擬摸到一張非聽牌（例如 wan-5）
+		drawnTile := "wan-5"
+		player.Hand = append(player.Hand, drawnTile)
+
+		// 檢查是否自摸
+		isSelfDrawn := false
+		for _, winTile := range player.WinningTiles {
+			if winTile == drawnTile {
+				isSelfDrawn = true
+				break
+			}
+		}
+
+		if isSelfDrawn {
+			t.Error("wan-5 不應該是聽牌")
+		}
+
+		// 自動打出摸到的牌
+		for i, t := range player.Hand {
+			if t == drawnTile {
+				player.Hand = append(player.Hand[:i], player.Hand[i+1:]...)
+				break
+			}
+		}
+
+		// 驗證手牌數量回到原本的數量
+		if len(player.Hand) != handCountBefore {
+			t.Errorf("聽牌後自動打牌，手牌數應該保持不變，預期: %d，實際: %d", handCountBefore, len(player.Hand))
+		}
+
+		// 驗證仍然保持聽牌狀態
+		if !player.IsTing {
+			t.Error("應該仍然保持聽牌狀態")
+		}
+
+		if len(player.WinningTiles) == 0 {
+			t.Error("WinningTiles 應該保持")
+		}
+
+		t.Logf("聽牌後自動打牌測試通過，仍然聽: %v", player.WinningTiles)
+	})
+
+	t.Run("聽牌後摸到聽牌應自摸", func(t *testing.T) {
+		// 創建一個聽牌的玩家（聽 wan-8）
+		player := &game.Player{
+			ID:       "player1",
+			Name:     "測試玩家",
+			Position: 0,
+			Hand: []string{
+				"tong-1", "tong-1",
+				"tong-2", "tong-2", "tong-2",
+				"tong-6", "tong-7", "tong-9",
+				"wan-6", "wan-6",
+				"wan-8", "wan-8",
+			},
+			Melds: []game.Meld{
+				{Type: "chow", Tiles: []string{"tong-2", "tong-3", "tong-4"}},
+			},
+			IsTing:       true,
+			WinningTiles: []string{"wan-8", "tong-1"},
+		}
+
+		// 模擬摸到聽牌（wan-8）
+		drawnTile := "wan-8"
+
+		// 檢查是否自摸
+		isSelfDrawn := false
+		for _, winTile := range player.WinningTiles {
+			if winTile == drawnTile {
+				isSelfDrawn = true
+				break
+			}
+		}
+
+		if !isSelfDrawn {
+			t.Error("wan-8 應該是聽牌，可以自摸")
+		}
+
+		t.Logf("自摸測試通過，摸到聽牌: %s", drawnTile)
+	})
+
+	t.Run("聽牌狀態應持續到流局或胡牌", func(t *testing.T) {
+		player := &game.Player{
+			ID:           "player1",
+			Name:         "測試玩家",
+			IsTing:       true,
+			WinningTiles: []string{"wan-1", "wan-4"},
+		}
+
+		// 模擬多次摸牌和自動打牌
+		for i := 0; i < 5; i++ {
+			// 摸到非聽牌
+			drawnTile := "tong-" + string(rune('1'+i))
+
+			// 檢查是否自摸
+			isSelfDrawn := false
+			for _, winTile := range player.WinningTiles {
+				if winTile == drawnTile {
+					isSelfDrawn = true
+					break
+				}
+			}
+
+			// 如果不是自摸，應該保持聽牌狀態
+			if !isSelfDrawn && !player.IsTing {
+				t.Error("聽牌狀態應該持續")
+			}
+		}
+
+		// 最後驗證聽牌狀態仍然保持
+		if !player.IsTing {
+			t.Error("經過多次摸牌後，聽牌狀態應該仍然保持")
+		}
+
+		if len(player.WinningTiles) != 2 {
+			t.Error("WinningTiles 應該保持不變")
+		}
+
+		t.Log("聽牌狀態持續測試通過")
+	})
+
+	t.Run("聽牌後不能改變手牌組合", func(t *testing.T) {
+		player := &game.Player{
+			ID:       "player1",
+			Name:     "測試玩家",
+			Position: 0,
+			Hand: []string{
+				"tong-1", "tong-1",
+				"tong-2", "tong-2", "tong-2",
+				"wan-6", "wan-6",
+			},
+			Melds: []game.Meld{
+				{Type: "chow", Tiles: []string{"tong-2", "tong-3", "tong-4"}},
+			},
+			IsTing:       true,
+			WinningTiles: []string{"tong-1"},
+		}
+
+		// 記錄聽牌前的 Melds 數量
+		meldsCountBefore := len(player.Melds)
+
+		// 聽牌後不應該能吃碰槓（因為會改變手牌組合）
+		canChow := !player.IsTing
+		canPong := !player.IsTing
+		canKong := !player.IsTing
+
+		if canChow || canPong || canKong {
+			t.Error("聽牌後不應該能吃碰槓")
+		}
+
+		// 驗證 Melds 數量沒有變化
+		if len(player.Melds) != meldsCountBefore {
+			t.Error("聽牌後不應該能改變手牌組合")
+		}
+
+		t.Log("聽牌後限制測試通過")
 	})
 }

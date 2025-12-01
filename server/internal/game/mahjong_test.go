@@ -455,11 +455,18 @@ func TestHandleKong_PromotedKongFromDiscard(t *testing.T) {
 	room.Game.DiscardPile = append(room.Game.DiscardPile, discardedTile)
 
 	// 3. Call HandleKong
-	success := room.HandleKong(playerA.ID, discardedTile, false)
+	success, drawnTile := room.HandleKong(playerA.ID, discardedTile, false)
 
 	// 4. Assertions
 	if !success {
 		t.Fatalf("HandleKong should have returned true for a valid promoted kong.")
+	}
+
+	// 檢查槓牌後有補牌
+	if drawnTile == "" {
+		t.Error("Expected a supplemental tile to be drawn after kong")
+	} else {
+		t.Logf("Supplemental tile drawn after kong: %s", drawnTile)
 	}
 
 	// Assert meld was updated
