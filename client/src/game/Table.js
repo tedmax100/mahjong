@@ -10,7 +10,9 @@ export class Table {
     this.container = new Container();
     this.centerSprite = null;
     this.centerTextures = [];
+    this.textureMetadata = []; // 存储每个纹理的原始尺寸信息
     this.currentTextureIndex = 0;
+    this.targetDisplaySize = 0; // 目标显示尺寸
 
     this.create();
   }
@@ -76,29 +78,41 @@ export class Table {
 
   async loadCenterImage() {
     try {
-      // 加载中央图片
-      const texture = await Assets.load('/assets/ui/bg_center.jpg');
+      // 加载三个中央图片，每个图片有不同的网格尺寸
+      const imageConfigs = [
+        { file: '/assets/ui/bg_center.jpg', cols: 3, rows: 4 },    // 12个小图
+        { file: '/assets/ui/bg_center_2.jpg', cols: 4, rows: 4 },  // 16个小图
+        { file: '/assets/ui/bg_center_3.jpg', cols: 3, rows: 5 }   // 15个小图
+      ];
 
-      // 图片是 3列 x 4行 = 12个小图
-      const cols = 3;
-      const rows = 4;
-      const cellWidth = texture.width / cols;
-      const cellHeight = texture.height / rows;
+      // 遍历加载每个图片
+      for (const config of imageConfigs) {
+        const texture = await Assets.load(config.file);
+        const cellWidth = texture.width / config.cols;
+        const cellHeight = texture.height / config.rows;
 
-      // 创建12个纹理
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          const rect = new Rectangle(
-            col * cellWidth,
-            row * cellHeight,
-            cellWidth,
-            cellHeight
-          );
-          const cellTexture = new Texture({
-            source: texture.source,
-            frame: rect
-          });
-          this.centerTextures.push(cellTexture);
+        // 设置目标显示尺寸为第一张图片小图尺寸的75%
+        if (this.targetDisplaySize === 0) {
+          this.targetDisplaySize = cellWidth * 0.75;
+        }
+
+        // 创建纹理并保存元数据
+        for (let row = 0; row < config.rows; row++) {
+          for (let col = 0; col < config.cols; col++) {
+            const rect = new Rectangle(
+              col * cellWidth,
+              row * cellHeight,
+              cellWidth,
+              cellHeight
+            );
+            const cellTexture = new Texture({
+              source: texture.source,
+              frame: rect
+            });
+            this.centerTextures.push(cellTexture);
+            // 保存原始尺寸信息
+            this.textureMetadata.push({ cellWidth, cellHeight });
+          }
         }
       }
 
@@ -108,10 +122,8 @@ export class Table {
       this.centerSprite.x = this.width / 2;
       this.centerSprite.y = this.height / 2;
 
-      // 设置大小（调整为合适的显示尺寸）
-      const displaySize = 200;
-      const scale = displaySize / cellWidth;
-      this.centerSprite.scale.set(scale);
+      // 设置初始缩放
+      this.updateSpriteScale();
 
       this.container.addChild(this.centerSprite);
 
@@ -124,11 +136,23 @@ export class Table {
     }
   }
 
+  updateSpriteScale() {
+    if (!this.centerSprite || this.textureMetadata.length === 0) return;
+
+    // 获取当前纹理的原始尺寸
+    const metadata = this.textureMetadata[this.currentTextureIndex];
+    // 计算缩放比例，使所有图片都显示为目标尺寸
+    const scale = this.targetDisplaySize / metadata.cellWidth;
+    this.centerSprite.scale.set(scale);
+  }
+
   startCarousel() {
     setInterval(() => {
       this.currentTextureIndex = (this.currentTextureIndex + 1) % this.centerTextures.length;
       if (this.centerSprite) {
         this.centerSprite.texture = this.centerTextures[this.currentTextureIndex];
+        // 更新缩放以保持统一大小
+        this.updateSpriteScale();
       }
     }, 2000); // 每2秒切换一张
   }
