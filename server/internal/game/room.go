@@ -578,8 +578,13 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) (bool, string) 
 
 	} else {
 		// 明杠：手牌中有3张，或已碰出，加上别人打出的1张
-		if !r.Game.CanExposedKong(player, tile) {
-			log.Printf("玩家 %s 无法明杠 %s", player.Name, tile)
+		// 判断是自己摸牌还是别人打出牌：
+		// 检查弃牌堆最后一张是否是这张牌
+		// 如果是，说明是响应别人打出的牌（明杠）
+		// 如果不是，说明是自己摸牌后想补杠
+		isSelfDrawn := len(r.Game.DiscardPile) == 0 || r.Game.DiscardPile[len(r.Game.DiscardPile)-1] != tile
+		if !r.Game.CanExposedKong(player, tile, isSelfDrawn) {
+			log.Printf("玩家 %s 无法明杠 %s (isSelfDrawn=%v)", player.Name, tile, isSelfDrawn)
 			return false, ""
 		}
 
@@ -588,6 +593,18 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) (bool, string) 
 		for i, meld := range player.Melds {
 			if meld.Type == "pong" && meld.Tiles[0] == tile {
 				log.Printf("玩家 %s 加杠 %s", player.Name, tile)
+
+				// 从手牌中移除1张（如果是自己摸牌补杠）
+				// 如果是别人打出的牌，则不需要从手牌中移除
+				if isSelfDrawn {
+					for j := len(player.Hand) - 1; j >= 0; j-- {
+						if player.Hand[j] == tile {
+							player.Hand = append(player.Hand[:j], player.Hand[j+1:]...)
+							break
+						}
+					}
+				}
+
 				player.Melds[i].Type = "kong_promoted"
 				player.Melds[i].Tiles = append(player.Melds[i].Tiles, tile)
 				isPromotedKong = true
@@ -662,15 +679,27 @@ func (r *Room) HandleHu(userID string, winTile string, isSelfDrawn bool) *WinRes
 		return nil
 	}
 
-	// 检查是否可以胡牌（将胡牌的牌加入手牌进行检查）
-	tempHand := append([]string{}, player.Hand...)
-	tempHand = append(tempHand, winTile)
-	if !r.Game.CanHu(tempHand, player.Melds) {
+	// 根据是否自摸，准备用于验证的最终手牌
+	var validationHand []string
+	if isSelfDrawn {
+		// 自摸时，牌已在 draw-logic 中加入手牌
+		validationHand = player.Hand
+	} else {
+		// 吃胡时，临时将胡的牌加入手牌
+		validationHand = append([]string{}, player.Hand...)
+		validationHand = append(validationHand, winTile)
+	}
+
+	// 使用最终手牌检查是否可以胡牌
+	if !r.Game.CanHu(validationHand, player.Melds) {
 		log.Printf("玩家 %s 无法胡牌（手牌+%s）", player.Name, winTile)
 		return nil
 	}
 
 	log.Printf("玩家 %s 胡牌成功！胡牌: %s", player.Name, winTile)
+
+	// 在算分前，确保玩家的手牌是最终的胡牌状态
+	player.Hand = validationHand
 
 	// 使用胡牌的牌作为 lastTile
 	lastTile := winTile
@@ -783,7 +812,9 @@ func (r *Room) ValidateAction(playerID string, actionType string, tile string, d
 				return count >= 4
 			}
 		}
-		return r.Game.CanExposedKong(player, tile)
+		// ValidateAction 用于验证 pending actions，即别人打出牌后的响应
+		// 所以这里 isSelfDrawn 应该为 false
+		return r.Game.CanExposedKong(player, tile, false)
 	case "pong":
 		return r.Game.CanPong(player.Hand, tile)
 	case "chow":

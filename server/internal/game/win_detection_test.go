@@ -326,3 +326,25 @@ func TestCanHu_ComplexPatterns(t *testing.T) {
 		}
 	})
 }
+
+// TestCanHu_BugFromLogs is the test case that reproduces the bug from the logs.
+func TestCanHu_BugFromLogs(t *testing.T) {
+	players := make([]*Player, 1)
+	players[0] = &Player{ID: "player1", Name: "Player 1", Position: 0}
+	game := NewMahjongGame(players)
+
+	t.Run("Bug from game log", func(t *testing.T) {
+		hand := []string{
+			"wan-1", "wan-2", "wan-3",
+			"tong-3", "tong-3", "tong-3",
+			"tiao-5", "tiao-6", "tiao-6", "tiao-7", "tiao-7", "tiao-8", "tiao-9", "tiao-9",
+		}
+		melds := []Meld{
+			{Type: "pong", Tiles: []string{"wan-8", "wan-8", "wan-8"}},
+		}
+
+		if !game.CanHu(hand, melds) {
+			t.Errorf("Hand from logs should be a winning hand but was not detected.")
+		}
+	})
+}

@@ -15,6 +15,9 @@ type WinResult struct {
 	TotalTai    int        // 总台数
 	BaseScore   int        // 基础分数
 	IsSelfDrawn bool       // 是否自摸
+	WinningHand []string   // 胡牌时的手牌
+	Melds       []Meld     // 胡牌时的吃碰杠
+	WinTile     string     // 胡的最后一张牌
 }
 
 // CalculateScore 计算台数和得分
@@ -22,6 +25,9 @@ func (g *MahjongGame) CalculateScore(player *Player, lastTile string, isSelfDraw
 	result := &WinResult{
 		HandTypes:   make([]HandType, 0),
 		IsSelfDrawn: isSelfDrawn,
+		WinningHand: player.Hand,
+		Melds:       player.Melds,
+		WinTile:     lastTile,
 	}
 
 	// 基础台数

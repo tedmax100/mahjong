@@ -104,14 +104,19 @@ export class ActionButtons {
    * 按鈕點擊處理
    */
   onButtonClick(action) {
-    console.log(`按鈕點擊: ${action}`);
+    console.log(`✅ 按鈕點擊: ${action}`);
+    console.log('可用回調:', Object.keys(this.callbacks));
+    console.log(`${action} 回調存在?`, !!this.callbacks[action]);
 
     // 隱藏按鈕
     this.hide();
 
     // 觸發回調
     if (this.callbacks[action]) {
+      console.log(`✅ 觸發 ${action} 回調`);
       this.callbacks[action]();
+    } else {
+      console.error(`❌ ${action} 回調不存在`);
     }
   }
 

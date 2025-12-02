@@ -44,6 +44,7 @@ export class Game {
 
     // 游戏公告
     this.announcementText = null;
+    this.winningHandContainer = null;
   }
 
   /**
@@ -108,6 +109,8 @@ export class Game {
     // 創建動作按鈕（異步初始化）
     this.actionButtons = new ActionButtons(this.app.screen.width, this.app.screen.height);
     this.container.addChild(this.actionButtons.container);
+    // 設置最高 zIndex 確保按鈕不被遮擋
+    this.actionButtons.container.zIndex = 3000;
 
     // 設置按鈕回調
     this.actionButtons.on('pong', () => this.handlePongAction());
@@ -132,6 +135,12 @@ export class Game {
     this.announcementText.visible = false;
     this.announcementText.zIndex = 2000;
     this.container.addChild(this.announcementText);
+
+    // Winning hand display container
+    this.winningHandContainer = new Container();
+    this.winningHandContainer.visible = false;
+    this.winningHandContainer.zIndex = 11000;
+    this.container.addChild(this.winningHandContainer);
 
     // 显示等待文字
     this.showWaitingText();
@@ -1388,10 +1397,13 @@ export class Game {
    * 處理胡牌動作
    */
   handleHuAction() {
-    console.log('執行胡牌');
+    console.log('✅ 執行胡牌動作');
 
     const myPlayer = this.players[this.myPosition];
     const myHand = myPlayer ? myPlayer.tiles.map(t => t.type) : [];
+    console.log('當前手牌:', myHand);
+    console.log('lastDiscardedTile:', this.lastDiscardedTile);
+    console.log('currentTurn:', this.currentTurn, 'myPosition:', this.myPosition);
 
     // 判斷是自摸還是別人放炮
     let isSelfDrawn = false;
@@ -1400,6 +1412,7 @@ export class Game {
     // 如果沒有 lastDiscardedTile，說明是自摸
     if (!this.lastDiscardedTile || this.currentTurn === this.myPosition) {
       isSelfDrawn = true;
+      console.log('判定為自摸，尋找胡牌牌型...');
       // Find the winning tile from hand (server will verify)
       // This is a simplified client-side check
       for (const tile of myHand) {
@@ -1409,16 +1422,24 @@ export class Game {
         });
         if (this.canHu(handWithoutTile, tile)) {
           winTile = tile;
+          console.log('找到胡牌牌型，胡牌:', winTile);
           break;
         }
       }
+    } else {
+      console.log('判定為放炮，胡牌:', winTile);
     }
 
+    console.log('準備發送胡牌動作:', { winTile, isSelfDrawn });
+
     if (this.ws && winTile) {
+      console.log('✅ 發送胡牌動作到服務器');
       this.ws.sendAction('hu', {
         tile: winTile,
         isSelfDrawn: isSelfDrawn
       });
+    } else {
+      console.error('❌ 無法發送胡牌動作:', { hasWs: !!this.ws, winTile });
     }
 
     // 清除牌組高亮
@@ -1478,21 +1499,314 @@ export class Game {
       this.actionButtons.resize(width, height);
     }
   }
+
+    tileValue(tile) {
+
+      const parts = tile.split('-');
+
+      const suit = parts[0];
+
+      let num = 0;
+
+      if (parts.length > 1) {
+
+          num = parseInt(parts[1], 10);
+
+      }
+
   
-  /**
-   * 处理游戏胜利
-   */
+
+      let suitOrder = 0;
+
+      switch (suit) {
+
+      case "wan":
+
+          suitOrder = 1;
+
+          break;
+
+      case "tong":
+
+          suitOrder = 2;
+
+          break;
+
+      case "tiao":
+
+          suitOrder = 3;
+
+          break;
+
+      case "dong":
+
+          suitOrder = 4;
+
+          num = 1;
+
+          break;
+
+      case "nan":
+
+          suitOrder = 4;
+
+          num = 2;
+
+          break;
+
+      case "xi":
+
+          suitOrder = 4;
+
+          num = 3;
+
+          break;
+
+      case "bei":
+
+          suitOrder = 4;
+
+          num = 4;
+
+          break;
+
+      case "zhong":
+
+          suitOrder = 5;
+
+          num = 1;
+
+          break;
+
+      case "fa":
+
+          suitOrder = 5;
+
+          num = 2;
+
+          break;
+
+      case "bai":
+
+          suitOrder = 5;
+
+          num = 3;
+
+          break;
+
+      }
+
+  
+
+      return suitOrder * 10 + num;
+
+    }
+
+  
+
+    /**
+
+     * 显示胡牌手牌
+
+     */
+
+    async displayWinningHand(hand, melds, winTile) {
+
+      const container = this.winningHandContainer;
+
+      container.removeChildren();
+
+  
+
+      const centerX = this.app.screen.width / 2;
+
+      const centerY = this.app.screen.height / 2;
+
+  
+
+      const bg = new Graphics();
+
+      bg.rect(0, 0, this.app.screen.width, this.app.screen.height);
+
+      bg.fill({ color: 0x000000, alpha: 0.7 });
+
+      container.addChild(bg);
+
+  
+
+      const allTilesContainer = new Container();
+
+      container.addChild(allTilesContainer);
+
+  
+
+      const tileScale = 0.8;
+
+      const tileWidth = 75 * tileScale;
+
+      const spacing = 8;
+
+      const meldSpacing = 20;
+
+  
+
+      let currentX = 0;
+
+  
+
+      // Display Melds
+
+      if (melds) {
+
+        for (const meld of melds) {
+
+          const meldContainer = new Container();
+
+          const tiles = meld.Tiles || meld.tiles;
+
+          for (let i = 0; i < tiles.length; i++) {
+
+            const texture = this.tileAssets[tiles[i]] || this.tileAssets['back'];
+
+            const tile = new Tile(tiles[i], texture);
+
+            await new Promise(resolve => setTimeout(resolve, 2)); // minimal delay for async creation
+
+            tile.setScale(tileScale);
+
+            tile.container.x = i * (tileWidth + spacing);
+
+            meldContainer.addChild(tile.container);
+
+          }
+
+          meldContainer.x = currentX;
+
+          allTilesContainer.addChild(meldContainer);
+
+          currentX += meldContainer.width + meldSpacing;
+
+        }
+
+      }
+
+  
+
+      // Display Hand, separating the winning tile
+
+      const handToShow = [...hand];
+
+      const winTileIndex = handToShow.lastIndexOf(winTile);
+
+      if (winTileIndex > -1) {
+
+        handToShow.splice(winTileIndex, 1);
+
+      }
+
+      handToShow.sort((a, b) => (this.tileValue(a) - this.tileValue(b)));
+
+  
+
+      for (const tileType of handToShow) {
+
+        const texture = this.tileAssets[tileType] || this.tileAssets['back'];
+
+        const tile = new Tile(tileType, texture);
+
+        await new Promise(resolve => setTimeout(resolve, 2));
+
+        tile.setScale(tileScale);
+
+        tile.container.x = currentX;
+
+        allTilesContainer.addChild(tile.container);
+
+        currentX += tileWidth + spacing;
+
+      }
+
+      
+
+      // Display the winning tile at the end, highlighted
+
+      if (winTile) {
+
+        currentX += meldSpacing;
+
+        const texture = this.tileAssets[winTile] || this.tileAssets['back'];
+
+        const winningTile = new Tile(winTile, texture);
+
+        await new Promise(resolve => setTimeout(resolve, 2));
+
+        winningTile.setScale(tileScale);
+
+        winningTile.container.x = currentX;
+
+  
+
+        const highlight = new Graphics();
+
+        highlight.roundRect(-5, -5, 75 + 10, 95 + 10, 8); // A bit larger than the tile
+
+        highlight.fill({color: 0xFFD700, alpha: 0.6});
+
+        winningTile.container.addChildAt(highlight, 0); // Add behind tile sprites
+
+  
+
+        allTilesContainer.addChild(winningTile.container);
+
+      }
+
+  
+
+      setTimeout(() => {
+
+          allTilesContainer.x = centerX - allTilesContainer.width / 2;
+
+          allTilesContainer.y = centerY - allTilesContainer.height / 2;
+
+      }, 50);
+
+  
+
+      container.visible = true;
+
+      setTimeout(() => {
+
+        container.visible = false;
+
+      }, 5000);
+
+    }
+
+    
+
+    /**
+
+     * 处理游戏胜利
+
+     */
   handleGameWin(data) {
     console.log('游戏胜利', data);
     const { winnerName, winResult, countdown } = data;
-    const { HandTypes, TotalTai, BaseScore } = winResult;
+    const { HandTypes, TotalTai, BaseScore, WinningHand, Melds, WinTile } = winResult;
+
+    // Display the winning hand
+    if (WinningHand && Melds && WinTile) {
+        this.displayWinningHand(WinningHand, Melds, WinTile);
+    }
 
     // 构建牌型描述
     const handTypesStr = HandTypes.map(ht => `${ht.Name} (${ht.Tai}台)`).join(' ');
     const title = `恭喜 ${winnerName} 胡牌！`;
     const details = `${handTypesStr}\n总计: ${TotalTai}台, 得分: ${BaseScore}`;
 
-    this.showEndRoundScreen(title, details, countdown);
+    setTimeout(() => {
+        this.showEndRoundScreen(title, details, countdown);
+    }, 5000);
   }
 
   /**
@@ -1592,20 +1906,30 @@ export class Game {
     // 保存最后打出的牌和可执行动作
     this.lastDiscardedTile = tile;
     this.pendingActions = actions;
+    console.log('✅ 保存 lastDiscardedTile:', this.lastDiscardedTile);
+    console.log('✅ 保存 pendingActions:', this.pendingActions);
 
     // 确定要显示的按钮
     const buttonsToShow = [];
     if (actions.pong) buttonsToShow.push('pong');
     if (actions.chow) buttonsToShow.push('chow');
     if (actions.kong) buttonsToShow.push('kong');
-    if (actions.hu) buttonsToShow.push('hu');
+    if (actions.hu) {
+      console.log('✅ 檢測到可以胡牌，添加 hu 按鈕');
+      buttonsToShow.push('hu');
+    }
     buttonsToShow.push('cancel'); // 总是显示"过"按钮
 
-    console.log('显示动作按钮:', buttonsToShow);
+    console.log('✅ 顯示動作按鈕:', buttonsToShow);
 
     // 显示按钮
     if (this.actionButtons) {
+      console.log('✅ actionButtons 存在，準備顯示按鈕');
+      console.log('✅ actionButtons.container.zIndex:', this.actionButtons.container.zIndex);
       this.actionButtons.show(buttonsToShow);
+      console.log('✅ 按鈕已顯示');
+    } else {
+      console.error('❌ actionButtons 不存在！');
     }
 
     // 清除之前的超时

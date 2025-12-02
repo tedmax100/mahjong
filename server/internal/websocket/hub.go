@@ -231,21 +231,28 @@ func (h *Hub) addBot(room *game.Room) {
 
 // CheckAndPlayBotTurn 检查并执行Bot回合
 func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
+	log.Printf("🎮 [CheckAndPlayBotTurn] 開始檢查並執行回合，withDelay: %v", withDelay)
+
 	if room == nil || room.Game == nil || !room.GameStarted {
+		log.Printf("❌ [CheckAndPlayBotTurn] 房間或遊戲狀態無效，返回")
 		return
 	}
 
+	log.Printf("🔒 [CheckAndPlayBotTurn] 獲取讀鎖")
 	h.mu.RLock()
 	if room.CurrentTurn < 0 || room.CurrentTurn >= len(room.Players) {
+		log.Printf("❌ [CheckAndPlayBotTurn] 當前回合無效: %d", room.CurrentTurn)
 		h.mu.RUnlock()
 		return
 	}
 	currentPlayer := room.Players[room.CurrentTurn]
 	currentTurnAtCheck := room.CurrentTurn
 	h.mu.RUnlock()
+	log.Printf("🔓 [CheckAndPlayBotTurn] 釋放讀鎖，當前玩家: %s (位置 %d)", currentPlayer.Name, currentTurnAtCheck)
 
 	// 如果是真实玩家，根据情况决定是否延迟发牌
 	if !strings.HasPrefix(currentPlayer.ID, "bot_") {
+		log.Printf("🧑 [CheckAndPlayBotTurn] 當前玩家是真實玩家")
 		if withDelay {
 			go func() {
 				log.Printf("检测到玩家 %s (位置 %d) 有可执行动作，开始 10 秒等待...", currentPlayer.Name, currentTurnAtCheck)
@@ -271,14 +278,17 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 
 	// Bot 的逻辑
 	if strings.HasPrefix(currentPlayer.ID, "bot_") {
+		log.Printf("🤖 [CheckAndPlayBotTurn] 當前玩家是 Bot")
 		go func() {
-			log.Printf("Bot %s 的回合已开始，等待出牌...", currentPlayer.Name)
+			log.Printf("🤖 Bot %s 的回合已开始，等待出牌...", currentPlayer.Name)
 			time.Sleep(time.Duration(1000+rand.Intn(1000)) * time.Millisecond)
 
+			log.Printf("🔒 [CheckAndPlayBotTurn-Bot] 準備獲取鎖")
 			h.mu.Lock()
+			log.Printf("✅ [CheckAndPlayBotTurn-Bot] 已獲取鎖")
 
 			if !room.GameStarted || room.CurrentTurn != currentTurnAtCheck {
-				log.Printf("Bot %s 的回合被中断", currentPlayer.Name)
+				log.Printf("⚠️ Bot %s 的回合被中断", currentPlayer.Name)
 				h.mu.Unlock()
 				return
 			}
@@ -315,11 +325,17 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 
 						if isSelfDrawn {
 							// 自摸！廣播胡牌
-							log.Printf("Bot %s 自摸 %s！", currentPlayer.Name, drawnTile)
-							// TODO: 廣播胡牌事件
-							// h.mu.Unlock()
-							// h.BroadcastGameWin(room, currentPlayer.ID, drawnTile, true)
-							// return
+							log.Printf("🎉 Bot %s 自摸 %s！準備廣播勝利", currentPlayer.Name, drawnTile)
+
+							// 使用 room.HandleHu 處理胡牌邏輯
+							winResult := room.HandleHu(currentPlayer.ID, drawnTile, true)
+							h.mu.Unlock() // 在廣播前解鎖
+
+							if winResult != nil {
+								// 廣播胡牌事件
+								h.BroadcastGameWin(room, currentPlayer.ID, winResult)
+							}
+							return
 						} else {
 							// 不是自摸，自動打出摸到的牌，保持聽牌狀態
 							log.Printf("Bot %s 聽牌中，自動打出 %s", currentPlayer.Name, drawnTile)
@@ -489,9 +505,15 @@ func (h *Hub) drawForRealPlayer_needsLock(room *game.Room) {
 
 				if isSelfDrawn {
 					// 自摸！廣播胡牌
-					log.Printf("玩家 %s 自摸 %s！", currentPlayer.Name, drawnTile)
-					// TODO: 廣播胡牌事件
-					// h.BroadcastGameWin(room, currentPlayer.ID, drawnTile, true)
+					log.Printf("🎉 玩家 %s 自摸 %s！準備廣播勝利", currentPlayer.Name, drawnTile)
+
+					// 使用 room.HandleHu 處理胡牌邏輯
+					winResult := room.HandleHu(currentPlayer.ID, drawnTile, true)
+					if winResult != nil {
+						// 廣播胡牌事件
+						h.BroadcastGameWin(room, currentPlayer.ID, winResult)
+					}
+					return
 				} else {
 					// 不是自摸，自動打出摸到的牌，保持聽牌狀態
 					log.Printf("玩家 %s 聽牌中，自動打出 %s", currentPlayer.Name, drawnTile)
@@ -504,37 +526,59 @@ func (h *Hub) drawForRealPlayer_needsLock(room *game.Room) {
 
 					// 檢查是否流局
 					if isDraw {
+						log.Printf("🎲 聽牌自動打牌後流局")
 						h.BroadcastGameDraw(room)
 						return
 					}
 
-					// 檢查是否有Bot響應
+					// 释放锁后再检查 Bot 响应（避免死锁）
+					log.Printf("🔓 [聽牌自動打牌] 釋放鎖，準備檢查 Bot 響應...")
+					h.mu.Unlock()
+					log.Printf("🔍 [聽牌自動打牌] 檢查 Bot 是否響應 %s 的打牌 %s", currentPlayer.Name, drawnTile)
 					actionTaken := h.botsReactToDiscard(room, drawnTile, currentPlayer.Position)
+					log.Printf("🔒 [聽牌自動打牌] 重新獲取鎖，Bot 響應結果: %v", actionTaken)
+					h.mu.Lock()
+
 					if !actionTaken {
+						log.Printf("✅ [聽牌自動打牌] 沒有 Bot 響應，繼續檢查真實玩家動作")
 						// 廣播可執行動作給真實玩家
 						h.BroadcastPossibleActions(room, drawnTile, currentPlayer.Position)
 
 						hasHumanAction := h.HasHumanAction(room, drawnTile, currentPlayer.Position)
+						log.Printf("🧑 [聽牌自動打牌] 真實玩家動作檢查結果: %v", hasHumanAction)
 
 						// 如果有真實玩家可以執行動作，等待10秒後再繼續
 						if hasHumanAction {
-							log.Printf("等待真實玩家響應可執行動作，10秒後自動繼續...")
+							log.Printf("⏰ [聽牌自動打牌] 等待真實玩家響應可執行動作，10秒後自動繼續...")
 							currentTurnSnapshot := room.CurrentTurn
+							// 释放锁后再启动定时器
+							log.Printf("🔓 [聽牌自動打牌] 釋放鎖，啟動等待計時器")
+							h.mu.Unlock()
 							room.StartNoResponseTimer(10*time.Second, func() {
 								h.mu.Lock()
 								shouldContinue := room.CurrentTurn == currentTurnSnapshot
 								if shouldContinue {
-									log.Printf("真實玩家未響應，繼續遊戲")
+									log.Printf("⏰ [聽牌自動打牌] 真實玩家未響應，繼續遊戲")
 									room.StopNoResponseTimer()
 								}
 								h.mu.Unlock()
 								if shouldContinue {
+									log.Printf("▶️ [聽牌自動打牌] 調用 CheckAndPlayBotTurn")
 									h.CheckAndPlayBotTurn(room, false)
 								}
 							})
+							log.Printf("🔒 [聽牌自動打牌] 重新獲取鎖（等待計時器路徑）")
+							h.mu.Lock() // 重新获取锁以保持函数退出时的锁状态一致
 						} else {
+							// 释放锁后再调用 CheckAndPlayBotTurn（避免死锁）
+							log.Printf("🔓 [聽牌自動打牌] 沒有真實玩家動作，釋放鎖並調用 CheckAndPlayBotTurn")
+							h.mu.Unlock()
 							h.CheckAndPlayBotTurn(room, false)
+							log.Printf("🔒 [聽牌自動打牌] CheckAndPlayBotTurn 完成，重新獲取鎖")
+							h.mu.Lock() // 重新获取锁以保持函数退出时的锁状态一致
 						}
+					} else {
+						log.Printf("🤖 [聽牌自動打牌] Bot 已響應，結束處理")
 					}
 				}
 			}
@@ -579,7 +623,8 @@ func (h *Hub) HasHumanAction(room *game.Room, discardedTile string, discarderPos
 		if room.Game.CanPong(p.Hand, discardedTile) {
 			return true
 		}
-		if room.Game.CanExposedKong(p, discardedTile) {
+		// 检查槓（别人打出牌，所以 isSelfDrawn=false）
+		if room.Game.CanExposedKong(p, discardedTile, false) {
 			return true
 		}
 
@@ -668,7 +713,10 @@ func (h *Hub) BroadcastGameDraw(room *game.Room) {
 
 // botsReactToDiscard 让所有机器人对一个弃牌做出反应
 func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarderPosition int) bool {
+	log.Printf("🔍 [botsReactToDiscard] 開始檢查 Bot 響應，牌: %s，打牌者位置: %d", discardedTile, discarderPosition)
+
 	if room == nil || room.Game == nil || !room.GameStarted {
+		log.Printf("❌ [botsReactToDiscard] 房間或遊戲狀態無效，返回 false")
 		return false
 	}
 
@@ -676,10 +724,12 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 	var bestBot *game.Player
 	var bestChowCombination []string
 
+	log.Printf("🔒 [botsReactToDiscard] 獲取讀鎖，複製玩家列表")
 	h.mu.RLock()
 	playersCopy := make([]*game.Player, len(room.Players))
 	copy(playersCopy, room.Players)
 	h.mu.RUnlock()
+	log.Printf("🔓 [botsReactToDiscard] 釋放讀鎖")
 
 	for _, p := range playersCopy {
 		if p.Position == discarderPosition || !strings.HasPrefix(p.ID, "bot_") {
@@ -707,7 +757,8 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 		}
 
 		// Simplified action checking...
-		if room.Game.CanExposedKong(p, discardedTile) {
+		// 检查槓（别人打出牌，所以 isSelfDrawn=false）
+		if room.Game.CanExposedKong(p, discardedTile, false) {
 			if bestAction != "hu" {
 				bestAction = "kong"
 				bestBot = p
@@ -733,13 +784,15 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 	}
 
 	if bestBot != nil {
+		log.Printf("🤖 [botsReactToDiscard] Bot %s 決定執行動作: %s on %s", bestBot.Name, bestAction, discardedTile)
 		time.Sleep(500 * time.Millisecond) // Shorter sleep for reaction
 
 		var success bool
 		var actionToBroadcast string
-		
+
+		log.Printf("🔒 [botsReactToDiscard] 準備獲取寫鎖執行 Bot 動作")
 		h.mu.Lock()
-		log.Printf("Bot %s 决定执行动作: %s on %s", bestBot.Name, bestAction, discardedTile)
+		log.Printf("✅ [botsReactToDiscard] 已獲取寫鎖，執行動作: %s", bestAction)
 		var drawnTile string
 		switch bestAction {
 		case "hu":
@@ -760,9 +813,11 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 			success = room.HandleChow(bestBot.ID, discardedTile, bestChowCombination)
 			actionToBroadcast = "chow"
 		}
+		log.Printf("🔓 [botsReactToDiscard] 釋放寫鎖")
 		h.mu.Unlock() // Unlock after state change
 
 		if success {
+			log.Printf("✅ [botsReactToDiscard] Bot 動作執行成功，廣播動作")
 			if actionToBroadcast == "chow" {
 				h.BroadcastChowAction(room, bestBot.ID, discardedTile, bestChowCombination)
 			} else if actionToBroadcast == "kong" {
@@ -787,11 +842,18 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 			} else {
 				h.BroadcastPlayerAction(room, bestBot.ID, actionToBroadcast, discardedTile)
 			}
+			log.Printf("▶️ [botsReactToDiscard] 調用 CheckAndPlayBotTurn 觸發 Bot 自己的回合")
 			h.CheckAndPlayBotTurn(room, false) // Now trigger the bot's own turn, no delay
+			log.Printf("✅ [botsReactToDiscard] Bot 響應完成，返回 true")
 			return true
+		} else {
+			log.Printf("❌ [botsReactToDiscard] Bot 動作執行失敗")
 		}
+	} else {
+		log.Printf("🚫 [botsReactToDiscard] 沒有 Bot 決定執行動作")
 	}
 
+	log.Printf("✅ [botsReactToDiscard] 完成檢查，返回 false")
 	return false
 }
 
@@ -1012,8 +1074,8 @@ func (h *Hub) BroadcastPossibleActions(room *game.Room, discardedTile string, di
 				}
 			}
 
-			// 检查槓（明槓）
-			if room.Game.CanExposedKong(player, discardedTile) {
+			// 检查槓（明槓，别人打出牌，所以 isSelfDrawn=false）
+			if room.Game.CanExposedKong(player, discardedTile, false) {
 				possibleActions["kong"] = true
 			}
 

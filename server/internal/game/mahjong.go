@@ -234,8 +234,9 @@ func (g *MahjongGame) CanKong(hand []string, tile string) bool {
 }
 
 // CanExposedKong 检查是否可以明杠（包含加杠）
-func (g *MahjongGame) CanExposedKong(player *Player, tile string) bool {
-	// 检查手牌中是否有三张
+// isSelfDrawn: true表示玩家自己摸到牌，false表示别人打出的牌
+func (g *MahjongGame) CanExposedKong(player *Player, tile string, isSelfDrawn bool) bool {
+	// 检查手牌中是否有三张（明杠：手上3张+别人打出1张）
 	handCount := 0
 	for _, t := range player.Hand {
 		if t == tile {
@@ -247,9 +248,12 @@ func (g *MahjongGame) CanExposedKong(player *Player, tile string) bool {
 	}
 
 	// 检查是否已有碰牌，可以加杠
-	for _, meld := range player.Melds {
-		if meld.Type == "pong" && meld.Tiles[0] == tile {
-			return true
+	// 重要：加杠只能在自己摸到牌时进行，不能通过别人打出的牌来加杠
+	if isSelfDrawn {
+		for _, meld := range player.Melds {
+			if meld.Type == "pong" && meld.Tiles[0] == tile {
+				return true
+			}
 		}
 	}
 
@@ -304,69 +308,72 @@ func (g *MahjongGame) CanChow(hand []string, tile string) [][]string {
 // CanHu 检查是否可以胡牌
 func (g *MahjongGame) CanHu(hand []string, melds []Meld) bool {
 	// 台湾16张麻将：胡牌牌型 = 5组面子（顺子/刻子） + 1对眼 = 17张牌
-	// 已展示的牌组（碰、杠）
 	meldCount := len(melds)
-
-	// 需要在手牌中找到剩余的组合
-	// 总共需要5组面子 + 1对眼
 	needGroups := 5 - meldCount
 
 	// 手牌数量检查
-	expectedHandSize := needGroups*3 + 2 // 剩余组数*3 + 1对眼
+	expectedHandSize := needGroups*3 + 2
 	if len(hand) != expectedHandSize {
 		return false
 	}
 
-	// 复制手牌进行判断
 	tiles := make([]string, len(hand))
 	copy(tiles, hand)
 	sortTiles(tiles)
 
-	return canFormWinningHand(tiles, needGroups, true)
-}
-
-// canFormWinningHand 递归检查是否能组成胡牌手型
-func canFormWinningHand(tiles []string, needGroups int, needPair bool) bool {
-	if len(tiles) == 0 {
-		return needGroups == 0 && !needPair
-	}
-
-	if needGroups == 0 && needPair {
-		// 只需要找一对眼
-		if len(tiles) != 2 {
-			return false
+	// 遍历所有可能的对子
+	for i := 0; i < len(tiles)-1; i++ {
+		// 跳过重复的对子检查，提高效率
+		if i > 0 && tiles[i] == tiles[i-1] {
+			continue
 		}
-		return tiles[0] == tiles[1]
-	}
 
-	// 尝试移除刻子（3张相同）
-	tile := tiles[0]
-	if countTile(tiles, tile) >= 3 {
-		newTiles := removeTiles(tiles, tile, 3)
-		if canFormWinningHand(newTiles, needGroups-1, needPair) {
-			return true
-		}
-	}
+		if tiles[i] == tiles[i+1] {
+			// 找到一个潜在的对子
+			remaining := make([]string, 0, len(tiles)-2)
+			remaining = append(remaining, tiles[:i]...)
+			remaining = append(remaining, tiles[i+2:]...)
 
-	// 尝试移除顺子（3张连续）
-	if isSequencePossible(tiles, tile) {
-		newTiles := removeSequence(tiles, tile)
-		if len(newTiles) < len(tiles) { // 确保移除成功
-			if canFormWinningHand(newTiles, needGroups-1, needPair) {
+			// 检查剩下的牌是否能组成 needGroups 个面子
+			if canFormGroups(remaining, needGroups) {
 				return true
 			}
 		}
 	}
 
-	// 如果还需要对眼，尝试移除一对
-	if needPair && countTile(tiles, tile) >= 2 {
-		newTiles := removeTiles(tiles, tile, 2)
-		if canFormWinningHand(newTiles, needGroups, false) {
+	return false
+}
+
+// canFormGroups 递归检查手牌是否能完全由刻子或顺子组成
+func canFormGroups(tiles []string, needGroups int) bool {
+	if len(tiles) == 0 {
+		return needGroups == 0
+	}
+	// 如果需要的组数和牌数不匹配，则失败
+	if needGroups*3 != len(tiles) {
+		return false
+	}
+
+	// 总是从第一张牌开始尝试组合
+	tile := tiles[0]
+
+	// 尝试移除刻子
+	if countTile(tiles, tile) >= 3 {
+		newTiles := removeTiles(tiles, tile, 3)
+		if canFormGroups(newTiles, needGroups-1) {
 			return true
 		}
 	}
 
-	// 当前牌无法组成任何组合
+	// 尝试移除顺子
+	if isSequencePossible(tiles, tile) {
+		newTiles := removeSequence(tiles, tile)
+		if canFormGroups(newTiles, needGroups-1) {
+			return true
+		}
+	}
+
+	// 如果第一张牌无法组成任何组合，则此路不通
 	return false
 }
 

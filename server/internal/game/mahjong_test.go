@@ -366,24 +366,29 @@ func TestBigDragons(t *testing.T) {
 func TestCanExposedKong(t *testing.T) {
 	game := NewMahjongGame([]*Player{})
 
-	// Scenario 1: Player has 3 tiles in hand, can kong a discard.
+	// Scenario 1: Player has 3 tiles in hand, can kong a discard (from others).
 	player1 := &Player{
 		Hand:  []string{"wan-5", "wan-5", "wan-5", "tiao-1"},
 		Melds: []Meld{},
 	}
-	if !game.CanExposedKong(player1, "wan-5") {
-		t.Errorf("TestCanExposedKong: Should be able to exposed kong from 3 tiles in hand.")
+	if !game.CanExposedKong(player1, "wan-5", false) {
+		t.Errorf("TestCanExposedKong: Should be able to exposed kong from 3 tiles in hand when others discard.")
 	}
 
-	// Scenario 2: Player has an exposed pong, can promote it with a discard.
+	// Scenario 2a: Player has an exposed pong, can promote it when self-drawn.
 	player2 := &Player{
-		Hand: []string{"tiao-1", "tiao-2"},
+		Hand: []string{"wan-5", "tiao-1", "tiao-2"},
 		Melds: []Meld{
 			{Type: "pong", Tiles: []string{"wan-5", "wan-5", "wan-5"}},
 		},
 	}
-	if !game.CanExposedKong(player2, "wan-5") {
-		t.Errorf("TestCanExposedKong: Should be able to promote an exposed pong.")
+	if !game.CanExposedKong(player2, "wan-5", true) {
+		t.Errorf("TestCanExposedKong: Should be able to promote an exposed pong when self-drawn.")
+	}
+
+	// Scenario 2b: Player has an exposed pong, CANNOT promote it with others' discard.
+	if game.CanExposedKong(player2, "wan-5", false) {
+		t.Errorf("TestCanExposedKong: Should NOT be able to promote an exposed pong when others discard.")
 	}
 
 	// Scenario 3: Player has only 2 tiles in hand, no pong.
@@ -391,7 +396,7 @@ func TestCanExposedKong(t *testing.T) {
 		Hand:  []string{"wan-5", "wan-5", "tiao-1"},
 		Melds: []Meld{},
 	}
-	if game.CanExposedKong(player3, "wan-5") {
+	if game.CanExposedKong(player3, "wan-5", false) {
 		t.Errorf("TestCanExposedKong: Should not be able to kong with only 2 tiles in hand.")
 	}
 
@@ -402,7 +407,7 @@ func TestCanExposedKong(t *testing.T) {
 			{Type: "pong", Tiles: []string{"tiao-3", "tiao-3", "tiao-3"}},
 		},
 	}
-	if game.CanExposedKong(player4, "wan-5") {
+	if game.CanExposedKong(player4, "wan-5", false) {
 		t.Errorf("TestCanExposedKong: Should not be able to kong tile that is not in hand or melds.")
 	}
 }
@@ -427,8 +432,8 @@ func TestDrawTileFromEnd(t *testing.T) {
 	}
 }
 
-// TestHandleKong_PromotedKongFromDiscard simulates promoting a Pong to a Kong from a discard.
-func TestHandleKong_PromotedKongFromDiscard(t *testing.T) {
+// TestHandleKong_CannotPromotePongWithOthersDiscard 测试不能用别人打出的牌来补杠
+func TestHandleKong_CannotPromotePongWithOthersDiscard(t *testing.T) {
 	// 1. Setup Room and Players
 	playerA := &Player{
 		ID:       "playerA",
@@ -446,23 +451,65 @@ func TestHandleKong_PromotedKongFromDiscard(t *testing.T) {
 		Game:    NewMahjongGame([]*Player{playerA, playerB}),
 	}
 	room.GameStarted = true
+
+	// 2. Simulate State: Player B discards wan-8
+	discardedTile := "wan-8"
+	room.LastDiscardPlayer = playerB.Position
+	room.Game.DiscardPile = append(room.Game.DiscardPile, discardedTile)
+
+	// 3. Call HandleKong - should fail because cannot promote pong with others' discard
+	success, _ := room.HandleKong(playerA.ID, discardedTile, false)
+
+	// 4. Assertions - should return false
+	if success {
+		t.Errorf("HandleKong should have returned false - cannot promote pong with others' discard")
+	}
+
+	// Assert meld was NOT updated
+	meld := playerA.Melds[0]
+	if meld.Type != "pong" {
+		t.Errorf("Meld type should still be 'pong', but got '%s'", meld.Type)
+	}
+	if len(meld.Tiles) != 3 {
+		t.Errorf("Meld should still have 3 tiles, but has %d", len(meld.Tiles))
+	}
+}
+
+// TestHandleKong_PromotePongWithSelfDraw 测试可以用自己摸到的牌来补杠
+func TestHandleKong_PromotePongWithSelfDraw(t *testing.T) {
+	// 1. Setup Room and Players
+	playerA := &Player{
+		ID:       "playerA",
+		Name:     "Player A",
+		Position: 0,
+		Hand:     []string{"tiao-1", "tiao-2", "tiao-3", "wan-8"}, // 手上有一张 wan-8
+		Melds: []Meld{
+			{Type: "pong", Tiles: []string{"wan-8", "wan-8", "wan-8"}},
+		},
+	}
+	playerB := &Player{ID: "playerB", Name: "Player B", Position: 1}
+	room := &Room{
+		ID:      "test-room",
+		Players: []*Player{playerA, playerB},
+		Game:    NewMahjongGame([]*Player{playerA, playerB}),
+	}
+	room.GameStarted = true
 	initialHandSize := len(playerA.Hand)
 	deckSize := len(room.Game.Deck)
 
-	// 2. Simulate State
-	discardedTile := "wan-8"
-	room.LastDiscardPlayer = playerB.Position // Player B discarded the tile
-	room.Game.DiscardPile = append(room.Game.DiscardPile, discardedTile)
+	// 2. Simulate State: No discard pile (self-drawn)
+	tileToKong := "wan-8"
+	// DiscardPile is empty or doesn't contain wan-8
 
 	// 3. Call HandleKong
-	success, drawnTile := room.HandleKong(playerA.ID, discardedTile, false)
+	success, drawnTile := room.HandleKong(playerA.ID, tileToKong, false)
 
 	// 4. Assertions
 	if !success {
-		t.Fatalf("HandleKong should have returned true for a valid promoted kong.")
+		t.Fatalf("HandleKong should have returned true for a valid promoted kong from self-draw")
 	}
 
-	// 檢查槓牌後有補牌
+	// 检查槓牌後有補牌
 	if drawnTile == "" {
 		t.Error("Expected a supplemental tile to be drawn after kong")
 	} else {
@@ -478,24 +525,19 @@ func TestHandleKong_PromotedKongFromDiscard(t *testing.T) {
 		t.Errorf("Meld should have 4 tiles after promotion, but has %d", len(updatedMeld.Tiles))
 	}
 
-	// Assert discard pile was consumed
-	if len(room.Game.DiscardPile) > 0 && room.Game.DiscardPile[len(room.Game.DiscardPile)-1] == discardedTile {
-		t.Errorf("Discard pile should not contain the konged tile.")
-	}
-
-	// Assert player drew a replacement tile
-	if len(playerA.Hand) != initialHandSize+1 {
-		t.Errorf("Player's hand size should be %d after drawing a replacement tile, but got %d.", initialHandSize+1, len(playerA.Hand))
+	// Assert player drew a replacement tile (hand should be same size, since we removed 1 and drew 1)
+	if len(playerA.Hand) != initialHandSize {
+		t.Errorf("Player's hand size should be %d after kong, but got %d", initialHandSize, len(playerA.Hand))
 	}
 
 	// Assert deck size decreased by 1 (for the replacement tile)
 	if len(room.Game.Deck) != deckSize-1 {
-		t.Errorf("Deck size should have decreased by 1, from %d to %d, but is %d.", deckSize, deckSize-1, len(room.Game.Deck))
+		t.Errorf("Deck size should have decreased by 1, from %d to %d, but is %d", deckSize, deckSize-1, len(room.Game.Deck))
 	}
 
 	// Assert turn changed to the konging player
 	if room.CurrentTurn != playerA.Position {
-		t.Errorf("It should be player A's turn after kong, but got turn %d.", room.CurrentTurn)
+		t.Errorf("It should be player A's turn after kong, but got turn %d", room.CurrentTurn)
 	}
 }
 
