@@ -3,6 +3,7 @@ import { Tile } from './Tile.js';
 import { Table } from './Table.js';
 import { Player } from './Player.js';
 import { ActionButtons } from './ActionButtons.js';
+import { AudioManager } from './AudioManager.js';
 
 /**
  * 主游戏类
@@ -45,6 +46,9 @@ export class Game {
     // 游戏公告
     this.announcementText = null;
     this.winningHandContainer = null;
+
+    // 音效管理器
+    this.audioManager = new AudioManager();
   }
 
   /**
@@ -144,6 +148,9 @@ export class Game {
 
     // 显示等待文字
     this.showWaitingText();
+
+    // 播放菜單背景音樂
+    this.audioManager.playBGM('menu');
 
     console.log('✅ Game initialized successfully');
   }
@@ -398,6 +405,10 @@ export class Game {
   startGame(data) {
     console.log('游戏开始!', data);
 
+    // 播放遊戲背景音樂和骰子音效
+    this.audioManager.playBGM('game');
+    this.audioManager.playEffect('dice');
+
     // 移除等待文字
     if (this.waitingText) {
       this.container.removeChild(this.waitingText);
@@ -436,6 +447,9 @@ export class Game {
 
     const { tiles, position } = data;
     const player = this.players[position];
+
+    // 播放發牌音效
+    this.audioManager.playEffect('deal');
 
     if (player) {
       // 检查发牌数据是否有重复牌（每张牌最多4张）
@@ -549,6 +563,21 @@ export class Game {
       return;
     }
 
+    const player = this.players[playerPosition];
+
+    // 播放打牌語音
+    this.audioManager.playTileVoice(playerId, tile);
+
+    // 🎯 檢查是否為聽牌後的自動打牌
+    if (player.isTing) {
+      console.log(`🎯 玩家 ${player.name} 聽牌中，自動打出 ${tile}`);
+
+      // 如果是自己聽牌自動打牌，顯示提示
+      if (playerPosition === this.myPosition) {
+        this.showAnnouncement(`自動打出 ${this.getTileName(tile)}`, 1500);
+      }
+    }
+
     // 創建棄牌容器（包含牌底和牌面）
     const discardContainer = new Container();
 
@@ -640,8 +669,13 @@ export class Game {
     this.discardContainer.addChild(discardContainer);
 
     // 从玩家手牌中移除该牌（视觉上）
-    const player = this.players[playerPosition];
     if (player) {
+      // 🎯 如果玩家已聽牌，等待一小段時間確保摸牌動畫完成
+      if (player.isTing) {
+        console.log(`⏳ [handleDiscard] 玩家已聽牌，等待摸牌完成後再移除 ${tile}`);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
       player.removeTile(tile);
 
       // 📋 記錄打牌後的手牌狀態
@@ -692,6 +726,16 @@ export class Game {
 
     const player = this.players[playerPosition];
 
+    // 🎯 檢查玩家是否已聽牌
+    if (player.isTing) {
+      console.log(`🎯 玩家 ${player.name} 已聽牌，摸到 ${tile}，即將自動打出`);
+
+      // 如果是自己聽牌，顯示提示
+      if (playerPosition === this.myPosition) {
+        this.showAnnouncement(`聽牌中，摸到 ${this.getTileName(tile)}`, 1500);
+      }
+    }
+
     // 如果是自己，顯示摸到的牌；如果是其他玩家，顯示牌背
     const tileToAdd = (playerPosition === this.myPosition) ? tile : 'back';
 
@@ -724,6 +768,9 @@ export class Game {
     const chowTiles = data.chowTiles || [];
     const tile = data.tile;
     console.log(`🍜 handleChow - 玩家 ${playerId} 吃了 ${tile}，牌組: ${chowTiles.join(', ')}`);
+
+    // 播放吃牌語音
+    this.audioManager.playActionVoice(playerId, 'chi');
 
     // 找到執行吃牌的玩家
     let playerPosition = -1;
@@ -800,6 +847,9 @@ export class Game {
     // 处理碰牌
     console.log(`玩家 ${playerId} 碰了 ${tile}`);
 
+    // 播放碰牌語音
+    this.audioManager.playActionVoice(playerId, 'peng');
+
     // 找到執行碰牌的玩家
     let playerPosition = -1;
     for (let i = 0; i < this.players.length; i++) {
@@ -871,6 +921,9 @@ export class Game {
     }
     const tile = meld.Tiles[0];
     console.log(`玩家 ${playerId} 杠了 ${tile} (类型: ${meld.Type})`);
+
+    // 播放槓牌語音
+    this.audioManager.playActionVoice(playerId, 'gang');
 
     // 找到執行槓牌的玩家
     let playerPosition = -1;
@@ -955,6 +1008,9 @@ export class Game {
   handleTing(playerId, data) {
     console.log(`玩家 ${playerId} 宣告聽牌`, data);
 
+    // 播放聽牌語音
+    this.audioManager.playActionVoice(playerId, 'ting');
+
     // 找到該玩家
     const player = this.players.find(p => p.userId === playerId);
     if (!player) {
@@ -999,6 +1055,28 @@ export class Game {
       clearTimeout(this.announcementTimeout);
       this.announcementTimeout = null;
     }
+  }
+
+  /**
+   * 獲取牌的中文名稱（用於顯示）
+   */
+  getTileName(tile) {
+    const tileNames = {
+      // 萬子
+      'wan-1': '一萬', 'wan-2': '二萬', 'wan-3': '三萬', 'wan-4': '四萬',
+      'wan-5': '五萬', 'wan-6': '六萬', 'wan-7': '七萬', 'wan-8': '八萬', 'wan-9': '九萬',
+      // 條子
+      'tiao-1': '一條', 'tiao-2': '二條', 'tiao-3': '三條', 'tiao-4': '四條',
+      'tiao-5': '五條', 'tiao-6': '六條', 'tiao-7': '七條', 'tiao-8': '八條', 'tiao-9': '九條',
+      // 筒子
+      'tong-1': '一筒', 'tong-2': '二筒', 'tong-3': '三筒', 'tong-4': '四筒',
+      'tong-5': '五筒', 'tong-6': '六筒', 'tong-7': '七筒', 'tong-8': '八筒', 'tong-9': '九筒',
+      // 風牌
+      'dong': '東', 'nan': '南', 'xi': '西', 'bei': '北',
+      // 箭牌
+      'zhong': '中', 'fa': '發', 'bai': '白'
+    };
+    return tileNames[tile] || tile;
   }
 
   gameOver(data) {
@@ -1175,6 +1253,9 @@ export class Game {
   handleReadyAction() {
     console.log('宣告聽牌');
 
+    // 播放按鈕音效
+    this.audioManager.playButtonSound();
+
     const myPlayer = this.players[this.myPosition];
     if (!myPlayer) return;
 
@@ -1193,6 +1274,10 @@ export class Game {
    */
   handlePongAction() {
     console.log('執行碰牌');
+
+    // 播放按鈕音效
+    this.audioManager.playButtonSound();
+
     if (this.lastDiscardedTile) {
       this.sendAction('pong', this.lastDiscardedTile);
     }
@@ -1206,6 +1291,10 @@ export class Game {
    */
   handleChowAction() {
     console.log('執行吃牌');
+
+    // 播放按鈕音效
+    this.audioManager.playButtonSound();
+
     if (this.lastDiscardedTile && this.pendingActions.chow) {
       if (this.pendingActions.chow.length > 1) {
         // 如果有多個吃牌組合，提示玩家選擇
@@ -1350,7 +1439,10 @@ export class Game {
    */
   handleKongAction() {
     console.log('執行槓牌');
-    
+
+    // 播放按鈕音效
+    this.audioManager.playButtonSound();
+
     let tileToKong = null;
     let isConcealed = false;
 
@@ -1398,6 +1490,9 @@ export class Game {
    */
   handleHuAction() {
     console.log('✅ 執行胡牌動作');
+
+    // 播放按鈕音效
+    this.audioManager.playButtonSound();
 
     const myPlayer = this.players[this.myPosition];
     const myHand = myPlayer ? myPlayer.tiles.map(t => t.type) : [];
@@ -1457,6 +1552,9 @@ export class Game {
    */
   handleCancelAction() {
     console.log('取消動作（過）');
+
+    // 播放按鈕音效
+    this.audioManager.playButtonSound();
 
     // 清理吃牌選擇界面（如果存在）
     this.clearChowSelection();
@@ -1791,8 +1889,14 @@ export class Game {
      */
   handleGameWin(data) {
     console.log('游戏胜利', data);
-    const { winnerName, winResult, countdown } = data;
+    const { winnerId, winnerName, winResult, countdown } = data;
     const { HandTypes, TotalTai, BaseScore, WinningHand, Melds, WinTile } = winResult;
+
+    // 播放胡牌語音和勝利音效
+    if (winnerId) {
+      this.audioManager.playActionVoice(winnerId, 'hu');
+    }
+    this.audioManager.playEffect('win');
 
     // Display the winning hand
     if (WinningHand && Melds && WinTile) {
@@ -1815,6 +1919,10 @@ export class Game {
   handleGameDraw(data) {
     console.log('游戏流局，无人胜出', data);
     const { countdown = 5 } = data; // 默认5秒倒计时
+
+    // 播放流局音效
+    this.audioManager.playEffect('lose');
+
     this.showEndRoundScreen('流局', '无人胜出', countdown);
   }
 

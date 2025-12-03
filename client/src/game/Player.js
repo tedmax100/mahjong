@@ -274,10 +274,15 @@ export class Player {
   }
 
   removeTile(tileType) {
+    console.log(`🗑️ [removeTile] 嘗試移除: ${tileType}, 當前手牌數: ${this.tiles.length}`);
+    console.log(`🗑️ [removeTile] 當前手牌:`, this.tiles.map(t => t.type));
+
     // 从手牌数组中找到并移除该牌
     const index = this.tiles.findIndex(tile => tile.type === tileType);
     if (index !== -1) {
       const tile = this.tiles[index];
+      console.log(`✅ [removeTile] 找到牌，索引: ${index}`);
+
       // 从显示中移除
       this.container.removeChild(tile.container);
       // 从数组中移除
@@ -287,6 +292,11 @@ export class Player {
       this.tiles.forEach((tile, i) => {
         this.positionTile(tile, i);
       });
+
+      console.log(`✅ [removeTile] 移除成功，剩餘手牌數: ${this.tiles.length}`);
+    } else {
+      console.error(`❌ [removeTile] 找不到要移除的牌: ${tileType}`);
+      console.error(`❌ [removeTile] 可能的原因: addTile 還未完成或牌已被移除`);
     }
   }
 

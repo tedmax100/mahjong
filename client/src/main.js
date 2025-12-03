@@ -88,7 +88,7 @@ class MahjongApp {
     if (!playerName) {
       // 随机生成名字
       const adjectives = ['快乐的', '勇敢的', '聪明的', '幸运的', '神秘的', '强大的', '可爱的', '酷炫的'];
-      const nouns = ['麻将王', '牌神', '高手', '大师', '玩家', '战士', '冠军', '传说'];
+      const nouns = ['麻将王', '雀神', '元肥', '東協', '西卡', '北麥', '南沾', '中周'];
       const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
       const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
       playerName = randomAdj + randomNoun;
