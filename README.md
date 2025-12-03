@@ -4,6 +4,7 @@
 
 ## ✨ 功能特性
 
+### 🎮 遊戲功能
 - ✅ 四人实时在线对战
 - ✅ Google OAuth 登录认证
 - ✅ 房间创建和加入系统
@@ -12,6 +13,26 @@
 - ✅ Pixi.js 2D游戏渲染
 - ✅ 台湾16张麻将规则
 - ✅ 自动生成麻将牌素材
+- ✅ 吃、碰、槓、胡牌功能
+- ✅ 聽牌檢測與自動打牌
+- ✅ 台數計算系統
+
+### 🎵 音效系統
+- ✅ 完整的牌語音（男生/女生）
+- ✅ 動作語音（吃、碰、槓、胡、聽）
+- ✅ 遊戲音效（發牌、勝利、失敗等）
+- ✅ 背景音樂
+- ✅ 音量控制系統
+
+詳細說明: [client/src/game/AUDIO_IMPLEMENTATION.md](./client/src/game/AUDIO_IMPLEMENTATION.md)
+
+### 🌐 Cloudflare Tunnel 支援
+- ✅ 一鍵建立公網訪問
+- ✅ 無需公網 IP 或端口轉發
+- ✅ 自動獲取並打開 URL
+- ✅ 適合遠程測試和分享
+
+詳細說明: [TUNNEL_SETUP.md](./TUNNEL_SETUP.md)
 
 ## 🏗️ 项目结构
 
@@ -55,6 +76,46 @@ mahjong/
 
 ## 🚀 快速开始
 
+### 方法 1: 使用 Makefile + Cloudflare Tunnel（推薦）
+
+**一鍵啟動所有服務並獲得公網 URL：**
+
+```bash
+# 安裝所有依賴
+make install
+
+# 啟動開發環境 + Cloudflare Tunnel
+./start-tunnel.sh
+```
+
+或使用 Makefile：
+
+```bash
+make tunnel-quick
+```
+
+這會自動：
+- ✅ 啟動後端服務器 (Port 8080)
+- ✅ 啟動前端開發服務器 (Port 5173)
+- ✅ 建立 Cloudflare Tunnel 並獲得公網 URL
+- ✅ 在瀏覽器中自動打開
+
+**其他可用命令：**
+
+```bash
+make help             # 顯示所有命令
+make dev              # 只啟動本地開發（無 tunnel）
+make dev-tunnel       # 啟動開發 + tunnel
+make stop             # 停止所有服務
+make status           # 檢查服務狀態
+```
+
+詳細說明請查看 [TUNNEL_SETUP.md](./TUNNEL_SETUP.md)
+
+---
+
+### 方法 2: 手動啟動（傳統方式）
+
 ### 1. 生成麻将牌素材
 
 ```bash
@@ -91,11 +152,11 @@ npm install
 npm run dev
 ```
 
-前端将在 `http://localhost:3000` 启动
+前端将在 `http://localhost:5173` 启动
 
 ### 4. 访问游戏
 
-打开浏览器访问 `http://localhost:3000`
+打开浏览器访问 `http://localhost:5173`
 
 ## 🎮 游戏流程
 
