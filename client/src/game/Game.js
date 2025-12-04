@@ -589,6 +589,9 @@ export class Game {
       case 'ting':
         this.handleTing(playerId, data);
         break;
+      case 'flower':
+        this.handleFlower(playerId, data.flowers);
+        break;
     }
   }
 
@@ -859,18 +862,30 @@ export class Game {
       console.log(`🍜 吃牌前手牌 (${player.tiles.length}張):`, player.tiles.map(t => t.type));
 
       // 從手牌中移除用於吃牌的2張牌（不包括被吃的那張）
-      const tilesToRemove = chowTiles.filter(t => t !== tile);
-      console.log(`🍜 要移除的牌:`, tilesToRemove);
+      // 如果是自己（visualPosition === 0），按牌型移除
+      // 如果是其他玩家，他們的手牌都是 'back'，直接移除2張
+      if (visualPosition === 0) {
+        // 自己的牌，按牌型移除
+        const tilesToRemove = chowTiles.filter(t => t !== tile);
+        console.log(`🍜 要移除的牌:`, tilesToRemove);
 
-      for (const tileToRemove of tilesToRemove) {
-        for (let i = player.tiles.length - 1; i >= 0; i--) {
-          if (player.tiles[i].type === tileToRemove) {
-            player.tiles[i].destroy();
-            player.tiles.splice(i, 1);
-            console.log(`🍜 已移除: ${tileToRemove}`);
-            break;
+        for (const tileToRemove of tilesToRemove) {
+          for (let i = player.tiles.length - 1; i >= 0; i--) {
+            if (player.tiles[i].type === tileToRemove) {
+              player.tiles[i].destroy();
+              player.tiles.splice(i, 1);
+              console.log(`🍜 已移除: ${tileToRemove}`);
+              break;
+            }
           }
         }
+      } else {
+        // 其他玩家的牌都是 'back'，直接移除2張
+        for (let i = 0; i < 2 && player.tiles.length > 0; i++) {
+          const tileToRemove = player.tiles.pop();
+          tileToRemove.destroy();
+        }
+        console.log(`🍜 已移除其他玩家的2張牌`);
       }
 
       console.log(`🍜 吃牌後手牌 (${player.tiles.length}張):`, player.tiles.map(t => t.type));
@@ -935,12 +950,24 @@ export class Game {
     if (visualPosition !== -1) {
       const player = this.players[visualPosition];
 
-      // 從手牌中移除2張相同的牌
+      // 從手牌中移除2張牌
+      // 如果是自己（visualPosition === 0），按牌型移除
+      // 如果是其他玩家，他們的手牌都是 'back'，直接移除2張
       let removed = 0;
-      for (let i = player.tiles.length - 1; i >= 0 && removed < 2; i--) {
-        if (player.tiles[i].type === tile) {
-          player.tiles[i].destroy();
-          player.tiles.splice(i, 1);
+      if (visualPosition === 0) {
+        // 自己的牌，按牌型移除
+        for (let i = player.tiles.length - 1; i >= 0 && removed < 2; i--) {
+          if (player.tiles[i].type === tile) {
+            player.tiles[i].destroy();
+            player.tiles.splice(i, 1);
+            removed++;
+          }
+        }
+      } else {
+        // 其他玩家的牌都是 'back'，直接移除2張
+        for (let i = 0; i < 2 && player.tiles.length > 0; i++) {
+          const tileToRemove = player.tiles.pop();
+          tileToRemove.destroy();
           removed++;
         }
       }
@@ -1011,29 +1038,60 @@ export class Game {
     if (visualPosition !== -1) {
       const player = this.players[visualPosition];
 
-      // 只为新杠从手牌中移除牌，而不是为加杠
+      // 根据槓的类型从手牌中移除对应数量的牌
+      // 如果是自己（visualPosition === 0），按牌型移除
+      // 如果是其他玩家，他們的手牌都是 'back'，直接移除对应数量
       if (meld.Type === 'kong_exposed') {
         // 明杠，从手牌移除3张
-        let removed = 0;
-        for (let i = player.tiles.length - 1; i >= 0 && removed < 3; i--) {
-          if (player.tiles[i].type === tile) {
-            player.tiles[i].destroy();
-            player.tiles.splice(i, 1);
-            removed++;
+        if (visualPosition === 0) {
+          let removed = 0;
+          for (let i = player.tiles.length - 1; i >= 0 && removed < 3; i--) {
+            if (player.tiles[i].type === tile) {
+              player.tiles[i].destroy();
+              player.tiles.splice(i, 1);
+              removed++;
+            }
+          }
+        } else {
+          for (let i = 0; i < 3 && player.tiles.length > 0; i++) {
+            const tileToRemove = player.tiles.pop();
+            tileToRemove.destroy();
           }
         }
       } else if (meld.Type === 'kong_concealed') {
         // 暗杠，从手牌移除4张
-        let removed = 0;
-        for (let i = player.tiles.length - 1; i >= 0 && removed < 4; i--) {
-          if (player.tiles[i].type === tile) {
-            player.tiles[i].destroy();
-            player.tiles.splice(i, 1);
-            removed++;
+        if (visualPosition === 0) {
+          let removed = 0;
+          for (let i = player.tiles.length - 1; i >= 0 && removed < 4; i--) {
+            if (player.tiles[i].type === tile) {
+              player.tiles[i].destroy();
+              player.tiles.splice(i, 1);
+              removed++;
+            }
+          }
+        } else {
+          for (let i = 0; i < 4 && player.tiles.length > 0; i++) {
+            const tileToRemove = player.tiles.pop();
+            tileToRemove.destroy();
+          }
+        }
+      } else if (meld.Type === 'kong_promoted') {
+        // 加杠（从碰升级为槓），从手牌移除1张
+        if (visualPosition === 0) {
+          for (let i = player.tiles.length - 1; i >= 0; i--) {
+            if (player.tiles[i].type === tile) {
+              player.tiles[i].destroy();
+              player.tiles.splice(i, 1);
+              break; // 只移除1张
+            }
+          }
+        } else {
+          if (player.tiles.length > 0) {
+            const tileToRemove = player.tiles.pop();
+            tileToRemove.destroy();
           }
         }
       }
-      // 对于 'kong_promoted'，不从手牌中移除牌
 
       // 重新排列剩餘手牌
       player.rearrangeTiles();
@@ -1110,6 +1168,125 @@ export class Game {
     }
   }
 
+  /**
+   * 處理花牌廣播
+   * @param {string} playerId - 玩家ID
+   * @param {Array<string>} flowers - 花牌列表
+   */
+  async handleFlower(playerId, flowers) {
+    console.log(`玩家 ${playerId} 摸到花牌:`, flowers);
+
+    // 找到該玩家的視覺位置
+    let visualPosition = -1;
+    for (let i = 0; i < this.players.length; i++) {
+      if (this.players[i].userId === playerId) {
+        visualPosition = i;
+        break;
+      }
+    }
+
+    if (visualPosition === -1) {
+      console.error('未找到玩家:', playerId);
+      return;
+    }
+
+    const player = this.players[visualPosition];
+
+    // 初始化花牌容器（如果還沒有）
+    if (!player.flowersContainer) {
+      player.flowersContainer = new Container();
+      player.flowersList = [];
+      player.container.addChild(player.flowersContainer);
+    }
+
+    // 為每張花牌創建顯示
+    for (const flower of flowers) {
+      const texture = this.tileAssets[flower] || this.tileAssets['back'];
+      const flowerSprite = new Sprite(texture);
+
+      // 載入牌底
+      let baseTexture;
+      try {
+        baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
+      } catch (error) {
+        console.warn('無法載入花牌牌底', error);
+      }
+
+      const flowerContainer = new Container();
+      if (baseTexture) {
+        const baseSprite = new Sprite(baseTexture);
+        flowerContainer.addChild(baseSprite);
+      }
+      flowerContainer.addChild(flowerSprite);
+
+      // 縮小花牌顯示
+      flowerContainer.scale.set(0.5);
+
+      player.flowersList.push({ container: flowerContainer, type: flower });
+      player.flowersContainer.addChild(flowerContainer);
+    }
+
+    // 根據玩家位置排列花牌
+    this.positionFlowers(player, visualPosition);
+
+    // 其他玩家（非自己）摸到花牌時，從手牌移除對應數量的白牌
+    if (visualPosition !== 0) {
+      for (let i = 0; i < flowers.length && player.tiles.length > 0; i++) {
+        const tileToRemove = player.tiles.pop();
+        tileToRemove.destroy();
+      }
+      // 重新排列手牌
+      player.tiles.forEach((tile, index) => {
+        player.positionTile(tile, index);
+      });
+    }
+
+    console.log(`✅ 花牌顯示完成，玩家 ${player.name} 現有 ${player.flowersList.length} 張花牌`);
+  }
+
+  /**
+   * 根據玩家視覺位置排列花牌
+   */
+  positionFlowers(player, visualPosition) {
+    const tileWidth = 40;
+    const tileHeight = 55;
+    const spacing = 5;
+
+    player.flowersList.forEach((flower, index) => {
+      const col = index % 4;
+      const row = Math.floor(index / 4);
+
+      switch (visualPosition) {
+        case 0: // 自己 (底部) - 花牌在右下角
+          player.flowersContainer.x = this.app.screen.width - 200;
+          player.flowersContainer.y = this.app.screen.height - 80;
+          flower.container.x = col * (tileWidth + spacing);
+          flower.container.y = row * (tileHeight + spacing);
+          break;
+        case 1: // 右邊玩家 - 花牌在右上角
+          player.flowersContainer.x = this.app.screen.width - 80;
+          player.flowersContainer.y = 100;
+          flower.container.x = 0;
+          flower.container.y = index * (tileHeight * 0.5 + spacing);
+          flower.container.rotation = Math.PI / 2;
+          break;
+        case 2: // 上方玩家 - 花牌在左上角
+          player.flowersContainer.x = 150;
+          player.flowersContainer.y = 80;
+          flower.container.x = col * (tileWidth + spacing);
+          flower.container.y = row * (tileHeight + spacing);
+          break;
+        case 3: // 左邊玩家 - 花牌在左下角
+          player.flowersContainer.x = 80;
+          player.flowersContainer.y = this.app.screen.height - 200;
+          flower.container.x = 0;
+          flower.container.y = index * (tileHeight * 0.5 + spacing);
+          flower.container.rotation = -Math.PI / 2;
+          break;
+      }
+    });
+  }
+
   showAnnouncement(text, duration = 3000) {
     this.announcementText.text = text;
     this.announcementText.visible = true;
@@ -1129,6 +1306,34 @@ export class Game {
       clearTimeout(this.announcementTimeout);
       this.announcementTimeout = null;
     }
+  }
+
+  /**
+   * 顯示玩家加入通知
+   * @param {string} playerName - 玩家名稱
+   */
+  showPlayerJoinNotification(playerName) {
+    // 播放加入音效
+    this.audioManager.playPlayerJoin();
+
+    // 顯示大字通知
+    this.showAnnouncement(`${playerName} 加入遊戲`, 2000);
+
+    console.log(`🎮 玩家 ${playerName} 加入遊戲`);
+  }
+
+  /**
+   * 顯示玩家離開/斷線通知
+   * @param {string} playerName - 玩家名稱
+   */
+  showPlayerLeftNotification(playerName) {
+    // 播放離開音效
+    this.audioManager.playPlayerLeft();
+
+    // 顯示大字通知
+    this.showAnnouncement(`${playerName} 斷線，由電腦代打`, 2000);
+
+    console.log(`🎮 玩家 ${playerName} 斷線，由電腦代打`);
   }
 
   /**

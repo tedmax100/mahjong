@@ -90,6 +90,24 @@ export class AudioManager {
   }
 
   /**
+   * 播放玩家加入音效
+   */
+  playPlayerJoin() {
+    if (!this.enabled) return;
+    this.playSound('/assets/music/effect_join.ogg', this.volume.effect);
+    console.log('🔔 播放玩家加入音效');
+  }
+
+  /**
+   * 播放玩家離開/斷線音效
+   */
+  playPlayerLeft() {
+    if (!this.enabled) return;
+    this.playSound('/assets/music/effect_player_lost.mp3', this.volume.effect);
+    console.log('🔔 播放玩家離開音效');
+  }
+
+  /**
    * 播放背景音樂
    * @param {string} scene - 場景名稱（如 'game', 'menu'）
    * @param {boolean} loop - 是否循環播放，預設為 true

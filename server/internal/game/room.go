@@ -60,6 +60,7 @@ type Room struct {
 		Flowers  []string // 花牌
 		IsTing   bool     // 玩家是否已听牌
 		WinningTiles []string // 听牌所胡的牌
+		IsBot    bool     // 是否為 Bot（包含斷線由 Bot 代打的玩家）
 	}
 	
 	// StartNoResponseTimer starts a timer that fires if no player action is received.
@@ -163,6 +164,11 @@ func NewRoom(id string) *Room {
 
 // AddPlayer 添加玩家到房间
 func (r *Room) AddPlayer(userID, userName string) error {
+	// 檢查遊戲是否已經開始
+	if r.GameStarted {
+		return errors.New("遊戲已開始")
+	}
+
 	if len(r.Players) >= 4 {
 		return errors.New("房间已满")
 	}
@@ -273,7 +279,10 @@ func (r *Room) GetDealTilesMessage(playerIndex int) []byte {
 }
 
 // HandleDiscard 处理出牌
-func (r *Room) HandleDiscard(userID, tile string) bool {
+// 返回值：(success bool, isDraw bool)
+// - success: 打牌是否成功
+// - isDraw: 是否流局（仅在 success=true 时有意义）
+func (r *Room) HandleDiscard(userID, tile string) (bool, bool) {
 	// 找到玩家
 	var player *Player
 	for _, p := range r.Players {
@@ -285,19 +294,19 @@ func (r *Room) HandleDiscard(userID, tile string) bool {
 
 	if player == nil {
 		log.Printf("未找到玩家: %s", userID)
-		return false
+		return false, false
 	}
 
 	// 检查是否轮到该玩家
 	if player.Position != r.CurrentTurn {
 		log.Printf("还没轮到玩家 %s（当前回合: %d，玩家位置: %d）", player.Name, r.CurrentTurn, player.Position)
-		return false
+		return false, false
 	}
 
 	// 检查是否正在等待动作回应（如胡、碰、杠等）
 	if r.IsWaitingForActions {
 		log.Printf("❌ 玩家 %s 无法打牌：正在等待动作回应（请选择胡/碰/杠/过）", player.Name)
-		return false
+		return false, false
 	}
 
 	// 检查手牌数量是否正确（应该有17张牌才能打牌，槓後補牌可能是18張）
@@ -320,7 +329,7 @@ func (r *Room) HandleDiscard(userID, tile string) bool {
 	if totalTiles != expectedMin && totalTiles != expectedMax {
 		log.Printf("❌ 玩家 %s 手牌数量错误！总牌数 %d（手牌 %d + 吃碰槓 %d 組，其中 %d 個槓），预期 %d或%d 张，拒绝打牌",
 			player.Name, totalTiles, len(player.Hand), len(player.Melds), kongCount, expectedMin, expectedMax)
-		return false
+		return false, false
 	}
 
 	log.Printf("玩家 %s 打出 %s", player.Name, tile)
@@ -342,7 +351,7 @@ func (r *Room) HandleDiscard(userID, tile string) bool {
 		if r.Game.CheckDraw() {
 			log.Printf("流局！牌山剩余 %d 张", r.Game.GetRemainingTiles())
 			r.GameStarted = false
-			return true // 返回 true 表示流局
+			return true, true // 打牌成功，且流局
 		}
 	}
 
@@ -358,7 +367,7 @@ func (r *Room) HandleDiscard(userID, tile string) bool {
 	r.NextTurn()
 	log.Printf("轮到下一位玩家（位置: %d）", r.CurrentTurn)
 
-	return false // 返回 false 表示没有流局
+	return true, false // 打牌成功，没有流局
 }
 
 // NextTurn 切换到下一个玩家

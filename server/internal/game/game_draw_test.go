@@ -34,9 +34,12 @@ func TestHandleDiscardReturnsDrawStatus(t *testing.T) {
 			"wan-4", "wan-4", "wan-4", "wan-5", "wan-5", "wan-5", "wan-6", "wan-7",
 		}
 
-		isDraw := room.HandleDiscard(player.ID, "wan-1")
+		success, isDraw := room.HandleDiscard(player.ID, "wan-1")
+		if !success {
+			t.Error("HandleDiscard 应该成功")
+		}
 		if isDraw {
-			t.Error("正常情况下 HandleDiscard 应该返回 false")
+			t.Error("正常情况下 isDraw 应该返回 false")
 		}
 	})
 
@@ -67,9 +70,12 @@ func TestHandleDiscardReturnsDrawStatus(t *testing.T) {
 		}
 
 		// 执行出牌，应该触发流局
-		isDraw := drawRoom.HandleDiscard(player.ID, "wan-1")
+		success, isDraw := drawRoom.HandleDiscard(player.ID, "wan-1")
+		if !success {
+			t.Error("HandleDiscard 应该成功")
+		}
 		if !isDraw {
-			t.Error("牌山剩余 <= 8 时，HandleDiscard 应该返回 true 表示流局")
+			t.Error("牌山剩余 <= 8 时，isDraw 应该返回 true 表示流局")
 		}
 
 		// 确认游戏已停止
@@ -274,8 +280,11 @@ func TestGameStateAfterDraw(t *testing.T) {
 
 	t.Run("流局后游戏应该停止", func(t *testing.T) {
 		// 触发流局
-		isDraw := room.HandleDiscard(player.ID, "wan-1")
+		success, isDraw := room.HandleDiscard(player.ID, "wan-1")
 
+		if !success {
+			t.Fatal("HandleDiscard 应该成功")
+		}
 		if !isDraw {
 			t.Fatal("应该触发流局")
 		}
@@ -306,7 +315,7 @@ func TestGameStateAfterDraw(t *testing.T) {
 		}
 
 		// 打出一张牌触发流局
-		newRoom.HandleDiscard(p.ID, "wan-1")
+		_, _ = newRoom.HandleDiscard(p.ID, "wan-1")
 
 		// 弃牌堆应该包含打出的牌
 		if len(newRoom.Game.DiscardPile) != 1 {

@@ -145,7 +145,13 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 		if !ok {
 			return
 		}
-		isDraw := c.Room.HandleDiscard(c.UserID, tile)
+		success, isDraw := c.Room.HandleDiscard(c.UserID, tile)
+
+		// 如果打牌失败，不广播也不继续处理
+		if !success {
+			return
+		}
+
 		c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "discard", tile)
 
 		// 检查是否流局
@@ -502,7 +508,12 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 			// 处理出牌
 
-			isDraw := c.Room.HandleDiscard(c.UserID, tile)
+			success, isDraw := c.Room.HandleDiscard(c.UserID, tile)
+
+			// 如果打牌失败，不广播也不继续处理
+			if !success {
+				return
+			}
 
 			// 先广播出牌动作（让客户端移除手牌）
 			c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "discard", tile)

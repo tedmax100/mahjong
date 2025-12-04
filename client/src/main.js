@@ -258,6 +258,19 @@ class MahjongApp {
       case 'possible_actions':
         this.game.handlePossibleActions(message.data);
         break;
+      case 'player_left':
+        if (this.game) {
+          this.game.showPlayerLeftNotification(message.data.playerName);
+        }
+        break;
+      case 'error':
+        console.error('伺服器錯誤:', message.message);
+        alert(message.message || '發生錯誤');
+        // 如果是房間已滿或遊戲已開始，返回房間選擇畫面
+        if (message.message === '房间已满' || message.message === '遊戲已開始') {
+          this.leaveRoom();
+        }
+        break;
       default:
         console.warn('未知消息类型:', message.type);
     }
@@ -265,6 +278,27 @@ class MahjongApp {
 
   updateRoomInfo(data) {
     console.log('更新房间信息:', data);
+
+    // 檢查是否有新玩家加入
+    const oldPlayerCount = this.lastPlayerCount || 0;
+    const newPlayerCount = data.playerCount;
+
+    // 如果有新玩家加入（且不是自己剛加入）
+    if (newPlayerCount > oldPlayerCount && oldPlayerCount > 0) {
+      // 找出新加入的玩家
+      const newPlayers = data.players.slice(oldPlayerCount);
+      for (const player of newPlayers) {
+        if (player && player.name) {
+          console.log(`新玩家加入: ${player.name}`);
+          // 顯示加入通知
+          if (this.game) {
+            this.game.showPlayerJoinNotification(player.name);
+          }
+        }
+      }
+    }
+
+    this.lastPlayerCount = newPlayerCount;
     document.getElementById('player-count').textContent = `${data.playerCount}/4`;
 
     // 即使游戏还没开始，也更新玩家列表
@@ -305,6 +339,37 @@ class MahjongApp {
         prompt('复制此链接分享给朋友:', shareUrl);
       });
     }
+  }
+
+  leaveRoom() {
+    // 關閉 WebSocket 連接
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+
+    // 清除遊戲狀態
+    this.roomId = null;
+    this.lastPlayerCount = 0;
+
+    // 銷毀遊戲實例
+    if (this.game) {
+      this.game.destroy();
+      this.game = null;
+    }
+
+    // 銷毀 Pixi 應用
+    if (this.app) {
+      this.app.destroy(true);
+      this.app = null;
+    }
+
+    // 隱藏遊戲畫面，顯示房間選擇畫面
+    document.getElementById('game-container').classList.add('hidden');
+    document.getElementById('room-info').classList.add('hidden');
+    document.getElementById('room-screen').classList.remove('hidden');
+
+    console.log('已離開房間');
   }
 }
 

@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"mahjong/internal/game"
 	"math/rand"
@@ -64,7 +65,9 @@ func (h *Hub) registerClient(client *Client) {
 	if err := room.AddPlayer(client.UserID, client.UserName); err != nil {
 		log.Printf("玩家加入房间失败: %v", err)
 		h.mu.Unlock() // Unlock before sending to channel
-		client.Send <- []byte(`{"type":"error","message":"房间已满"}`)
+		// 發送具體的錯誤訊息
+		errorMsg := fmt.Sprintf(`{"type":"error","message":"%s"}`, err.Error())
+		client.Send <- []byte(errorMsg)
 		return
 	}
 
@@ -93,34 +96,102 @@ func (h *Hub) registerClient(client *Client) {
 // unregisterClient 注销客户端
 func (h *Hub) unregisterClient(client *Client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+
+	var roomToCheck *game.Room
+	var shouldCheckBotTurn bool
 
 	if client.Room != nil {
 		room := client.Room
 
-		// 从房间移除客户端
+		// 从房间移除客户端連接
 		delete(room.Clients, client.UserID)
-		room.RemovePlayer(client.UserID)
 
 		log.Printf("玩家 %s 离开房间 %s", client.UserName, room.ID)
 
-		// 如果房间为空，删除房间
+		// 如果遊戲已開始，將玩家轉為 Bot 代打
+		if room.GameStarted {
+			playerName := client.UserName
+			// 將玩家標記為 Bot
+			for _, player := range room.Players {
+				if player.ID == client.UserID {
+					player.IsBot = true
+					log.Printf("玩家 %s 斷線，由 Bot 代打", playerName)
+					break
+				}
+			}
+
+			// 廣播玩家離開通知
+			h.broadcastPlayerLeftNoLock(room, client.UserID, playerName)
+
+			// 標記需要檢查 Bot 回合
+			roomToCheck = room
+			shouldCheckBotTurn = true
+		} else {
+			// 遊戲未開始，直接移除玩家
+			room.RemovePlayer(client.UserID)
+		}
+
+		// 檢查是否還有真實玩家連線（有 WebSocket 連接的玩家）
+		// 如果沒有任何真實玩家連線，刪除房間
 		if len(room.Clients) == 0 {
 			delete(h.rooms, room.ID)
-			log.Printf("删除空房间: %s", room.ID)
+			log.Printf("房間 %s 已無真實玩家連線，刪除房間", room.ID)
+			shouldCheckBotTurn = false // 房間已刪除，不需要檢查
 		} else {
-			// 广播房间更新
-			h.broadcastRoomUpdate(room)
+			// 還有玩家，广播房间更新
+			h.broadcastRoomUpdateNoLock(room)
 		}
 	}
 
 	close(client.Send)
+	h.mu.Unlock()
+
+	// 在鎖外檢查 Bot 回合，避免死鎖
+	if shouldCheckBotTurn && roomToCheck != nil {
+		h.CheckAndPlayBotTurn(roomToCheck, false)
+	}
 }
 
 // broadcastRoomUpdate 广播房间状态更新
 func (h *Hub) broadcastRoomUpdate(room *game.Room) {
 	message := room.GetRoomUpdateMessage()
 	h.broadcast(room, message)
+}
+
+// broadcastRoomUpdateNoLock 广播房间状态更新（調用者已持有鎖）
+func (h *Hub) broadcastRoomUpdateNoLock(room *game.Room) {
+	message := room.GetRoomUpdateMessage()
+	h.broadcastNoLock(room, message)
+}
+
+// broadcastPlayerLeft 廣播玩家離開通知
+func (h *Hub) broadcastPlayerLeft(room *game.Room, playerID, playerName string) {
+	message := map[string]interface{}{
+		"type": "player_left",
+		"data": map[string]interface{}{
+			"playerId":   playerID,
+			"playerName": playerName,
+		},
+	}
+
+	data, _ := json.Marshal(message)
+	h.broadcast(room, data)
+	log.Printf("廣播玩家離開通知: %s", playerName)
+}
+
+// broadcastPlayerLeftNoLock 廣播玩家離開通知（調用者已持有鎖）
+func (h *Hub) broadcastPlayerLeftNoLock(room *game.Room, playerID, playerName string) {
+	message := map[string]interface{}{
+		"type": "player_left",
+		"data": map[string]interface{}{
+			"playerId":   playerID,
+			"playerName": playerName,
+		},
+	}
+
+	data, _ := json.Marshal(message)
+	h.broadcastNoLock(room, data)
+	log.Printf("廣播玩家離開通知: %s", playerName)
 }
 
 // startGame 开始游戏
@@ -250,10 +321,13 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 	currentPlayer := room.Players[room.CurrentTurn]
 	currentTurnAtCheck := room.CurrentTurn
 	h.mu.RUnlock()
-	log.Printf("🔓 [CheckAndPlayBotTurn] 釋放讀鎖，當前玩家: %s (位置 %d)", currentPlayer.Name, currentTurnAtCheck)
+	log.Printf("🔓 [CheckAndPlayBotTurn] 釋放讀鎖，當前玩家: %s (位置 %d), IsBot: %v", currentPlayer.Name, currentTurnAtCheck, currentPlayer.IsBot)
+
+	// 判斷是否為 Bot（包括原生 Bot 和斷線轉為 Bot 的玩家）
+	isBot := strings.HasPrefix(currentPlayer.ID, "bot_") || currentPlayer.IsBot
 
 	// 如果是真实玩家，根据情况决定是否延迟发牌
-	if !strings.HasPrefix(currentPlayer.ID, "bot_") {
+	if !isBot {
 		log.Printf("🧑 [CheckAndPlayBotTurn] 當前玩家是真實玩家")
 		if withDelay {
 			go func() {
@@ -278,9 +352,10 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 		return
 	}
 
-	// Bot 的逻辑
-	if strings.HasPrefix(currentPlayer.ID, "bot_") {
-		log.Printf("🤖 [CheckAndPlayBotTurn] 當前玩家是 Bot")
+	// Bot 的逻辑（包括原生 Bot 和斷線轉為 Bot 的玩家）
+	if isBot {
+		log.Printf("🤖 [CheckAndPlayBotTurn] 當前玩家是 Bot (IsBot: %v)", currentPlayer.IsBot)
+		roomID := room.ID // 保存房間 ID 用於後續檢查
 		go func() {
 			log.Printf("🤖 Bot %s 的回合已开始，等待出牌...", currentPlayer.Name)
 			time.Sleep(time.Duration(1000+rand.Intn(1000)) * time.Millisecond)
@@ -288,6 +363,13 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 			log.Printf("🔒 [CheckAndPlayBotTurn-Bot] 準備獲取鎖")
 			h.mu.Lock()
 			log.Printf("✅ [CheckAndPlayBotTurn-Bot] 已獲取鎖")
+
+			// 檢查房間是否還存在（可能已被刪除）
+			if _, exists := h.rooms[roomID]; !exists {
+				log.Printf("🚫 Bot %s 的房間 %s 已不存在，取消執行", currentPlayer.Name, roomID)
+				h.mu.Unlock()
+				return
+			}
 
 			if !room.GameStarted || room.CurrentTurn != currentTurnAtCheck {
 				log.Printf("⚠️ Bot %s 的回合被中断", currentPlayer.Name)
@@ -346,7 +428,11 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 							h.mu.Unlock()
 
 							// 處理出牌（HandleDiscard 會自己移除手牌）
-							isDraw := room.HandleDiscard(currentPlayer.ID, drawnTile)
+							success, isDraw := room.HandleDiscard(currentPlayer.ID, drawnTile)
+							if !success {
+								log.Printf("警告：Bot %s 打牌失敗", currentPlayer.Name)
+								return
+							}
 							h.BroadcastPlayerAction(room, currentPlayer.ID, "discard", drawnTile)
 
 							// 檢查是否流局
@@ -397,7 +483,11 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 
 				log.Printf("Bot %s 自动打出 %s", currentPlayer.Name, tileToDiscard)
 
-				isDraw := room.HandleDiscard(currentPlayer.ID, tileToDiscard)
+				success, isDraw := room.HandleDiscard(currentPlayer.ID, tileToDiscard)
+				if !success {
+					log.Printf("警告：Bot %s 打牌失敗", currentPlayer.Name)
+					return
+				}
 				h.BroadcastPlayerAction(room, currentPlayer.ID, "discard", tileToDiscard)
 
 				// 检查是否流局
@@ -521,7 +611,11 @@ func (h *Hub) drawForRealPlayer_needsLock(room *game.Room) {
 					log.Printf("玩家 %s 聽牌中，自動打出 %s", currentPlayer.Name, drawnTile)
 
 					// 處理出牌（HandleDiscard 會自己移除手牌）
-					isDraw := room.HandleDiscard(currentPlayer.ID, drawnTile)
+					success, isDraw := room.HandleDiscard(currentPlayer.ID, drawnTile)
+					if !success {
+						log.Printf("警告：玩家 %s 聽牌打牌失敗", currentPlayer.Name)
+						return
+					}
 
 					// 廣播出牌動作
 					h.BroadcastPlayerAction(room, currentPlayer.ID, "discard", drawnTile)
@@ -734,7 +828,9 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 	log.Printf("🔓 [botsReactToDiscard] 釋放讀鎖")
 
 	for _, p := range playersCopy {
-		if p.Position == discarderPosition || !strings.HasPrefix(p.ID, "bot_") {
+		// 判斷是否為 Bot（包括原生 Bot 和斷線轉為 Bot 的玩家）
+		isBot := strings.HasPrefix(p.ID, "bot_") || p.IsBot
+		if p.Position == discarderPosition || !isBot {
 			continue
 		}
 
@@ -794,6 +890,14 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 
 		log.Printf("🔒 [botsReactToDiscard] 準備獲取寫鎖執行 Bot 動作")
 		h.mu.Lock()
+
+		// 檢查房間是否還存在（可能已被刪除）
+		if _, exists := h.rooms[room.ID]; !exists {
+			log.Printf("🚫 [botsReactToDiscard] 房間 %s 已不存在，取消執行 Bot 動作", room.ID)
+			h.mu.Unlock()
+			return false
+		}
+
 		log.Printf("✅ [botsReactToDiscard] 已獲取寫鎖，執行動作: %s", bestAction)
 		var drawnTile string
 		switch bestAction {
@@ -1028,6 +1132,21 @@ func (h *Hub) BroadcastFlowerTiles(room *game.Room, playerID string, flowers []s
 
 // broadcast is a helper to send a message to all clients in a room
 func (h *Hub) broadcast(room *game.Room, message []byte) {
+	for _, clientInterface := range room.Clients {
+		client, ok := clientInterface.(*Client)
+		if !ok {
+			continue
+		}
+		select {
+		case client.Send <- message:
+		default:
+			log.Printf("警告：客户端 %s 的发送缓冲区已满，消息被丢弃", client.UserName)
+		}
+	}
+}
+
+// broadcastNoLock 廣播訊息（與 broadcast 相同，用於區分調用場景）
+func (h *Hub) broadcastNoLock(room *game.Room, message []byte) {
 	for _, clientInterface := range room.Clients {
 		client, ok := clientInterface.(*Client)
 		if !ok {

@@ -400,7 +400,7 @@ func TestTingActionBroadcastOrder(t *testing.T) {
 		player.WinningTiles = tingResult.WinningTiles
 
 		// 處理出牌
-		room.HandleDiscard(player.ID, tile)
+		_, _ = room.HandleDiscard(player.ID, tile)
 
 		// 驗證應該廣播的動作順序
 		// 1. 先廣播 discard 動作
@@ -452,7 +452,7 @@ func TestTingActionBroadcastOrder(t *testing.T) {
 		discardTile := "wan-8"
 
 		// 處理出牌
-		room.HandleDiscard(player.ID, discardTile)
+		_, _ = room.HandleDiscard(player.ID, discardTile)
 
 		// 驗證棄牌堆
 		if len(room.Game.DiscardPile) == 0 {

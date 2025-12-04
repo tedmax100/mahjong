@@ -233,12 +233,12 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			initialHandCount := len(player.Hand)
 			initialTotalTiles := player.GetTotalTiles()
 
-			// 嘗試打牌（返回值表示是否流局，不是是否成功）
-			_ = room.HandleDiscard(player.ID, tileToDiscard)
+			// 嘗試打牌（返回值: success, isDraw）
+			success, _ := room.HandleDiscard(player.ID, tileToDiscard)
 
 			// 檢查牌是否被移除（判斷是否成功）
 			tileWasRemoved := len(player.Hand) == initialHandCount-1
-			actualSuccess := tileWasRemoved
+			actualSuccess := success && tileWasRemoved
 
 			// 驗證結果
 			if tc.shouldSucceed && !actualSuccess {
