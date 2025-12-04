@@ -1,284 +1,94 @@
-# 🀄 台湾16张麻将 - 在线对战游戏
+# 麻將專案 README
 
-一个支持四人在线对战的台湾16张麻将网页游戏，使用Pixi.js渲染和Go语言后端。
+這是一個16張台灣麻將的網頁遊戲專案。
 
-## ✨ 功能特性
+## ✨ 功能亮點
 
-### 🎮 遊戲功能
-- ✅ 四人实时在线对战
-- ✅ Google OAuth 登录认证
-- ✅ 房间创建和加入系统
-- ✅ 房间分享功能（房号 + URL链接）
-- ✅ WebSocket实时通信
-- ✅ Pixi.js 2D游戏渲染
-- ✅ 台湾16张麻将规则
-- ✅ 自动生成麻将牌素材
-- ✅ 吃、碰、槓、胡牌功能
-- ✅ 聽牌檢測與自動打牌
-- ✅ 台數計算系統
+*   **前後端分離**: 採用 Go 語言後端與現代 JavaScript 前端分離的架構。
+*   **即時通訊**: 使用 WebSocket 技術實現玩家之間的即時互動。
+*   **一鍵啟動**: 透過 `Makefile` 整合了完整的開發、測試、建置與部署流程。
+*   **遠端測試**: 內建 Cloudflare Tunnel 整合，方便將本機服務暴露於公網進行測試。
 
-### 🎵 音效系統
-- ✅ 完整的牌語音（男生/女生）
-- ✅ 動作語音（吃、碰、槓、胡、聽）
-- ✅ 遊戲音效（發牌、勝利、失敗等）
-- ✅ 背景音樂
-- ✅ 音量控制系統
+## 🛠️ 技術棧 (Tech Stack)
 
-詳細說明: [client/src/game/AUDIO_IMPLEMENTATION.md](./client/src/game/AUDIO_IMPLEMENTATION.md)
+*   **後端 (Backend)**: Go
+*   **前端 (Frontend)**: JavaScript (使用 [Vite](https://vitejs.dev/) 作為建置工具)
+*   **即時通訊 (Real-time Communication)**: WebSocket
 
-### 🌐 Cloudflare Tunnel 支援
-- ✅ 一鍵建立公網訪問
-- ✅ 無需公網 IP 或端口轉發
-- ✅ 自動獲取並打開 URL
-- ✅ 適合遠程測試和分享
+## 🚀 如何開始 (Getting Started)
 
-詳細說明: [TUNNEL_SETUP.md](./TUNNEL_SETUP.md)
+#### 1. 環境準備
 
-## 🏗️ 项目结构
+請確保您已安裝以下軟體：
 
-```
-mahjong/
-├── client/                 # 前端项目 (Vite + Pixi.js)
-│   ├── src/
-│   │   ├── game/          # 游戏核心逻辑
-│   │   │   ├── Game.js    # 主游戏类
-│   │   │   ├── Table.js   # 牌桌
-│   │   │   ├── Player.js  # 玩家
-│   │   │   └── Tile.js    # 麻将牌
-│   │   ├── network/
-│   │   │   └── WebSocketClient.js
-│   │   ├── auth/
-│   │   │   └── GoogleAuth.js
-│   │   └── main.js
-│   ├── public/
-│   │   └── assets/tiles/  # 麻将牌素材
-│   ├── index.html
-│   └── package.json
-│
-├── server/                 # Go后端项目
-│   ├── cmd/
-│   │   └── main.go        # 主程序入口
-│   ├── internal/
-│   │   ├── websocket/     # WebSocket处理
-│   │   │   ├── hub.go     # 连接管理
-│   │   │   └── client.go  # 客户端
-│   │   ├── game/          # 游戏逻辑
-│   │   │   ├── room.go    # 房间管理
-│   │   │   └── mahjong.go # 麻将规则
-│   │   └── api/           # HTTP API
-│   │       └── room.go
-│   └── go.mod
-│
-└── tools/                  # 工具
-    ├── generate-tiles.html # 素材生成器（浏览器）
-    └── package.json
-```
+*   `make`
+*   `Go` (建議版本 1.20+)
+*   `Node.js` (建議版本 18+) 及 `npm`
+*   (選用) `cloudflared` - 若要使用 `make start` 功能，會自動為您安裝。
 
-## 🚀 快速开始
+#### 2. 安裝依賴
 
-### 方法 1: 使用 Makefile + Cloudflare Tunnel（推薦）
-
-**一鍵啟動所有服務並獲得公網 URL：**
+進入專案根目錄，執行以下指令來安裝前後端的所有依賴項目：
 
 ```bash
-# 安裝所有依賴
 make install
-
-# 啟動開發環境 + Cloudflare Tunnel
-./start-tunnel.sh
 ```
 
-或使用 Makefile：
+#### 3. 運行開發環境
+
+您可以根據需求選擇不同的啟動方式：
+
+*   **純本機開發** (推薦日常開發使用)
+    此模式會在本機啟動後端伺服器 (`:8080`) 與前端開發伺服器 (`:5173`)。
+
+    ```bash
+    make dev
+    ```
+
+*   **本機開發並建立公網通道**
+    此模式除了啟動本機服務外，還會使用 Cloudflare Tunnel 建立一個臨時的公開網址，讓其他人可以存取您的本機前端服務。
+
+    ```bash
+    make start
+    ```
+
+#### 4. 停止所有服務
+
+若要停止所有由 `make` 啟動的服務 (包含後端、前端與 tunnel)，請執行：
 
 ```bash
-make tunnel-quick
+make stop
 ```
 
-這會自動：
-- ✅ 啟動後端服務器 (Port 8080)
-- ✅ 啟動前端開發服務器 (Port 5173)
-- ✅ 建立 Cloudflare Tunnel 並獲得公網 URL
-- ✅ 在瀏覽器中自動打開
+## 🧪 如何測試 (Running Tests)
 
-**其他可用命令：**
+使用以下指令來運行前端的單元測試：
 
 ```bash
-make help             # 顯示所有命令
-make dev              # 只啟動本地開發（無 tunnel）
-make dev-tunnel       # 啟動開發 + tunnel
-make stop             # 停止所有服務
-make status           # 檢查服務狀態
+make test
 ```
 
-詳細說明請查看 [TUNNEL_SETUP.md](./TUNNEL_SETUP.md)
-
----
-
-### 方法 2: 手動啟動（傳統方式）
-
-### 1. 生成麻将牌素材
+您也可以使用 Vitest 的 UI 模式來進行互動式測試：
 
 ```bash
-# 用浏览器打开素材生成器
-open tools/generate-tiles.html
-
-# 点击"生成所有素材"，然后"打包下载全部"
-# 解压 mahjong-tiles.zip 到 client/public/assets/tiles/
+make test-ui
 ```
 
-### 2. 启动后端服务器
+## 📦 如何建置 (Building for Production)
+
+執行以下指令來建置用於生產環境的前後端應用程式：
 
 ```bash
-cd server
-
-# 下载依赖
-go mod download
-
-# 运行服务器
-go run cmd/main.go
+make build
 ```
 
-后端将在 `http://localhost:8080` 启动
+*   後端應用程式會被編譯成執行檔 `mahjong-server` 並放置於專案根目錄。
+*   前端的靜態檔案會被建置到 `client/dist` 目錄下。
 
-### 3. 启动前端开发服务器
+## 📜 可用指令
+
+本專案 `Makefile` 中包含了許多便利的指令，您可以執行 `make help` 來查看所有可用的指令及其說明。
 
 ```bash
-cd client
-
-# 安装依赖
-npm install
-
-# 启动开发服务器
-npm run dev
+make help
 ```
-
-前端将在 `http://localhost:5173` 启动
-
-### 4. 访问游戏
-
-打开浏览器访问 `http://localhost:5173`
-
-## 🎮 游戏流程
-
-1. **登录** - 使用Google账号登录（或测试模式）
-2. **创建/加入房间**
-   - 点击"创建新房间"获得房间号
-   - 或输入房间号"加入房间"
-3. **分享房间** - 点击"分享房间"复制链接给朋友
-4. **等待玩家** - 等待4名玩家齐聚
-5. **开始游戏** - 系统自动发牌，游戏开始！
-
-## 🔧 配置
-
-### Google OAuth 设置
-
-1. 前往 [Google Cloud Console](https://console.cloud.google.com/)
-2. 创建新项目或选择现有项目
-3. 启用 Google+ API
-4. 创建 OAuth 2.0 客户端ID
-5. 将客户端ID填入：
-   - `client/index.html` 第7行
-   - `client/src/auth/GoogleAuth.js` 第12行
-
-```html
-<!-- client/index.html -->
-<meta name="google-signin-client_id" content="YOUR_CLIENT_ID.apps.googleusercontent.com">
-```
-
-```javascript
-// client/src/auth/GoogleAuth.js
-client_id: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
-```
-
-## 📦 生产环境部署
-
-### 1. 构建前端
-
-```bash
-cd client
-npm run build
-```
-
-构建文件将输出到 `dist/public/`
-
-### 2. 部署后端
-
-```bash
-cd server
-
-# 构建二进制文件
-go build -o mahjong cmd/main.go
-
-# 运行
-./mahjong
-```
-
-### 3. 使用Docker（可选）
-
-```bash
-# TODO: 添加Dockerfile
-```
-
-## 🎯 台湾16张麻将规则
-
-### 基本规则
-
-- **牌数**: 每人16张牌（庄家17张）
-- **牌型**: 万、筒、条、风牌、三元牌、花牌
-- **花牌**: 抽到花牌立即明示并补牌
-- **胡牌**: 5组顺子/刻子 + 1对眼
-
-### 台数计算（简化版）
-
-- 自摸: +1台
-- 门清: +1台
-- 碰碰胡: +2台
-- 清一色: +5台
-- 字一色: +8台
-- ... (更多台型待实现)
-
-## 🛠️ 技术栈
-
-**前端:**
-- Pixi.js 8.x - 2D WebGL渲染
-- Vite - 构建工具
-- JavaScript (ES6+)
-
-**后端:**
-- Go 1.24
-- Gin - Web框架
-- Gorilla WebSocket
-- Google UUID
-
-**素材生成:**
-- HTML5 Canvas API
-- JSZip - 打包下载
-
-## 📝 待实现功能
-
-- [ ] 完整的台湾16张麻将胡牌判断
-- [ ] 台数计算系统
-- [ ] AI玩家
-- [ ] 游戏历史记录
-- [ ] 排行榜系统
-- [ ] 牌局回放
-- [ ] 音效和动画
-- [ ] 移动端适配
-- [ ] Google OAuth后端验证
-- [ ] Redis缓存房间状态
-
-## 🤝 贡献
-
-欢迎提交Issue和Pull Request！
-
-## 📄 许可证
-
-MIT License
-
-## 👨‍💻 作者
-
-Generated with Claude Code
-
----
-
-**Enjoy the game! 🀄**
