@@ -243,7 +243,7 @@ describe('聽牌狀態測試', () => {
     });
 
     it('聽牌後能胡牌時不應自動打牌', () => {
-      // 這個測試需要修改 checkSelfActions 讓它能檢測到可以胡牌
+      // 這個測試需要修改 checkSelfActions 讓它能偵測到可以胡牌
       // 這裡只是示範結構
       const myPlayer = game.players[game.myPosition];
       myPlayer.isTing = true;
@@ -264,7 +264,7 @@ describe('聽牌狀態測試', () => {
     });
   });
 
-  describe('聽牌狀態設置', () => {
+  describe('聽牌狀態設定', () => {
     it('初始狀態應該是未聽牌', () => {
       expect(player.isTing).toBe(false);
       expect(player.winningTiles).toEqual([]);
@@ -303,7 +303,7 @@ describe('聽牌狀態測試', () => {
       expect(result).toBe(false);
     });
 
-    it('未設置onDiscard回調時不應崩潰', () => {
+    it('未設定onDiscard回呼時不應崩潰', () => {
       player.isTing = false;
       player.lastDrawnTile = 'wan-1';
       player.isInteractive = true;
@@ -314,7 +314,7 @@ describe('聽牌狀態測試', () => {
       }).not.toThrow();
     });
 
-    it('玩家不可交互時聽牌限制應該優先', () => {
+    it('玩家不可互動時聽牌限制應該優先', () => {
       player.isTing = true;
       player.lastDrawnTile = 'wan-1';
       player.isInteractive = false;

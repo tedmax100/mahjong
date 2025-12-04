@@ -23,7 +23,7 @@ class MockGameForRemainingTiles {
   updateRemainingTiles(count) {
     this.remainingTiles = count;
 
-    // 台湾麻将规则：海底剩余8张时流局
+    // 臺灣麻將規則：海底剩餘8張時流局
     if (this.remainingTiles <= 8 && this.remainingTiles > 0) {
       this.handleGameDraw();
     }
@@ -73,7 +73,7 @@ describe('剩餘牌數計算測試', () => {
   });
 
   describe('基本功能測試', () => {
-    it('應該在初始化時設置正確的剩餘牌數', () => {
+    it('應該在初始化時設定正確的剩餘牌數', () => {
       expect(game.remainingTiles).toBe(79);
     });
 
@@ -108,7 +108,7 @@ describe('剩餘牌數計算測試', () => {
     });
 
     it('應該在摸到牌山只剩8張時觸發流局', () => {
-      // 設置剩餘9張
+      // 設定剩餘9張
       game.updateRemainingTiles(9);
       game.isDrawTriggered = false; // 重置流局標誌
 

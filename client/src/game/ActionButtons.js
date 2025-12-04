@@ -8,9 +8,9 @@ export class ActionButtons {
     this.screenWidth = screenWidth;
     this.screenHeight = screenHeight;
     this.container = new Container();
-    this.buttons = {}; // 存儲各個按鈕
+    this.buttons = {}; // 儲存各個按鈕
     this.visible = false;
-    this.callbacks = {}; // 存儲回調函數
+    this.callbacks = {}; // 儲存回呼函數
 
     // 按鈕配置
     this.buttonConfigs = [
@@ -39,14 +39,14 @@ export class ActionButtons {
         button.x = this.screenWidth / 2 + config.x;
         button.y = this.screenHeight - 250; // 按鈕位置（在手牌上方）
 
-        // 設置為可交互
+        // 設定為可互動
         button.eventMode = 'static';
         button.cursor = 'pointer';
 
-        // 添加點擊事件
+        // 新增點擊事件
         button.on('pointerdown', () => this.onButtonClick(config.action));
 
-        // 添加懸停效果
+        // 新增懸停效果
         button.on('pointerover', () => {
           button.scale.set(0.9);
         });
@@ -105,25 +105,25 @@ export class ActionButtons {
    */
   onButtonClick(action) {
     console.log(`✅ 按鈕點擊: ${action}`);
-    console.log('可用回調:', Object.keys(this.callbacks));
-    console.log(`${action} 回調存在?`, !!this.callbacks[action]);
+    console.log('可用回呼:', Object.keys(this.callbacks));
+    console.log(`${action} 回呼存在?`, !!this.callbacks[action]);
 
     // 隱藏按鈕
     this.hide();
 
-    // 觸發回調
+    // 觸發回呼
     if (this.callbacks[action]) {
-      console.log(`✅ 觸發 ${action} 回調`);
+      console.log(`✅ 觸發 ${action} 回呼`);
       this.callbacks[action]();
     } else {
-      console.error(`❌ ${action} 回調不存在`);
+      console.error(`❌ ${action} 回呼不存在`);
     }
   }
 
   /**
-   * 設置按鈕回調函數
+   * 設定按鈕回呼函數
    * @param {string} action - 動作名稱
-   * @param {Function} callback - 回調函數
+   * @param {Function} callback - 回呼函數
    */
   on(action, callback) {
     this.callbacks[action] = callback;

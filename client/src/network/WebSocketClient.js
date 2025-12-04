@@ -1,5 +1,5 @@
 /**
- * WebSocket 客户端
+ * WebSocket 客戶端
  */
 export class WebSocketClient {
   constructor(roomId, user) {
@@ -18,15 +18,15 @@ export class WebSocketClient {
   connect() {
     const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws?room=${this.roomId}&userId=${this.user.id}&userName=${encodeURIComponent(this.user.name)}`;
 
-    console.log('连接WebSocket:', wsUrl);
+    console.log('連接WebSocket:', wsUrl);
 
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
-      console.log('WebSocket已连接');
+      console.log('WebSocket已連接');
       this.reconnectAttempts = 0;
 
-      // 发送加入房间消息
+      // 發送加入房間訊息
       this.send({
         type: 'join',
         roomId: this.roomId,
@@ -39,33 +39,33 @@ export class WebSocketClient {
     this.ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('收到消息:', message);
+        console.log('收到訊息:', message);
 
         if (this.onMessage) {
           this.onMessage(message);
         }
       } catch (error) {
-        console.error('解析消息失败:', error);
+        console.error('解析訊息失敗:', error);
       }
     };
 
     this.ws.onerror = (error) => {
-      console.error('WebSocket错误:', error);
+      console.error('WebSocket錯誤:', error);
       if (this.onError) {
         this.onError(error);
       }
     };
 
     this.ws.onclose = () => {
-      console.log('WebSocket已断开');
+      console.log('WebSocket已斷開');
 
-      // 尝试重连
+      // 嘗試重連
       if (this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++;
-        console.log(`尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+        console.log(`嘗試重連 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
         setTimeout(() => this.connect(), 2000 * this.reconnectAttempts);
       } else {
-        console.error('重连失败，已达到最大尝试次数');
+        console.error('重連失敗，已達到最大嘗試次數');
         if (this.onClose) {
           this.onClose();
         }
@@ -77,12 +77,12 @@ export class WebSocketClient {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     } else {
-      console.error('WebSocket未连接，无法发送消息');
+      console.error('WebSocket未連接，無法發送訊息');
     }
   }
 
   /**
-   * 发送游戏动作
+   * 發送遊戲動作
    */
   sendAction(action, data) {
     this.send({
@@ -95,10 +95,10 @@ export class WebSocketClient {
   }
 
   /**
-   * 关闭连接
+   * 關閉連線
    */
   close() {
-    this.reconnectAttempts = this.maxReconnectAttempts; // 防止自动重连
+    this.reconnectAttempts = this.maxReconnectAttempts; // 防止自動重連
     if (this.ws) {
       this.ws.close();
     }

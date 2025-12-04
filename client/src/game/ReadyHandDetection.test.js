@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 /**
- * 測試聽牌檢測功能
- * 這個測試文件專門測試吃碰槓後的聽牌檢測邏輯
+ * 測試聽牌偵測功能
+ * 這個測試檔案專門測試吃碰槓後的聽牌偵測邏輯
  */
 
-// 模擬的 Game 邏輯類（只包含聽牌檢測相關的方法）
+// 模擬的 Game 邏輯類（只包含聽牌偵測相關的方法）
 class MockGameLogic {
   constructor() {
     this.players = [
@@ -176,12 +176,12 @@ class MockGameLogic {
     return actions;
   }
 
-  // 設置玩家手牌
+  // 設定玩家手牌
   setPlayerTiles(tiles) {
     this.players[this.myPosition].tiles = tiles;
   }
 
-  // 添加吃碰槓牌組
+  // 新增吃碰槓牌組
   addMeld(meld) {
     this.players[this.myPosition].melds.push(meld);
   }
@@ -195,7 +195,7 @@ class MockGameLogic {
   }
 }
 
-describe('聽牌檢測功能測試', () => {
+describe('聽牌偵測功能測試', () => {
   let game;
 
   beforeEach(() => {
@@ -204,7 +204,7 @@ describe('聽牌檢測功能測試', () => {
 
   describe('checkSelfActions - 基本功能', () => {
     it('應該在自摸時顯示胡牌按鈕', () => {
-      // 設置一個已經胡牌的手牌
+      // 設定一個已經胡牌的手牌
       game.setPlayerTiles([
         'wan-1', 'wan-2', 'wan-3',
         'wan-4', 'wan-5', 'wan-6',
@@ -224,7 +224,7 @@ describe('聽牌檢測功能測試', () => {
     });
 
     it('應該在聽牌時顯示聽牌按鈕', () => {
-      // 設置一個聽牌的手牌（差一張就能胡）
+      // 設定一個聽牌的手牌（差一張就能胡）
       game.setPlayerTiles([
         'wan-1', 'wan-2', 'wan-3',
         'wan-4', 'wan-5', 'wan-6',
@@ -244,7 +244,7 @@ describe('聽牌檢測功能測試', () => {
     });
 
     it('應該在既不能自摸也不能聽牌時不顯示按鈕', () => {
-      // 設置一個雜亂的手牌
+      // 設定一個雜亂的手牌
       game.setPlayerTiles([
         'wan-1', 'wan-3', 'wan-5',
         'tong-2', 'tong-4', 'tong-6',
@@ -260,8 +260,8 @@ describe('聽牌檢測功能測試', () => {
     });
   });
 
-  describe('吃牌後的聽牌檢測', () => {
-    it('應該在吃牌後檢測到聽牌', () => {
+  describe('吃牌後的聽牌偵測', () => {
+    it('應該在吃牌後偵測到聽牌', () => {
       // 模擬吃了一組牌（wan-7, wan-8, wan-9）
       game.addMeld({
         type: 'chow',
@@ -286,7 +286,7 @@ describe('聽牌檢測功能測試', () => {
       expect(readyTiles).toContain('zhong');
     });
 
-    it('應該在吃了兩組牌後檢測到聽牌', () => {
+    it('應該在吃了兩組牌後偵測到聽牌', () => {
       // 吃了兩組牌
       game.addMeld({ type: 'chow', tiles: ['wan-1', 'wan-2', 'wan-3'] });
       game.addMeld({ type: 'chow', tiles: ['tong-4', 'tong-5', 'tong-6'] });
@@ -307,7 +307,7 @@ describe('聽牌檢測功能測試', () => {
       expect(readyTiles).toContain('zhong');
     });
 
-    it('應該在吃牌後檢測到兩面聽', () => {
+    it('應該在吃牌後偵測到兩面聽', () => {
       game.addMeld({ type: 'chow', tiles: ['tiao-3', 'tiao-4', 'tiao-5'] });
       game.addMeld({ type: 'pong', tiles: ['zhong', 'zhong', 'zhong'] });
 
@@ -329,8 +329,8 @@ describe('聽牌檢測功能測試', () => {
     });
   });
 
-  describe('碰牌後的聽牌檢測', () => {
-    it('應該在碰牌後檢測到聽牌', () => {
+  describe('碰牌後的聽牌偵測', () => {
+    it('應該在碰牌後偵測到聽牌', () => {
       // 碰了一組牌
       game.addMeld({
         type: 'pong',
@@ -354,7 +354,7 @@ describe('聽牌檢測功能測試', () => {
       expect(readyTiles).toContain('dong');
     });
 
-    it('應該在碰了多組牌後檢測到聽牌', () => {
+    it('應該在碰了多組牌後偵測到聽牌', () => {
       // 碰了三組牌
       game.addMeld({ type: 'pong', tiles: ['wan-1', 'wan-1', 'wan-1'] });
       game.addMeld({ type: 'pong', tiles: ['wan-2', 'wan-2', 'wan-2'] });
@@ -376,8 +376,8 @@ describe('聽牌檢測功能測試', () => {
     });
   });
 
-  describe('槓牌後的聽牌檢測', () => {
-    it('應該在明槓後檢測到聽牌', () => {
+  describe('槓牌後的聽牌偵測', () => {
+    it('應該在明槓後偵測到聽牌', () => {
       // 明槓一組
       game.addMeld({
         type: 'kong_exposed',
@@ -398,7 +398,7 @@ describe('聽牌檢測功能測試', () => {
       expect(actions).toContain('ready');
     });
 
-    it('應該在暗槓後檢測到聽牌', () => {
+    it('應該在暗槓後偵測到聽牌', () => {
       // 暗槓一組
       game.addMeld({
         type: 'kong_concealed',
@@ -422,7 +422,7 @@ describe('聽牌檢測功能測試', () => {
       expect(readyTiles).toContain('zhong');
     });
 
-    it('應該在加槓後檢測到聽牌', () => {
+    it('應該在加槓後偵測到聽牌', () => {
       // 加槓（從碰升級為槓）
       game.addMeld({
         type: 'kong_promoted',
@@ -444,8 +444,8 @@ describe('聽牌檢測功能測試', () => {
     });
   });
 
-  describe('混合吃碰槓後的聽牌檢測', () => {
-    it('應該在吃+碰+槓的組合後檢測到聽牌', () => {
+  describe('混合吃碰槓後的聽牌偵測', () => {
+    it('應該在吃+碰+槓的組合後偵測到聽牌', () => {
       // 各種組合
       game.addMeld({ type: 'chow', tiles: ['wan-1', 'wan-2', 'wan-3'] });
       game.addMeld({ type: 'pong', tiles: ['tong-5', 'tong-5', 'tong-5'] });
@@ -466,7 +466,7 @@ describe('聽牌檢測功能測試', () => {
       expect(readyTiles).toContain('zhong');
     });
 
-    it('應該在4組吃碰槓後檢測到聽牌（只差一對將）', () => {
+    it('應該在4組吃碰槓後偵測到聽牌（只差一對將）', () => {
       // 4組面子
       game.addMeld({ type: 'chow', tiles: ['wan-1', 'wan-2', 'wan-3'] });
       game.addMeld({ type: 'pong', tiles: ['tong-5', 'tong-5', 'tong-5'] });
@@ -489,13 +489,13 @@ describe('聽牌檢測功能測試', () => {
     });
   });
 
-  describe('用戶報告的實際案例', () => {
+  describe('使用者報告的實際案例', () => {
     it('案例：3張8條 + 1張9條，已有2組吃牌應該聽牌', () => {
-      // 用戶的吃牌組合
+      // 使用者的吃牌組合
       game.addMeld({ type: 'chow', tiles: ['wan-7', 'wan-8', 'wan-9'] });
       game.addMeld({ type: 'chow', tiles: ['wan-5', 'wan-6', 'wan-7'] });
 
-      // 假設還有其他碰牌或吃牌（用戶手牌只剩4張說明有很多吃碰槓）
+      // 假設還有其他碰牌或吃牌（使用者手牌只剩4張說明有很多吃碰槓）
       game.addMeld({ type: 'pong', tiles: ['dong', 'dong', 'dong'] });
 
       // 剩餘手牌：還需要2組面子 + 1對將 = 8張（包含要胡的）
@@ -551,7 +551,7 @@ describe('聽牌檢測功能測試', () => {
 
   describe('優先級測試', () => {
     it('自摸應該優先於聽牌', () => {
-      // 設置一個已經胡牌的手牌（也可以說是聽牌）
+      // 設定一個已經胡牌的手牌（也可以說是聽牌）
       game.setPlayerTiles([
         'wan-1', 'wan-2', 'wan-3',
         'wan-4', 'wan-5', 'wan-6',

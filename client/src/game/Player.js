@@ -2,12 +2,12 @@ import { Container, Text, Graphics } from 'pixi.js';
 import { Tile } from './Tile.js';
 
 /**
- * 玩家类
+ * 玩家類
  */
 export class Player {
   constructor(id, position, screenWidth, screenHeight) {
     this.id = id;
-    this.userId = null; // 玩家的实际ID（从服务器获取）
+    this.userId = null; // 玩家的實際ID（從伺服器獲取）
     this.position = position; // 'bottom', 'right', 'top', 'left'
     this.screenWidth = screenWidth;
     this.screenHeight = screenHeight;
@@ -18,7 +18,7 @@ export class Player {
     this.meldsContainer = new Container(); // 用於顯示吃/碰/槓牌組的容器
     this.name = '';
     this.score = 1000;
-    this.isInteractive = false; // 是否可以交互（轮到自己）
+    this.isInteractive = false; // 是否可以互動（輪到自己）
     this.isTing = false; // 是否已宣告聽牌
     this.winningTiles = []; // 聽的牌
     this.lastDrawnTile = null; // 最後摸到的牌（用於聽牌後限制打牌）
@@ -31,7 +31,7 @@ export class Player {
   }
 
   createInfoDisplay() {
-    // 玩家信息显示
+    // 玩家資訊顯示
     const bg = new Graphics();
     bg.rect(0, 0, 120, 60);
     bg.fill(0x333333, 0.8);
@@ -51,7 +51,7 @@ export class Player {
 
     bg.addChild(this.infoText);
 
-    // 根据位置设置信息框位置
+    // 根據位置設定資訊框位置
     this.positionInfoDisplay(bg);
 
     this.container.addChild(bg);
@@ -79,7 +79,7 @@ export class Player {
   }
 
   updateInfo(playerData) {
-    this.userId = playerData.id; // 存储玩家ID
+    this.userId = playerData.id; // 儲存玩家ID
     this.name = playerData.name || '玩家';
     this.score = playerData.score || 1000;
 
@@ -91,12 +91,12 @@ export class Player {
    */
   updateNameDisplay() {
     if (this.infoText) {
-      this.infoText.text = `${this.name}\n分数: ${this.score}`;
+      this.infoText.text = `${this.name}\n分數: ${this.score}`;
     }
   }
 
   /**
-   * 排序手牌（按照台灣麻將規則：萬 -> 筒 -> 條 -> 字牌 -> 花牌，每組內由小到大）
+   * 排序手牌（按照臺灣麻將規則：萬 -> 筒 -> 條 -> 字牌 -> 花牌，每組內由小到大）
    */
   sortTiles(tilesData) {
     return tilesData.sort((a, b) => {
@@ -132,14 +132,14 @@ export class Player {
   }
 
   async setTiles(tilesData, tileAssets) {
-    // 清除现有牌
+    // 清除現有牌
     this.tiles.forEach(tile => tile.destroy());
     this.tiles = [];
 
     // 排序手牌
     const sortedTiles = this.sortTiles([...tilesData]);
 
-    // 创建新牌（等待所有牌創建完成）
+    // 創建新牌（等待所有牌創建完成）
     for (const tileType of sortedTiles) {
       const texture = tileAssets[tileType] || tileAssets['back'];
       const tile = new Tile(tileType, texture);
@@ -147,7 +147,7 @@ export class Player {
       // 等待牌創建完成（包括牌底載入）
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      // 只有底部玩家（自己）的牌可以点击
+      // 只有底部玩家（自己）的牌可以點擊
       if (this.position === 'bottom') {
         tile.on('click', (clickedTile) => this.onTileClick(clickedTile));
       }
@@ -156,14 +156,14 @@ export class Player {
       this.container.addChild(tile.container);
     }
 
-    // 所有牌都加入後，統一設置位置
+    // 所有牌都加入後，統一設定位置
     this.tiles.forEach((tile, index) => {
       this.positionTile(tile, index);
     });
   }
 
   positionTile(tile, index) {
-    // 手牌包含牌底，实际占用空间更大
+    // 手牌包含牌底，實際佔用空間更大
     const tileWidth = 42.1875;  // 縮小至56.25%（原75）
     const tileHeight = 53.4375; // 縮小至56.25%（原95）
 
@@ -175,7 +175,7 @@ export class Player {
       case 'bottom':
         // 底部 - 水平排列
         // 計算最佳間距，確保牌不重疊
-        const availableWidth = this.screenWidth - 120; // 左右各留 60px 邊距（更靠近边缘）
+        const availableWidth = this.screenWidth - 120; // 左右各留 60px 邊距（更靠近邊緣）
         const totalTileWidth = totalTiles * tileWidth;
         const totalSpacingWidth = availableWidth - totalTileWidth;
 
@@ -197,10 +197,10 @@ export class Player {
         break;
 
       case 'right':
-        // 右侧 - 垂直排列
+        // 右側 - 垂直排列
         spacing = 12; // 增加間距避免重疊
         tile.setPosition(
-          this.screenWidth - 70,  // 更靠近右边（从 100 改为 70）
+          this.screenWidth - 70,  // 更靠近右邊（從 100 改為 70）
           this.screenHeight / 2 - (totalTiles * (tileHeight + spacing)) / 2 + index * (tileHeight + spacing)
         );
         tile.setRotation(Math.PI / 2);
@@ -208,20 +208,20 @@ export class Player {
         break;
 
       case 'top':
-        // 顶部 - 水平排列（背面）
+        // 頂部 - 水平排列（背面）
         spacing = 12; // 增加間距避免重疊
         tile.setPosition(
           this.screenWidth / 2 - (totalTiles * (tileWidth + spacing)) / 2 + index * (tileWidth + spacing),
-          30  // 更靠近顶部（从 50 改为 30）
+          30  // 更靠近頂部（從 50 改為 30）
         );
         tile.setScale(0.6); // 縮小牌底和牌面至75% (0.8 * 0.75 = 0.6)
         break;
 
       case 'left':
-        // 左侧 - 垂直排列
+        // 左側 - 垂直排列
         spacing = 12; // 增加間距避免重疊
         tile.setPosition(
-          30,  // 更靠近左边（从 50 改为 30）
+          30,  // 更靠近左邊（從 50 改為 30）
           this.screenHeight / 2 - (totalTiles * (tileHeight + spacing)) / 2 + index * (tileHeight + spacing)
         );
         tile.setRotation(-Math.PI / 2);
@@ -231,11 +231,11 @@ export class Player {
   }
 
   onTileClick(tile) {
-    console.log('点击了牌:', tile.type);
+    console.log('點擊了牌:', tile.type);
 
-    // 只有轮到自己时才能出牌
+    // 只有輪到自己時才能出牌
     if (!this.isInteractive) {
-      console.log('还没轮到你，不能出牌！');
+      console.log('還沒輪到你，不能出牌！');
       return;
     }
 
@@ -248,7 +248,7 @@ export class Player {
       }
     }
 
-    // 触发出牌事件（由Game类处理）
+    // 觸發出牌事件（由Game類處理）
     if (this.onDiscard) {
       this.onDiscard(tile.type);
     }
@@ -256,12 +256,12 @@ export class Player {
 
   setInteractive(interactive) {
     this.isInteractive = interactive;
-    console.log(`玩家 ${this.name || this.id} 可交互状态: ${interactive}`);
+    console.log(`玩家 ${this.name || this.id} 可互動狀態: ${interactive}`);
 
-    // 可以在这里添加视觉反馈，比如高亮手牌
+    // 可以在這裡新增視覺回饋，比如高亮手牌
     if (this.position === 'bottom') {
       this.tiles.forEach(tile => {
-        // 實際禁用/啟用牌面的交互性
+        // 實際禁用/啟用牌面的互動性
         if (tile.sprite) {
           tile.sprite.eventMode = interactive ? 'static' : 'none';
         }
@@ -269,7 +269,7 @@ export class Player {
         if (interactive) {
           tile.container.alpha = 1.0; // 完全不透明
         } else {
-          tile.container.alpha = 0.7; // 半透明表示不可交互
+          tile.container.alpha = 0.7; // 半透明表示不可互動
         }
       });
     }
@@ -277,25 +277,25 @@ export class Player {
 
   addDiscardedTile(tile) {
     this.discardedTiles.push(tile);
-    // TODO: 在中央区域显示打出的牌
+    // TODO: 在中央區域顯示打出的牌
   }
 
   removeTile(tileType) {
     console.log(`🗑️ [removeTile] 嘗試移除: ${tileType}, 當前手牌數: ${this.tiles.length}`);
     console.log(`🗑️ [removeTile] 當前手牌:`, this.tiles.map(t => t.type));
 
-    // 从手牌数组中找到并移除该牌
+    // 從手牌陣列中找到並移除該牌
     const index = this.tiles.findIndex(tile => tile.type === tileType);
     if (index !== -1) {
       const tile = this.tiles[index];
       console.log(`✅ [removeTile] 找到牌，索引: ${index}`);
 
-      // 从显示中移除
+      // 從顯示中移除
       this.container.removeChild(tile.container);
-      // 从数组中移除
+      // 從陣列中移除
       this.tiles.splice(index, 1);
 
-      // 重新排列剩余的牌
+      // 重新排列剩餘的牌
       this.tiles.forEach((tile, i) => {
         this.positionTile(tile, i);
       });
@@ -333,11 +333,11 @@ export class Player {
       // 等待牌創建完成（包括牌底載入）
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      // 只有底部玩家（自己）的牌可以点击
+      // 只有底部玩家（自己）的牌可以點擊
       if (this.position === 'bottom') {
         tile.on('click', (clickedTile) => this.onTileClick(clickedTile));
 
-        // 設置初始交互狀態
+        // 設定初始互動狀態
         if (tile.sprite) {
           tile.sprite.eventMode = this.isInteractive ? 'static' : 'none';
         }
@@ -350,7 +350,7 @@ export class Player {
       this.container.addChild(tile.container);
     }
 
-    // 所有牌都加入後，統一設置位置
+    // 所有牌都加入後，統一設定位置
     this.tiles.forEach((tile, index) => {
       this.positionTile(tile, index);
     });
@@ -397,7 +397,7 @@ export class Player {
         if (tilesToHighlight.has(tile.type)) {
           // 往上移動 20 像素
           tile.container.y -= 20;
-          // 添加發光效果
+          // 新增發光效果
           tile.container.alpha = 1.0;
         } else {
           // 其他牌變暗
@@ -429,7 +429,7 @@ export class Player {
         if (highlightSet.has(tile.type)) {
           // 往上移動 20 像素
           tile.container.y -= 20;
-          // 添加發光效果
+          // 新增發光效果
           tile.container.alpha = 1.0;
         } else {
           // 其他牌變暗
@@ -456,8 +456,8 @@ export class Player {
   }
 
   /**
-   * 添加吃/碰/槓牌組
-   * @param {Object} meldData - {type: 'chow'|'pong'|'kong', tiles: [...]}
+   * 新增吃/碰/槓牌組
+   * @param {Object} meldData - {type: 'chow'|'pong'|'kong', tiles: [...]} 
    * @param {Object} tileAssets - 牌面素材
    */
   async addMeld(meldData, tileAssets) {
@@ -604,7 +604,7 @@ export class Player {
     });
     this.tingStatusText.anchor.set(0.5);
 
-    // 根據位置設置聽牌圖示位置
+    // 根據位置設定聽牌圖示位置
     switch (this.position) {
       case 'bottom':
         this.tingStatusText.x = this.screenWidth / 2;

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 /**
  * 測試輔助類 - 提取 Game 類中的純邏輯方法進行測試
- * 這樣可以避免依賴 PixiJS 和其他 UI 組件
+ * 這樣可以避免依賴 PixiJS 和其他 UI 元件
  */
 class MahjongLogic {
   constructor() {
@@ -355,8 +355,8 @@ describe('麻將胡牌判斷測試', () => {
   });
 
   describe('實際案例測試', () => {
-    it('用戶案例：7,8萬 + 2張8桶 + 345條應該聽牌', () => {
-      // 假設用戶已經有其他吃碰槓的組合
+    it('使用者案例：7,8萬 + 2張8桶 + 345條應該聽牌', () => {
+      // 假設使用者已經有其他吃碰槓的組合
       logic.players[0].melds = [
         { type: 'chow', tiles: ['tiao-3', 'tiao-4', 'tiao-5'] },
         { type: 'pong', tiles: ['fa', 'fa', 'fa'] }

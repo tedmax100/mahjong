@@ -1,7 +1,7 @@
 import { Container, Graphics, Text, Sprite, Assets, Texture, Rectangle } from 'pixi.js';
 
 /**
- * 麻将桌类
+ * 麻將桌類
  */
 export class Table {
   constructor(width, height) {
@@ -10,22 +10,22 @@ export class Table {
     this.container = new Container();
     this.centerSprite = null;
     this.centerTextures = [];
-    this.textureMetadata = []; // 存储每个纹理的原始尺寸信息
+    this.textureMetadata = []; // 儲存每個紋理的原始尺寸資訊
     this.currentTextureIndex = 0;
-    this.targetDisplaySize = 0; // 目标显示尺寸
+    this.targetDisplaySize = 0; // 目標顯示尺寸
 
     this.create();
   }
 
   create() {
-    // 绘制桌面
+    // 繪製桌面
     const table = new Graphics();
 
-    // 外边框 - 深绿色
+    // 外邊框 - 深綠色
     table.rect(0, 0, this.width, this.height);
     table.fill(0x1a5f3c);
 
-    // 中央牌桌区域 - 稍浅的绿色
+    // 中央牌桌區域 - 稍淺的綠色
     const centerWidth = Math.min(this.width * 0.92, 1600);
     const centerHeight = Math.min(this.height * 0.92, 950);
     const centerX = (this.width - centerWidth) / 2;
@@ -37,10 +37,10 @@ export class Table {
 
     this.container.addChild(table);
 
-    // 异步加载中央装饰图片
+    // 非同步載入中央裝飾圖片
     this.loadCenterImage();
 
-    // 绘制四个玩家区域标记
+    // 繪製四個玩家區域標記
     this.drawPlayerMarkers(centerX, centerY, centerWidth, centerHeight);
   }
 
@@ -48,7 +48,7 @@ export class Table {
     const positions = [
       { x: this.width / 2, y: y + height + 20, text: '你' },        // 下
       { x: x + width + 20, y: this.height / 2, text: '右家' },      // 右
-      { x: this.width / 2, y: y - 20, text: '对家' },               // 上
+      { x: this.width / 2, y: y - 20, text: '對家' },               // 上
       { x: x - 20, y: this.height / 2, text: '左家' }               // 左
     ];
 
@@ -78,25 +78,25 @@ export class Table {
 
   async loadCenterImage() {
     try {
-      // 加载三个中央图片，每个图片有不同的网格尺寸
+      // 載入三個中央圖片，每個圖片有不同的網格尺寸
       const imageConfigs = [
-        { file: '/assets/ui/bg_center.jpg', cols: 3, rows: 4 },    // 12个小图
-        { file: '/assets/ui/bg_center_2.jpg', cols: 4, rows: 4 },  // 16个小图
-        { file: '/assets/ui/bg_center_3.jpg', cols: 3, rows: 5 }   // 15个小图
+        { file: '/assets/ui/bg_center.jpg', cols: 3, rows: 4 },    // 12個小圖
+        { file: '/assets/ui/bg_center_2.jpg', cols: 4, rows: 4 },  // 16個小圖
+        { file: '/assets/ui/bg_center_3.jpg', cols: 3, rows: 5 }   // 15個小圖
       ];
 
-      // 遍历加载每个图片
+      // 遍歷載入每個圖片
       for (const config of imageConfigs) {
         const texture = await Assets.load(config.file);
         const cellWidth = texture.width / config.cols;
         const cellHeight = texture.height / config.rows;
 
-        // 设置目标显示尺寸为第一张图片小图尺寸的75%
+        // 設定目標顯示尺寸為第一張圖片小圖尺寸的75%
         if (this.targetDisplaySize === 0) {
           this.targetDisplaySize = cellWidth * 0.75;
         }
 
-        // 创建纹理并保存元数据
+        // 創建紋理並儲存元數據
         for (let row = 0; row < config.rows; row++) {
           for (let col = 0; col < config.cols; col++) {
             const rect = new Rectangle(
@@ -110,28 +110,28 @@ export class Table {
               frame: rect
             });
             this.centerTextures.push(cellTexture);
-            // 保存原始尺寸信息
+            // 儲存原始尺寸資訊
             this.textureMetadata.push({ cellWidth, cellHeight });
           }
         }
       }
 
-      // 创建中央 sprite
+      // 創建中央 sprite
       this.centerSprite = new Sprite(this.centerTextures[0]);
       this.centerSprite.anchor.set(0.5);
       this.centerSprite.x = this.width / 2;
       this.centerSprite.y = this.height / 2;
 
-      // 设置初始缩放
+      // 設定初始縮放
       this.updateSpriteScale();
 
       this.container.addChild(this.centerSprite);
 
-      // 启动轮播（每2秒切换一张图）
+      // 啟動輪播（每2秒切換一張圖）
       this.startCarousel();
     } catch (error) {
-      console.warn('无法加载中央装饰图片:', error);
-      // 如果加载失败，显示原来的文字
+      console.warn('無法載入中央裝飾圖片:', error);
+      // 如果載入失敗，顯示原來的文字
       this.showFallbackCenter();
     }
   }
@@ -139,9 +139,9 @@ export class Table {
   updateSpriteScale() {
     if (!this.centerSprite || this.textureMetadata.length === 0) return;
 
-    // 获取当前纹理的原始尺寸
+    // 獲取當前紋理的原始尺寸
     const metadata = this.textureMetadata[this.currentTextureIndex];
-    // 计算缩放比例，使所有图片都显示为目标尺寸
+    // 計算縮放比例，使所有圖片都顯示為目標尺寸
     const scale = this.targetDisplaySize / metadata.cellWidth;
     this.centerSprite.scale.set(scale);
   }
@@ -151,10 +151,10 @@ export class Table {
       this.currentTextureIndex = (this.currentTextureIndex + 1) % this.centerTextures.length;
       if (this.centerSprite) {
         this.centerSprite.texture = this.centerTextures[this.currentTextureIndex];
-        // 更新缩放以保持统一大小
+        // 更新縮放以保持統一大小
         this.updateSpriteScale();
       }
-    }, 2000); // 每2秒切换一张
+    }, 2000); // 每2秒切換一張
   }
 
   showFallbackCenter() {
@@ -174,7 +174,7 @@ export class Table {
     this.width = width;
     this.height = height;
 
-    // 重新创建桌面
+    // 重新創建桌面
     this.container.removeChildren();
     this.create();
   }

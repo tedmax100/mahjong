@@ -4,7 +4,7 @@
  */
 export class AudioManager {
   constructor() {
-    this.sounds = new Map(); // 緩存已加載的音效
+    this.sounds = new Map(); // 快取已載入的音效
     this.bgm = null; // 當前背景音樂
     this.enabled = true; // 是否啟用音效
 

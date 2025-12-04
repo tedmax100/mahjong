@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 /**
- * 流局功能测试
+ * 流局功能測試
  *
- * 测试目标：
- * 1. 测试从服务器接收剩余牌数更新
- * 2. 测试 handleGameDraw 被正确调用
- * 3. 测试流局倒计时逻辑
+ * 測試目標：
+ * 1. 測試從伺服器接收剩餘牌數更新
+ * 2. 測試 handleGameDraw 被正確呼叫
+ * 3. 測試流局倒數計時邏輯
  */
 
-// 模拟 Game 类的流局相关方法
+// 模擬 Game 類的流局相關方法
 class MockGameForDraw {
   constructor() {
     this.remainingTiles = 79;
@@ -19,31 +19,31 @@ class MockGameForDraw {
   }
 
   /**
-   * 更新剩余牌数（从服务器接收）
+   * 更新剩餘牌數（從伺服器接收）
    */
   updateRemainingTiles(count) {
     this.remainingTiles = count;
 
-    // 台湾麻将规则：海底剩余8张时流局
+    // 臺灣麻將規則：海底剩餘8張時流局
     if (this.remainingTiles <= 8 && this.remainingTiles > 0) {
       this.handleGameDraw();
     }
   }
 
   /**
-   * 处理玩家动作（包括剩余牌数更新）
+   * 處理玩家動作（包括剩餘牌數更新）
    */
   handlePlayerAction(data) {
     const { remainingTiles } = data;
 
-    // 更新剩余牌数（如果服务器发送了这个信息）
+    // 更新剩餘牌數（如果伺服器發送了這個資訊）
     if (remainingTiles !== undefined) {
       this.updateRemainingTiles(remainingTiles);
     }
   }
 
   /**
-   * 处理流局（模拟）
+   * 處理流局（模擬）
    */
   handleGameDraw(data) {
     this.drawHandlerCalled = true;
@@ -52,7 +52,7 @@ class MockGameForDraw {
   }
 
   /**
-   * 重置状态
+   * 重置狀態
    */
   reset() {
     this.remainingTiles = 79;
@@ -62,15 +62,15 @@ class MockGameForDraw {
   }
 }
 
-describe('流局功能测试', () => {
+describe('流局功能測試', () => {
   let game;
 
   beforeEach(() => {
     game = new MockGameForDraw();
   });
 
-  describe('从服务器接收剩余牌数更新', () => {
-    it('应该在 handlePlayerAction 中更新剩余牌数', () => {
+  describe('從伺服器接收剩餘牌數更新', () => {
+    it('應該在 handlePlayerAction 中更新剩餘牌數', () => {
       const data = {
         playerId: 'player1',
         action: 'draw',
@@ -82,7 +82,7 @@ describe('流局功能测试', () => {
       expect(game.remainingTiles).toBe(50);
     });
 
-    it('应该在剩余牌数 <= 8 时触发流局', () => {
+    it('應該在剩餘牌數 <= 8 時觸發流局', () => {
       const data = {
         playerId: 'player1',
         action: 'draw',
@@ -95,7 +95,7 @@ describe('流局功能测试', () => {
       expect(game.drawHandlerCalled).toBe(true);
     });
 
-    it('应该在剩余牌数 > 8 时不触发流局', () => {
+    it('應該在剩餘牌數 > 8 時不觸發流局', () => {
       const data = {
         playerId: 'player1',
         action: 'draw',
@@ -108,13 +108,13 @@ describe('流局功能测试', () => {
       expect(game.drawHandlerCalled).toBe(false);
     });
 
-    it('应该在没有 remainingTiles 字段时不更新', () => {
+    it('應該在沒有 remainingTiles 欄位時不更新', () => {
       const initialCount = game.remainingTiles;
       const data = {
         playerId: 'player1',
         action: 'discard',
         tile: 'wan-1'
-        // 没有 remainingTiles 字段
+        // 沒有 remainingTiles 欄位
       };
 
       game.handlePlayerAction(data);
@@ -122,13 +122,13 @@ describe('流局功能测试', () => {
     });
   });
 
-  describe('流局处理器调用', () => {
-    it('应该在流局时调用 handleGameDraw', () => {
+  describe('流局處理器呼叫', () => {
+    it('應該在流局時呼叫 handleGameDraw', () => {
       game.updateRemainingTiles(8);
       expect(game.drawHandlerCalled).toBe(true);
     });
 
-    it('应该在多次流局时多次调用 handleGameDraw', () => {
+    it('應該在多次流局時多次呼叫 handleGameDraw', () => {
       game.updateRemainingTiles(8);
       expect(game.drawHandlerCallCount).toBe(1);
 
@@ -137,7 +137,7 @@ describe('流局功能测试', () => {
       expect(game.drawHandlerCallCount).toBe(1);
     });
 
-    it('应该能够接收 game_draw 消息数据', () => {
+    it('應該能夠接收 game_draw 訊息數據', () => {
       const drawData = {
         remainingTiles: 8
       };
@@ -148,37 +148,37 @@ describe('流局功能测试', () => {
     });
   });
 
-  describe('流局边界条件', () => {
-    it('应该在剩余8张时触发流局', () => {
+  describe('流局邊界條件', () => {
+    it('應該在剩餘8張時觸發流局', () => {
       game.updateRemainingTiles(8);
       expect(game.drawHandlerCalled).toBe(true);
     });
 
-    it('应该在剩余1张时触发流局', () => {
+    it('應該在剩餘1張時觸發流局', () => {
       game.updateRemainingTiles(1);
       expect(game.drawHandlerCalled).toBe(true);
     });
 
-    it('应该在剩余0张时不触发流局', () => {
+    it('應該在剩餘0張時不觸發流局', () => {
       game.updateRemainingTiles(0);
       expect(game.drawHandlerCalled).toBe(false);
     });
 
-    it('应该在剩余9张时不触发流局', () => {
+    it('應該在剩餘9張時不觸發流局', () => {
       game.updateRemainingTiles(9);
       expect(game.drawHandlerCalled).toBe(false);
     });
   });
 
-  describe('实际游戏场景模拟', () => {
-    it('应该模拟服务器发送流局前的摸牌序列', () => {
-      // 模拟游戏进行到接近流局
+  describe('實際遊戲場景模擬', () => {
+    it('應該模擬伺服器發送流局前的摸牌序列', () => {
+      // 模擬遊戲進行到接近流局
       const drawSequence = [
         { action: 'draw', remainingTiles: 12 },
         { action: 'draw', remainingTiles: 11 },
         { action: 'draw', remainingTiles: 10 },
-        { action: 'draw', remainingTiles: 9 },  // 还不流局
-        { action: 'draw', remainingTiles: 8 }   // 触发流局
+        { action: 'draw', remainingTiles: 9 },  // 還不流局
+        { action: 'draw', remainingTiles: 8 }   // 觸發流局
       ];
 
       drawSequence.forEach((data, index) => {
@@ -193,7 +193,7 @@ describe('流局功能测试', () => {
       });
     });
 
-    it('应该模拟服务器直接发送 game_draw 消息', () => {
+    it('應該模擬伺服器直接發送 game_draw 訊息', () => {
       const gameDrawMessage = {
         type: 'game_draw',
         data: {
@@ -201,7 +201,7 @@ describe('流局功能测试', () => {
         }
       };
 
-      // 模拟 main.js 中的消息处理
+      // 模擬 main.js 中的訊息處理
       if (gameDrawMessage.type === 'game_draw') {
         game.handleGameDraw(gameDrawMessage.data);
       }
@@ -211,15 +211,15 @@ describe('流局功能测试', () => {
     });
   });
 
-  describe('倒计时逻辑测试', () => {
-    it('应该在5秒后完成倒计时（模拟）', async () => {
-      // 使用 fake timers 模拟倒计时
+  describe('倒數計時邏輯測試', () => {
+    it('應該在5秒後完成倒數計時（模擬）', async () => {
+      // 使用 fake timers 模擬倒數計時
       vi.useFakeTimers();
 
       let countdownComplete = false;
       let countdownValue = 5;
 
-      // 模拟倒计时
+      // 模擬倒數計時
       const countdownInterval = setInterval(() => {
         countdownValue--;
         if (countdownValue <= 0) {
@@ -228,7 +228,7 @@ describe('流局功能测试', () => {
         }
       }, 1000);
 
-      // 快进5秒
+      // 快進5秒
       vi.advanceTimersByTime(5000);
 
       expect(countdownComplete).toBe(true);
@@ -237,7 +237,7 @@ describe('流局功能测试', () => {
       vi.useRealTimers();
     });
 
-    it('应该在倒计时过程中正确更新文本', () => {
+    it('應該在倒數計時過程中正確更新文本', () => {
       vi.useFakeTimers();
 
       const countdownTexts = [];
@@ -246,22 +246,22 @@ describe('流局功能测试', () => {
       const countdownInterval = setInterval(() => {
         countdown--;
         if (countdown > 0) {
-          countdownTexts.push(`${countdown}秒后开始新局`);
+          countdownTexts.push(`${countdown}秒後開始新局`);
         } else {
           clearInterval(countdownInterval);
         }
       }, 1000);
 
-      // 每秒推进一次，共5次
+      // 每秒推進一次，共5次
       for (let i = 0; i < 5; i++) {
         vi.advanceTimersByTime(1000);
       }
 
       expect(countdownTexts).toEqual([
-        '4秒后开始新局',
-        '3秒后开始新局',
-        '2秒后开始新局',
-        '1秒后开始新局'
+        '4秒後開始新局',
+        '3秒後開始新局',
+        '2秒後開始新局',
+        '1秒後開始新局'
       ]);
 
       vi.useRealTimers();
@@ -270,18 +270,18 @@ describe('流局功能测试', () => {
 });
 
 /**
- * 消息处理集成测试
+ * 訊息處理整合測試
  *
- * 测试 main.js 中的消息处理逻辑
+ * 測試 main.js 中的訊息處理邏輯
  */
-describe('消息处理集成测试', () => {
+describe('訊息處理整合測試', () => {
   let game;
 
   beforeEach(() => {
     game = new MockGameForDraw();
   });
 
-  it('应该正确处理 player_action 消息（包含 remainingTiles）', () => {
+  it('應該正確處理 player_action 訊息（包含 remainingTiles）', () => {
     const message = {
       type: 'player_action',
       data: {
@@ -293,7 +293,7 @@ describe('消息处理集成测试', () => {
       }
     };
 
-    // 模拟 main.js 的 handleServerMessage
+    // 模擬 main.js 的 handleServerMessage
     if (message.type === 'player_action') {
       game.handlePlayerAction(message.data);
     }
@@ -301,7 +301,7 @@ describe('消息处理集成测试', () => {
     expect(game.remainingTiles).toBe(45);
   });
 
-  it('应该正确处理 game_draw 消息', () => {
+  it('應該正確處理 game_draw 訊息', () => {
     const message = {
       type: 'game_draw',
       data: {
@@ -309,7 +309,7 @@ describe('消息处理集成测试', () => {
       }
     };
 
-    // 模拟 main.js 的 handleServerMessage
+    // 模擬 main.js 的 handleServerMessage
     if (message.type === 'game_draw') {
       game.handleGameDraw(message.data);
     }
@@ -318,8 +318,8 @@ describe('消息处理集成测试', () => {
     expect(game.drawData.remainingTiles).toBe(8);
   });
 
-  it('应该在流局消息后不再处理摸牌消息', () => {
-    // 先收到流局消息
+  it('應該在流局訊息後不再處理摸牌訊息', () => {
+    // 先收到流局訊息
     const drawMessage = {
       type: 'game_draw',
       data: { remainingTiles: 8 }
@@ -328,11 +328,11 @@ describe('消息处理集成测试', () => {
     game.handleGameDraw(drawMessage.data);
     expect(game.drawHandlerCalled).toBe(true);
 
-    // 重置标志以测试后续行为
+    // 重置標誌以測試後續行為
     const initialCallCount = game.drawHandlerCallCount;
 
-    // 尝试再次更新剩余牌数（不应该再次触发流局处理）
-    // 这取决于实际实现，这里只是测试状态
+    // 嘗試再次更新剩餘牌數（不應該再次觸發流局處理）
+    // 這取決於實際實作，這裡只是測試狀態
     expect(game.drawHandlerCallCount).toBe(initialCallCount);
   });
 });

@@ -1,5 +1,5 @@
 /**
- * Google OAuth 认证管理
+ * Google OAuth 認證管理
  */
 export class GoogleAuth {
   constructor() {
@@ -22,13 +22,13 @@ export class GoogleAuth {
         { theme: 'outline', size: 'large', text: 'signin_with', locale: 'zh_TW' }
       );
 
-      // 自动登入提示
+      // 自動登入提示
       google.accounts.id.prompt();
     }
   }
 
   /**
-   * 处理Google登入响应
+   * 處理Google登入回應
    */
   handleCredentialResponse(response) {
     const credential = response.credential;
@@ -50,16 +50,16 @@ export class GoogleAuth {
   }
 
   /**
-   * 手动触发登入（备用方案）
+   * 手動觸發登入（備用方案）
    */
   signIn() {
     if (typeof google !== 'undefined' && google.accounts) {
       google.accounts.id.prompt();
     } else {
-      // 如果Google Identity Services未加载，使用简单的测试登入
-      console.warn('Google Identity Services未加载，使用测试用户');
+      // 如果Google Identity Services未載入，使用簡單的測試登入
+      console.warn('Google Identity Services未載入，使用測試使用者');
 
-      // 为每个浏览器标签生成唯一ID
+      // 為每個瀏覽器標籤生成唯一ID
       const uniqueId = 'player_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
       const playerNumber = Math.floor(Math.random() * 4) + 1;
 
@@ -71,7 +71,7 @@ export class GoogleAuth {
         token: 'test_token_' + Date.now()
       };
 
-      console.log('创建测试用户:', this.user);
+      console.log('創建測試使用者:', this.user);
 
       if (this.onSignIn) {
         this.onSignIn(this.user);
@@ -105,7 +105,7 @@ export class GoogleAuth {
   }
 
   /**
-   * 获取当前用户
+   * 獲取當前使用者
    */
   getUser() {
     return this.user;

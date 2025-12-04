@@ -1,7 +1,7 @@
 import { Sprite, Container, Assets } from 'pixi.js';
 
 /**
- * 麻将牌类
+ * 麻將牌類
  */
 export class Tile {
   constructor(type, texture, faceUp = true) {
@@ -39,7 +39,7 @@ export class Tile {
     this.sprite.interactive = true;
     this.sprite.buttonMode = true;
 
-    // 设置点击事件
+    // 設定點擊事件
     this.sprite.on('pointerdown', () => this.onClick());
     this.sprite.on('pointerover', () => this.onHover());
     this.sprite.on('pointerout', () => this.onHoverOut());
@@ -53,12 +53,12 @@ export class Tile {
   }
 
   onClick() {
-    // 牌被点击
+    // 牌被點擊
     this.emit('click', this);
   }
 
   onHover() {
-    // 鼠标悬停 - 整張牌上移
+    // 滑鼠懸停 - 整張牌上移
     if (this.faceUp && !this.isHovered) {
       this.container.y -= this.hoverOffset;
       this.isHovered = true;
@@ -66,7 +66,7 @@ export class Tile {
   }
 
   onHoverOut() {
-    // 鼠标离开 - 恢复位置
+    // 滑鼠離開 - 恢復位置
     if (this.faceUp && this.isHovered) {
       this.container.y += this.hoverOffset;
       this.isHovered = false;
@@ -74,7 +74,7 @@ export class Tile {
   }
 
   emit(event, data) {
-    // 简单的事件系统
+    // 簡單的事件系統
     if (this.container.eventListeners && this.container.eventListeners[event]) {
       this.container.eventListeners[event].forEach(callback => callback(data));
     }
@@ -111,7 +111,7 @@ export class Tile {
 
   flip(faceUp) {
     this.faceUp = faceUp;
-    // 可以在这里切换纹理到牌背
+    // 可以在這裡切換紋理到牌背
   }
 
   destroy() {

@@ -1,5 +1,4 @@
-
-  /**
+/**
    * 檢查自己摸牌後可以執行的動作（自摸、聽牌、暗槓）
    */
   checkSelfActions() {
@@ -15,7 +14,7 @@
   }
 
   /**
-   * 处理服务器返回的听牌结果
+   * 處理伺服器返回的聽牌結果
    * @param {Object} data - key: discardable tile, value: list of winning tiles
    */
   handleTingResult(data) {

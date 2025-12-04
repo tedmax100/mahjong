@@ -6,7 +6,7 @@ import { ActionButtons } from './ActionButtons.js';
 import { AudioManager } from './AudioManager.js';
 
 /**
- * 主游戏类
+ * 主遊戲類
  */
 export class Game {
   constructor(app, ws) {
@@ -19,10 +19,10 @@ export class Game {
     this.players = [];
     this.currentPlayer = null;
     this.myPosition = 0; // 0=下, 1=右, 2=上, 3=左
-    this.currentTurn = 0; // 当前轮到谁（0-3）
+    this.currentTurn = 0; // 當前輪到誰（0-3）
     this.tileAssets = {};
-    this.discardedTiles = []; // 存储所有打出的牌的sprite
-    this.discardContainer = new Container(); // 中央弃牌区域容器
+    this.discardedTiles = []; // 儲存所有打出的牌的sprite
+    this.discardContainer = new Container(); // 中央棄牌區域容器
 
     // 牌山相關
     this.wallContainer = new Container(); // 牌山容器
@@ -43,7 +43,7 @@ export class Game {
     this.isDeclaringTing = false;
     this.selfKongOptions = [];
 
-    // 游戏公告
+    // 遊戲公告
     this.announcementText = null;
     this.winningHandContainer = null;
 
@@ -52,7 +52,7 @@ export class Game {
   }
 
   /**
-   * 設置 WebSocket 實例（用於延後連接）
+   * 設定 WebSocket 實體（用於延後連接）
    */
   setWebSocket(ws) {
     this.ws = ws;
@@ -85,45 +85,48 @@ export class Game {
    * 記錄所有玩家的手牌狀態
    */
   logAllPlayersHands(action = '') {
-    console.log(`\n${'='.repeat(60)}`);
+    console.log(`
+${'='.repeat(60)}`);
     console.log(`📊 ${action || '當前遊戲狀態'}`);
-    console.log(`${'='.repeat(60)}\n`);
+    console.log(`${'='.repeat(60)}
+`);
     this.players.forEach((player, index) => {
       this.logPlayerHand(index, '');
     });
-    console.log(`${'='.repeat(60)}\n`);
+    console.log(`${'='.repeat(60)}
+`);
   }
 
   async init() {
     // 啟用容器的 zIndex 排序，確保層級正確
     this.container.sortableChildren = true;
 
-    // 加载素材
+    // 載入素材
     await this.loadAssets();
 
-    // 创建牌桌
+    // 創建牌桌
     this.table = new Table(this.app.screen.width, this.app.screen.height);
     this.container.addChild(this.table.container);
 
-    // 添加牌山容器
+    // 新增牌山容器
     this.container.addChild(this.wallContainer);
 
-    // 添加弃牌区域容器
+    // 新增棄牌區域容器
     this.container.addChild(this.discardContainer);
 
-    // 创建玩家区域
+    // 創建玩家區域
     this.createPlayers();
 
     // 創建牌山視覺
     this.createWalls();
 
-    // 創建動作按鈕（異步初始化）
+    // 創建動作按鈕（非同步初始化）
     this.actionButtons = new ActionButtons(this.app.screen.width, this.app.screen.height);
     this.container.addChild(this.actionButtons.container);
-    // 設置最高 zIndex 確保按鈕不被遮擋
+    // 設定最高 zIndex 確保按鈕不被遮擋
     this.actionButtons.container.zIndex = 3000;
 
-    // 設置按鈕回調
+    // 設定按鈕回呼
     this.actionButtons.on('pong', () => this.handlePongAction());
     this.actionButtons.on('chow', () => this.handleChowAction());
     this.actionButtons.on('kong', () => this.handleKongAction());
@@ -131,7 +134,7 @@ export class Game {
     this.actionButtons.on('hu', () => this.handleHuAction());
     this.actionButtons.on('cancel', () => this.handleCancelAction());
 
-    // 创建游戏公告区域
+    // 創建遊戲公告區域
     this.announcementText = new Text({ text: '', style: {
         fontSize: 80,
         fill: 0xFFD700,
@@ -153,19 +156,19 @@ export class Game {
     this.winningHandContainer.zIndex = 11000;
     this.container.addChild(this.winningHandContainer);
 
-    // 显示等待文字
+    // 顯示等待文字
     this.showWaitingText();
 
-    // 播放菜單背景音樂
+    // 播放選單背景音樂
     this.audioManager.playBGM('menu');
 
     console.log('✅ Game initialized successfully');
   }
 
   async loadAssets() {
-    console.log('开始加载麻将牌素材...');
+    console.log('開始載入麻將牌素材...');
 
-    // 映射內部牌名到新圖片檔名
+    // 對應內部牌名到新圖片檔名
     const tileMapping = {
       // 萬子 (w = 萬)
       'wan-1': '1wf', 'wan-2': '2wf', 'wan-3': '3wf',
@@ -196,23 +199,23 @@ export class Game {
       'back': 'pback1'
     };
 
-    // 加载所有素材
+    // 載入所有素材
     for (const [tileType, fileName] of Object.entries(tileMapping)) {
       try {
         const texture = await Assets.load(`/assets/tiles/carddown/${fileName}.png`);
         this.tileAssets[tileType] = texture;
       } catch (error) {
-        console.warn(`加载素材失败: ${fileName}.png`, error);
-        // 创建占位纹理
+        console.warn(`載入素材失敗: ${fileName}.png`, error);
+        // 創建佔位紋理
         this.tileAssets[tileType] = this.createPlaceholderTexture(tileType);
       }
     }
 
-    console.log('素材加载完成');
+    console.log('素材載入完成');
   }
 
   createPlaceholderTexture(type) {
-    // 创建临时占位图
+    // 創建臨時佔位圖
     const graphics = new Graphics();
     graphics.rect(0, 0, 60, 80);
     graphics.fill(0xF5F0E8);
@@ -240,7 +243,7 @@ export class Game {
     for (let i = 0; i < 4; i++) {
       const player = new Player(i, positions[i], this.app.screen.width, this.app.screen.height);
 
-      // 设置底部玩家（自己）的出牌回调
+      // 設定底部玩家（自己）的出牌回呼
       if (i === 0) {
         player.onDiscard = (tileType) => this.handlePlayerDiscard(tileType);
       }
@@ -267,7 +270,7 @@ export class Game {
             return;
         }
     } else {
-        // 通过WebSocket发送出牌消息
+        // 透過WebSocket發送出牌訊息
         if (this.ws) {
             this.ws.sendAction('discard', { tile: tileType });
         }
@@ -284,7 +287,7 @@ export class Game {
       console.log('🎴 莊家第一次打牌，不摸牌（17張→16張）');
       this.dealerFirstDiscard = false; // 之後可以正常摸牌
 
-      // 摸牌后，重新设置为可交互状态
+      // 摸牌後，重新設定為可互動狀態
       this.players[0].setInteractive(true);
       return; // 不摸牌，直接返回
     }
@@ -309,7 +312,7 @@ export class Game {
 
       console.log(`✅ 摸牌完成！手牌數量: ${player.tiles.length}，牌池剩餘: ${this.tilePool.length}張`);
 
-      // 摸牌后，重新设置为可交互状态（可以继续出牌）
+      // 摸牌後，重新設定為可互動狀態（可以繼續出牌）
       player.setInteractive(true);
     } else if (!this.tileAssets[drawnTile]) {
       console.warn(`⚠️ 找不到牌的素材: ${drawnTile}`);
@@ -336,14 +339,14 @@ export class Game {
   }
 
   updatePlayers(playersData) {
-    console.log('更新玩家信息:', playersData);
+    console.log('更新玩家資訊:', playersData);
 
     // 在遊戲開始前，直接按伺服器位置順序更新
     // 遊戲開始後，startGame 會根據 myPosition 重新排列
     playersData.forEach((playerData, serverPosition) => {
       if (this.players[serverPosition]) {
         this.players[serverPosition].updateInfo(playerData);
-        // 保存玩家的原始伺服器位置
+        // 儲存玩家的原始伺服器位置
         this.players[serverPosition].serverPosition = serverPosition;
       }
     });
@@ -414,7 +417,7 @@ export class Game {
   }
 
   startGame(data) {
-    console.log('游戏开始!', data);
+    console.log('遊戲開始!', data);
 
     // 播放遊戲背景音樂和骰子音效
     this.audioManager.playBGM('game');
@@ -434,14 +437,14 @@ export class Game {
     this.dealerPosition = data.dealerPosition || 0;
     this.dealerFirstDiscard = true; // 重置莊家第一次打牌標記
 
-    console.log(`我的位置: ${this.myPosition}, 莊家位置: ${this.dealerPosition}, 当前轮次: ${this.currentTurn}`);
+    console.log(`我的位置: ${this.myPosition}, 莊家位置: ${this.dealerPosition}, 當前輪次: ${this.currentTurn}`);
 
     if (this.myPosition === this.dealerPosition) {
       console.log('🎴 你是莊家！起手 17 張，第一次打牌後不摸牌');
     }
 
     // 🔄 根據 myPosition 重新排列玩家資訊
-    // 保存原始玩家資訊（按伺服器位置）
+    // 儲存原始玩家資訊（按伺服器位置）
     const originalPlayerInfo = this.players.map(p => ({
       userId: p.userId,
       name: p.name,
@@ -466,7 +469,7 @@ export class Game {
       }
     }
 
-    // 初始化牌池（臨時方案：用於本地模擬摸牌）
+    // 初始化牌池（臨時方案：用於本機模擬摸牌）
     this.initializeTilePool();
 
     // 計算已發出的牌數並更新剩餘牌數
@@ -475,7 +478,7 @@ export class Game {
     const dealtTiles = 65; // 簡化計算
     this.updateRemainingTiles(144 - dealtTiles);
 
-    // 更新所有玩家的轮次状态
+    // 更新所有玩家的輪次狀態
     this.updateTurnStatus();
   }
 
@@ -503,7 +506,7 @@ export class Game {
   }
 
   dealTiles(data) {
-    console.log('发牌:', data);
+    console.log('發牌:', data);
 
     const { tiles, position } = data;
     // 將伺服器位置轉換為視覺位置
@@ -515,12 +518,12 @@ export class Game {
     this.audioManager.playEffect('deal');
 
     if (player) {
-      // 检查发牌数据是否有重复牌（每张牌最多4张）
+      // 檢查發牌數據是否有重複牌（每張牌最多4張）
       const tileCount = {};
       tiles.forEach(tile => {
         tileCount[tile] = (tileCount[tile] || 0) + 1;
         if (tileCount[tile] > 4) {
-          console.error(`❌ 错误：${tile} 在手牌中出现 ${tileCount[tile]} 次！这是服务器端的BUG`);
+          console.error(`❌ 錯誤：${tile} 在手牌中出現 ${tileCount[tile]} 次！這是伺服器端的BUG`);
         }
       });
 
@@ -531,7 +534,7 @@ export class Game {
         const removed = this.removeTileFromPool(tile);
         if (!removed) {
           console.warn(`⚠️ 無法從牌池移除 ${tile}（可能已經被移除或不存在）`);
-          console.warn(`⚠️ 这可能是服务器端发送了重复的牌`);
+          console.warn(`⚠️ 這可能是伺服器端發送了重複的牌`);
         }
       });
 
@@ -551,19 +554,19 @@ export class Game {
   }
 
   handlePlayerAction(data) {
-    console.log('玩家动作:', data);
+    console.log('玩家動作:', data);
 
     const {playerId, action, tile, currentTurn, remainingTiles} = data;
 
-    // 更新剩余牌数（如果服务器发送了这个信息）
+    // 更新剩餘牌數（如果伺服器發送了這個資訊）
     if (remainingTiles !== undefined) {
       this.updateRemainingTiles(remainingTiles);
     }
 
-    // 更新当前轮次
+    // 更新當前輪次
     if (currentTurn !== undefined) {
       this.currentTurn = currentTurn;
-      console.log(`更新轮次: ${this.currentTurn}`);
+      console.log(`更新輪次: ${this.currentTurn}`);
       this.updateTurnStatus();
     }
 
@@ -600,11 +603,11 @@ export class Game {
     const visualTurn = this.serverToVisualPosition(this.currentTurn);
     console.log(`更新回合狀態: 伺服器回合 ${this.currentTurn} -> 視覺回合 ${visualTurn}`);
 
-    // 更新所有玩家的可交互状态
+    // 更新所有玩家的可互動狀態
     this.players.forEach((player, index) => {
       // index 是視覺位置，視覺位置 0 是自己
       const isMyTurn = (index === visualTurn && index === 0);
-      // 如果玩家已听牌，禁用交互（服务器会自动打牌）
+      // 如果玩家已聽牌，禁用互動（伺服器會自動打牌）
       const canInteract = isMyTurn && !player.isTing;
       player.setInteractive(canInteract);
 
@@ -620,7 +623,7 @@ export class Game {
   async handleDiscard(playerId, tile) {
     console.log(`玩家 ${playerId} 打出了 ${tile}`);
 
-    // 找到打出牌的玩家（通過 userId 查找視覺位置）
+    // 找到打出牌的玩家（透過 userId 查找視覺位置）
     let visualPosition = -1;
     for (let i = 0; i < this.players.length; i++) {
       if (this.players[i].userId === playerId) {
@@ -664,14 +667,14 @@ export class Game {
 
     if (baseTexture) {
       const baseSprite = new Sprite(baseTexture);
-      baseSprite.anchor.set(0.5); // 設置錨點在中心
+      baseSprite.anchor.set(0.5); // 設定錨點在中心
       discardContainer.addChild(baseSprite);
     }
 
-    // 创建牌面 sprite
+    // 創建牌面 sprite
     const texture = this.tileAssets[tile] || this.tileAssets['back'];
     const tileSprite = new Sprite(texture);
-    tileSprite.anchor.set(0.5); // 設置錨點在中心
+    tileSprite.anchor.set(0.5); // 設定錨點在中心
     tileSprite.y = 5; // 調整牌面位置，讓它貼齊牌底下緣
 
     // 針對筒子微調
@@ -681,48 +684,48 @@ export class Game {
 
     discardContainer.addChild(tileSprite);
 
-    // 设置弃牌大小（參考圖片樣式，縮小一點）
+    // 設定棄牌大小（參考圖片樣式，縮小一點）
     const scale = 0.45; // 縮小牌底和牌面至75% (0.6 * 0.75 = 0.45)
     discardContainer.scale.set(scale);
 
-    // 计算弃牌位置（在中央区域，根据玩家位置排列）
+    // 計算棄牌位置（在中央區域，根據玩家位置排列）
     const centerX = this.app.screen.width / 2;
     const centerY = this.app.screen.height / 2;
-    // 使用实际的牌底尺寸来计算间距（牌底比牌面稍大）
-    // 弃牌包含牌底和牌面，实际占用空间更大
+    // 使用實際的牌底尺寸來計算間距（牌底比牌面稍大）
+    // 棄牌包含牌底和牌面，實際佔用空間更大
     const tileWidth = 53.4375 * scale;  // 縮小至56.25%（原95）
     const tileHeight = 64.6875 * scale; // 縮小至56.25%（原115）
     const spacing = 18; // 增加間距避免重疊
 
-    // 计算该玩家已经打出的牌数
+    // 計算該玩家已經打出的牌數
     const playerDiscards = this.discardedTiles.filter(d => d.playerPosition === playerPosition);
     const discardIndex = playerDiscards.length;
 
-    // 根据玩家位置计算弃牌位置（按照红框标注的区域）
+    // 根據玩家位置計算棄牌位置（按照紅框標註的區域）
     let x, y;
-    // 上下方向每行10张，左右方向每列8张
+    // 上下方向每行10張，左右方向每列8張
     const maxTilesPerRow = (playerPosition === 1 || playerPosition === 3) ? 8 : 10;
     const row = Math.floor(discardIndex / maxTilesPerRow);
     const col = discardIndex % maxTilesPerRow;
 
-    // 所有弃牌都保持正向（不旋轉）
+    // 所有棄牌都保持正向（不旋轉）
     switch (playerPosition) {
-      case 0: // 底部玩家 - 弃牌放在底部中央区域
+      case 0: // 底部玩家 - 棄牌放在底部中央區域
         x = centerX - (maxTilesPerRow * (tileWidth + spacing)) / 2 + col * (tileWidth + spacing) + tileWidth / 2;
         y = centerY + 200 + row * (tileHeight + spacing);
         break;
 
-      case 1: // 右侧玩家 - 弃牌放在右侧区域，垂直排列（每列8张）
+      case 1: // 右側玩家 - 棄牌放在右側區域，垂直排列（每列8張）
         x = centerX + 400 + row * (tileWidth + spacing);
         y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing) + tileHeight / 2;
         break;
 
-      case 2: // 顶部玩家 - 弃牌放在顶部中央区域，從右邊開始，第二排往下
+      case 2: // 頂部玩家 - 棄牌放在頂部中央區域，從右邊開始，第二排往下
         x = centerX + (maxTilesPerRow * (tileWidth + spacing)) / 2 - col * (tileWidth + spacing) - tileWidth / 2;
         y = centerY - 280 + row * (tileHeight + spacing); // 改為 + row，讓第二排往下移
         break;
 
-      case 3: // 左侧玩家 - 弃牌放在左侧区域，垂直排列（每列8张）
+      case 3: // 左側玩家 - 棄牌放在左側區域，垂直排列（每列8張）
         x = centerX - 400 - row * (tileWidth + spacing);
         y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing) + tileHeight / 2;
         break;
@@ -731,17 +734,17 @@ export class Game {
     discardContainer.x = x;
     discardContainer.y = y;
 
-    // 记录弃牌信息
+    // 記錄棄牌資訊
     this.discardedTiles.push({
       sprite: discardContainer,
       playerPosition: playerPosition,
       tile: tile
     });
 
-    // 添加到弃牌区域
+    // 新增到棄牌區域
     this.discardContainer.addChild(discardContainer);
 
-    // 从玩家手牌中移除该牌（视觉上）
+    // 從玩家手牌中移除該牌（視覺上）
     if (player) {
       // 🎯 如果玩家已聽牌，等待一小段時間確保摸牌動畫完成
       if (player.isTing) {
@@ -838,7 +841,7 @@ export class Game {
   }
 
   async handleChow(playerId, data) {
-    // 处理吃牌
+    // 處理吃牌
     const chowTiles = data.chowTiles || [];
     const tile = data.tile;
     console.log(`🍜 handleChow - 玩家 ${playerId} 吃了 ${tile}，牌組: ${chowTiles.join(', ')}`);
@@ -893,7 +896,7 @@ export class Game {
       // 重新排列剩餘手牌
       player.rearrangeTiles();
 
-      // 添加吃牌組到顯示區域
+      // 新增吃牌組到顯示區域
       await player.addMeld({
         type: 'chow',
         tiles: chowTiles
@@ -931,7 +934,7 @@ export class Game {
   }
 
   async handlePong(playerId, tile) {
-    // 处理碰牌
+    // 處理碰牌
     console.log(`玩家 ${playerId} 碰了 ${tile}`);
 
     // 播放碰牌語音
@@ -975,7 +978,7 @@ export class Game {
       // 重新排列剩餘手牌
       player.rearrangeTiles();
 
-      // 添加碰牌組到顯示區域
+      // 新增碰牌組到顯示區域
       await player.addMeld({
         type: 'pong',
         tiles: [tile, tile, tile]
@@ -1013,14 +1016,14 @@ export class Game {
   }
 
   async handleKong(playerId, data) {
-    // 处理杠牌
+    // 處理槓牌
     const meld = data.meld; // Note: Keys will be capitalized: Type, Tiles
     if (!meld) {
-      console.error('无效的杠牌动作: 缺少牌组信息', data);
+      console.error('無效的槓牌動作: 缺少牌組資訊', data);
       return;
     }
     const tile = meld.Tiles[0];
-    console.log(`玩家 ${playerId} 杠了 ${tile} (类型: ${meld.Type})`);
+    console.log(`玩家 ${playerId} 槓了 ${tile} (類型: ${meld.Type})`);
 
     // 播放槓牌語音
     this.audioManager.playActionVoice(playerId, 'gang');
@@ -1038,11 +1041,11 @@ export class Game {
     if (visualPosition !== -1) {
       const player = this.players[visualPosition];
 
-      // 根据槓的类型从手牌中移除对应数量的牌
+      // 根據槓的類型從手牌中移除對應數量的牌
       // 如果是自己（visualPosition === 0），按牌型移除
-      // 如果是其他玩家，他們的手牌都是 'back'，直接移除对应数量
+      // 如果是其他玩家，他們的手牌都是 'back'，直接移除對應數量
       if (meld.Type === 'kong_exposed') {
-        // 明杠，从手牌移除3张
+        // 明槓，從手牌移除3張
         if (visualPosition === 0) {
           let removed = 0;
           for (let i = player.tiles.length - 1; i >= 0 && removed < 3; i--) {
@@ -1059,7 +1062,7 @@ export class Game {
           }
         }
       } else if (meld.Type === 'kong_concealed') {
-        // 暗杠，从手牌移除4张
+        // 暗槓，從手牌移除4張
         if (visualPosition === 0) {
           let removed = 0;
           for (let i = player.tiles.length - 1; i >= 0 && removed < 4; i--) {
@@ -1076,13 +1079,13 @@ export class Game {
           }
         }
       } else if (meld.Type === 'kong_promoted') {
-        // 加杠（从碰升级为槓），从手牌移除1张
+        // 加槓（從碰升級為槓），從手牌移除1張
         if (visualPosition === 0) {
           for (let i = player.tiles.length - 1; i >= 0; i--) {
             if (player.tiles[i].type === tile) {
               player.tiles[i].destroy();
               player.tiles.splice(i, 1);
-              break; // 只移除1张
+              break; // 只移除1張
             }
           }
         } else {
@@ -1096,16 +1099,16 @@ export class Game {
       // 重新排列剩餘手牌
       player.rearrangeTiles();
 
-      // 添加槓牌組到顯示區域
+      // 新增槓牌組到顯示區域
       await player.addMeld(meld, this.tileAssets);
 
-      // 如果是明杠，从弃牌堆中移除最后一张（被槓的牌）
+      // 如果是明槓，從棄牌堆中移除最後一張（被槓的牌）
       if (meld.Type === 'kong_exposed' && this.discardedTiles.length > 0) {
         const lastDiscard = this.discardedTiles.pop();
         this.discardContainer.removeChild(lastDiscard.sprite);
       }
 
-      console.log(`✅ 玩家 ${playerPosition} 杠牌完成`);
+      console.log(`✅ 玩家 ${playerPosition} 槓牌完成`);
 
       // 📋 記錄槓牌後的手牌狀態
       setTimeout(() => {
@@ -1359,13 +1362,15 @@ export class Game {
   }
 
   gameOver(data) {
-    console.log('游戏结束:', data);
+    console.log('遊戲結束:', data);
 
     const { winner, winType, points } = data;
 
-    // 显示游戏结果
+    // 顯示遊戲結果
     const resultText = new Text({
-      text: `游戏结束!\n${winner} 胡牌 (${winType})\n得分: ${points}`,
+      text: `遊戲結束!
+${winner} 胡牌 (${winType})
+得分: ${points}`,
       style: {
         fontSize: 36,
         fill: 0xffffff,
@@ -1390,7 +1395,7 @@ export class Game {
     const tileHeight = 45;    // 縮小至56.25%（原80）
 
     // 根據螢幕大小計算牌山位置（緊貼牌桌邊緣）
-    // 牌桌是 92% 大小，所以边缘在 46% 的位置，牌山应该在稍微内侧
+    // 牌桌是 92% 大小，所以邊緣在 46% 的位置，牌山應該在稍微內側
     const wallDistanceVertical = Math.min(centerY * 0.85, 460);   // 上下方向（更靠近牌桌）
     const wallDistanceHorizontal = Math.min(centerX * 0.86, 830); // 左右方向（更靠近牌桌）
     const tilesPerSide = 18; // 每邊18張牌（144張 / 4邊 / 2層）
@@ -1485,11 +1490,11 @@ export class Game {
     this.wallTextContainer.addChild(bg);
     this.wallTextContainer.addChild(this.wallText);
 
-    // 設置位置（置中，避免被遮擋）
+    // 設定位置（置中，避免被遮擋）
     this.wallTextContainer.x = this.app.screen.width / 2;
     this.wallTextContainer.y = 30;
 
-    // 設置 zIndex 確保顯示在最上層
+    // 設定 zIndex 確保顯示在最上層
     this.wallTextContainer.zIndex = 1000;
 
     // 加入到主容器的最上層
@@ -1542,7 +1547,7 @@ export class Game {
 
     const validDiscards = Object.keys(this.possibleTingDiscards);
     myPlayer.highlightTiles(validDiscards);
-    myPlayer.setInteractive(true); // 确保玩家在选择听牌时可交互
+    myPlayer.setInteractive(true); // 確保玩家在選擇聽牌時可互動
     
     this.showAnnouncement('請選擇一張牌打出以聽牌', 3000);
     this.actionButtons.hide();
@@ -1593,10 +1598,10 @@ export class Game {
   async promptChowSelection(combinations) {
     this.actionButtons.hide(); // 隱藏主操作按鈕
 
-    // 清理之前的選擇界面（如果存在）
+    // 清理之前的選擇介面（如果存在）
     this.clearChowSelection();
 
-    // 創建新的選擇容器並保存引用
+    // 創建新的選擇容器並儲存引用
     this.chowSelectionContainer = new Container();
     this.chowSelectionContainer.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
     this.chowSelectionContainer.zIndex = 2000; // 確保在最上層
@@ -1642,14 +1647,14 @@ export class Game {
         const tileType = combo[tileIndex];
         const tileContainer = new Container();
 
-        // 添加牌底
+        // 新增牌底
         if (baseTexture) {
           const baseSprite = new Sprite(baseTexture);
           baseSprite.anchor.set(0.5);
           tileContainer.addChild(baseSprite);
         }
 
-        // 添加牌面
+        // 新增牌面
         const texture = this.tileAssets[tileType] || this.tileAssets['back'];
         const tileSprite = new Sprite(texture);
         tileSprite.anchor.set(0.5);
@@ -1662,7 +1667,7 @@ export class Game {
 
         tileContainer.addChild(tileSprite);
 
-        // 設置牌的位置（水平排列，居中）
+        // 設定牌的位置（水平排列，居中）
         const startX = -(comboWidth / 2) + tileWidth / 2;
         tileContainer.x = startX + tileIndex * (tileWidth + tileSpacing);
         tileContainer.scale.set(tileScale);
@@ -1674,13 +1679,13 @@ export class Game {
       comboContainer.eventMode = 'static';
       comboContainer.cursor = 'pointer';
 
-      // 添加半透明背景以增強點擊區域
+      // 新增半透明背景以增強點擊區域
       const clickArea = new Graphics();
       clickArea.roundRect(-comboWidth / 2 - 5, -tileHeight / 2 - 5, comboWidth + 10, tileHeight + 10, 5);
       clickArea.fill({ color: 0xFFFFFF, alpha: 0 });
       comboContainer.addChildAt(clickArea, 0);
 
-      // 添加懸停效果
+      // 新增懸停效果
       comboContainer.on('pointerover', () => {
         clickArea.clear();
         clickArea.roundRect(-comboWidth / 2 - 5, -tileHeight / 2 - 5, comboWidth + 10, tileHeight + 10, 5);
@@ -1703,7 +1708,7 @@ export class Game {
   }
 
   /**
-   * 清理吃牌選擇界面
+   * 清理吃牌選擇介面
    */
   clearChowSelection() {
     if (this.chowSelectionContainer && this.chowSelectionContainer.parent) {
@@ -1751,7 +1756,7 @@ export class Game {
       console.log(`準備發送槓牌動作: ${tileToKong}, 暗槓: ${isConcealed}`);
       this.ws.sendAction('kong', { tile: tileToKong, concealed: isConcealed });
       
-      // 清理所有待处理动作状态
+      // 清理所有待處理動作狀態
       this.selfKongOptions = [];
       this.pendingActions = {};
       this.actionButtons.hide();
@@ -1808,7 +1813,7 @@ export class Game {
     console.log('準備發送胡牌動作:', { winTile, isSelfDrawn });
 
     if (this.ws && winTile) {
-      console.log('✅ 發送胡牌動作到服務器');
+      console.log('✅ 發送胡牌動作到伺服器');
       this.ws.sendAction('hu', {
         tile: winTile,
         isSelfDrawn: isSelfDrawn
@@ -1836,14 +1841,14 @@ export class Game {
     // 播放按鈕音效
     this.audioManager.playButtonSound();
 
-    // 清理吃牌選擇界面（如果存在）
+    // 清理吃牌選擇介面（如果存在）
     this.clearChowSelection();
 
-    // 发送过的动作到服务器
+    // 發送過的動作到伺服器
     if (this.lastDiscardedTile) {
       this.sendAction('pass', this.lastDiscardedTile);
     } else {
-      // 如果没有 lastDiscardedTile，只是隐藏按钮
+      // 如果沒有 lastDiscardedTile，只是隱藏按鈕
       this.actionButtons.hide();
       this.pendingActions = [];
     }
@@ -1984,7 +1989,7 @@ export class Game {
 
     /**
 
-     * 显示胡牌手牌
+     * 顯示胡牌手牌
 
      */
 
@@ -2164,11 +2169,11 @@ export class Game {
 
     /**
 
-     * 处理游戏胜利
+     * 處理遊戲勝利
 
      */
   handleGameWin(data) {
-    console.log('游戏胜利', data);
+    console.log('遊戲勝利', data);
     const { winnerId, winnerName, winResult, countdown } = data;
     const { HandTypes, TotalTai, BaseScore, WinningHand, Melds, WinTile } = winResult;
 
@@ -2183,10 +2188,10 @@ export class Game {
         this.displayWinningHand(WinningHand, Melds, WinTile);
     }
 
-    // 构建牌型描述
-    const handTypesStr = HandTypes.map(ht => `${ht.Name} (${ht.Tai}台)`).join(' ');
+    // 建構牌型描述
+    const handTypesStr = HandTypes.map(ht => `${ht.Name} (${ht.Tai}臺)`).join(' ');
     const title = `恭喜 ${winnerName} 胡牌！`;
-    const details = `${handTypesStr}\n总计: ${TotalTai}台, 得分: ${BaseScore}`;
+    const details = `${handTypesStr}\n總計: ${TotalTai}臺, 得分: ${BaseScore}`;
 
     setTimeout(() => {
         this.showEndRoundScreen(title, details, countdown);
@@ -2194,52 +2199,52 @@ export class Game {
   }
 
   /**
-   * 处理流局（荒牌）
+   * 處理流局（荒牌）
    */
   handleGameDraw(data) {
-    console.log('游戏流局，无人胜出', data);
-    const { countdown = 5 } = data; // 默认5秒倒计时
+    console.log('遊戲流局，無人勝出', data);
+    const { countdown = 5 } = data; // 預設5秒倒數計時
 
     // 播放流局音效
     this.audioManager.playEffect('lose');
 
-    this.showEndRoundScreen('流局', '无人胜出', countdown);
+    this.showEndRoundScreen('流局', '無人勝出', countdown);
   }
 
   /**
-   * 检查可执行的对手动作（吃/碰/槓/胡）
-   * 注：现在由服务器端检测并通过 handlePossibleActions 通知
+   * 檢查可執行的對手動作（吃/碰/槓/胡）
+   * 注：現在由伺服器端偵測並透過 handlePossibleActions 通知
    */
   checkPossibleActions(tile, playerPosition) {
-    // 服务器端已经检测并广播，这里不需要客户端检查
-    console.log('checkPossibleActions 调用（由服务器端处理）');
+    // 伺服器端已經偵測並廣播，這裡不需要客戶端檢查
+    console.log('checkPossibleActions 呼叫（由伺服器端處理）');
   }
 
   /**
-   * 检查自己可以执行的动作（暗槓/听牌/自摸）
+   * 檢查自己可以執行的動作（暗槓/聽牌/自摸）
    */
   checkSelfActions() {
     const myPlayer = this.players[0]; // 視覺位置 0 是自己
     if (!myPlayer) return;
 
-    // 如果已经听牌，不再检查其他动作
+    // 如果已經聽牌，不再檢查其他動作
     if (myPlayer.isTing) {
-      console.log('玩家已听牌，跳过动作检查');
+      console.log('玩家已聽牌，跳過動作檢查');
       return;
     }
 
-    // 1. 发送听牌检查请求
+    // 1. 發送聽牌檢查請求
     if (this.ws) {
       console.log('向伺服器發送聽牌檢查請求');
       this.ws.sendAction('check_ting');
     }
 
-    // 2. 本地检查暗槓/加槓
+    // 2. 本地檢查暗槓/加槓
 
     this.selfKongOptions = [];
     const hand = myPlayer.tiles.map(t => t.type);
 
-    // 检查加槓
+    // 檢查加槓
     const pongMelds = myPlayer.melds.filter(m => (m.type === 'pong' || m.Type === 'pong'));
     for (const tileInHand of new Set(hand)) {
         for (const meld of pongMelds) {
@@ -2252,7 +2257,7 @@ export class Game {
         }
     }
 
-    // 检查暗槓
+    // 檢查暗槓
     const handCounts = {};
     for (const tile of hand) {
         handCounts[tile] = (handCounts[tile] || 0) + 1;
@@ -2265,10 +2270,10 @@ export class Game {
         }
     }
     
-    // 如果有可用的槓牌選項，显示按钮
-    // 注意：这可能会覆盖由听牌检查显示的按钮，这是一个已知的UI限制
+    // 如果有可用的槓牌選項，顯示按鈕
+    // 注意：這可能會覆蓋由聽牌檢查顯示的按鈕，這是一個已知的UI限制
     if (this.selfKongOptions.length > 0) {
-        console.log("发现可执行的个人槓牌:", this.selfKongOptions);
+        console.log("發現可執行的個人槓牌:", this.selfKongOptions);
         this.actionButtons.show(['kong', 'cancel']);
     }
 
@@ -2276,42 +2281,42 @@ export class Game {
   }
 
   /**
-   * 处理可执行动作通知
+   * 處理可執行動作通知
    */
   handlePossibleActions(data) {
-    const { playerId, tile, actions, timeout } = data;
-    console.log('收到可执行动作通知:', { playerId, tile, actions, timeout });
+    const {playerId, tile, actions, timeout} = data;
+    console.log('收到可執行動作通知:', {playerId, tile, actions, timeout});
 
-    // 检查是否是当前玩家（使用 userId 而不是 id）
+    // 檢查是否是當前玩家（使用 userId 而不是 id）
     // 視覺位置 0 是自己
     const myPlayer = this.players[0];
     console.log('DEBUG: myPlayer.userId =', myPlayer?.userId, 'playerId =', playerId, '是否相等?', myPlayer?.userId === playerId);
 
     if (!myPlayer || myPlayer.userId !== playerId) {
-      console.log('不是当前玩家的动作，忽略 - myPlayer.userId:', myPlayer?.userId, 'expected:', playerId);
+      console.log('不是當前玩家的動作，忽略 - myPlayer.userId:', myPlayer?.userId, 'expected:', playerId);
       return;
     }
 
-    // 保存最后打出的牌和可执行动作
+    // 儲存最後打出的牌和可執行動作
     this.lastDiscardedTile = tile;
     this.pendingActions = actions;
-    console.log('✅ 保存 lastDiscardedTile:', this.lastDiscardedTile);
-    console.log('✅ 保存 pendingActions:', this.pendingActions);
+    console.log('✅ 儲存 lastDiscardedTile:', this.lastDiscardedTile);
+    console.log('✅ 儲存 pendingActions:', this.pendingActions);
 
-    // 确定要显示的按钮
+    // 確定要顯示的按鈕
     const buttonsToShow = [];
     if (actions.pong) buttonsToShow.push('pong');
     if (actions.chow) buttonsToShow.push('chow');
     if (actions.kong) buttonsToShow.push('kong');
     if (actions.hu) {
-      console.log('✅ 檢測到可以胡牌，添加 hu 按鈕');
+      console.log('✅ 偵測到可以胡牌，新增 hu 按鈕');
       buttonsToShow.push('hu');
     }
-    buttonsToShow.push('cancel'); // 总是显示"过"按钮
+    buttonsToShow.push('cancel'); // 總是顯示"過"按鈕
 
     console.log('✅ 顯示動作按鈕:', buttonsToShow);
 
-    // 显示按钮
+    // 顯示按鈕
     if (this.actionButtons) {
       console.log('✅ actionButtons 存在，準備顯示按鈕');
       console.log('✅ actionButtons.container.zIndex:', this.actionButtons.container.zIndex);
@@ -2321,25 +2326,25 @@ export class Game {
       console.error('❌ actionButtons 不存在！');
     }
 
-    // 清除之前的超时
+    // 清除之前的超時
     if (this.actionTimeout) {
       clearTimeout(this.actionTimeout);
     }
 
-    // 设置超时自动过
+    // 設定超時自動過
     this.actionTimeout = setTimeout(() => {
-      console.log('动作选择超时，自动过');
+      console.log('動作選擇超時，自動過');
       this.sendAction('pass', tile);
       if (this.actionButtons) {
         this.actionButtons.hide();
       }
-      // 清理吃牌選擇界面（如果存在）
+      // 清理吃牌選擇介面（如果存在）
       this.clearChowSelection();
     }, timeout * 1000);
   }
 
   /**
-   * 发送动作选择到服务器
+   * 發送動作選擇到伺服器
    */
   sendAction(action, tile, combination = null) {
     const data = {
@@ -2360,26 +2365,26 @@ export class Game {
       data: data
     };
 
-    console.log('发送动作:', message);
+    console.log('發送動作:', message);
     this.ws.send(message);
 
-    // 清除超时
+    // 清除超時
     if (this.actionTimeout) {
       clearTimeout(this.actionTimeout);
       this.actionTimeout = null;
     }
 
-    // 隐藏按钮
+    // 隱藏按鈕
     if (this.actionButtons) {
       this.actionButtons.hide();
     }
   }
 
   /**
-   * 显示回合结束画面（胡牌或流局）
+   * 顯示回合結束畫面（胡牌或流局）
    */
   async showEndRoundScreen(title, details, countdown) {
-    // 禁用所有玩家交互
+    // 禁用所有玩家互動
     this.players.forEach(player => {
       player.setInteractive(false);
     });
@@ -2394,7 +2399,7 @@ export class Game {
     bg.fill({ color: 0x000000, alpha: 0.7 });
     endScreenContainer.addChild(bg);
 
-    // 标题（例如 "恭喜..." 或 "流局"）
+    // 標題（例如 "恭喜..." 或 "流局"）
     const titleText = new Text({ text: title, style: {
       fontSize: 60,
       fill: 0xFFD700,
@@ -2406,7 +2411,7 @@ export class Game {
     titleText.y = this.app.screen.height / 2 - 100;
     endScreenContainer.addChild(titleText);
 
-    // 详情（例如牌型和分数）
+    // 詳情（例如牌型和分數）
     const detailsText = new Text({ text: details, style: {
       fontSize: 32,
       fill: 0xFFFFFF,
@@ -2419,9 +2424,9 @@ export class Game {
     detailsText.y = this.app.screen.height / 2;
     endScreenContainer.addChild(detailsText);
 
-    // 倒计时文本
+    // 倒數計時文字
     const countdownText = new Text({
-      text: `${countdown}秒后开始新局`,
+      text: `${countdown}秒後開始新局`,
       style: {
         fontSize: 28,
         fill: 0xCCCCCC,
@@ -2434,16 +2439,16 @@ export class Game {
 
     this.container.addChild(endScreenContainer);
 
-    // 倒计时逻辑
+    // 倒數計時邏輯
     let remaining = countdown;
     const countdownInterval = setInterval(() => {
       remaining--;
       if (remaining > 0) {
-        countdownText.text = `${remaining}秒后开始新局`;
+        countdownText.text = `${remaining}秒後開始新局`;
       } else {
         clearInterval(countdownInterval);
-        // 服务器会自动开始新的一局，客户端等待 game_start 消息
-        // 清理界面
+        // 伺服器會自動開始新的一局，客戶端等待 game_start 訊息
+        // 清理介面
         this.container.removeChild(endScreenContainer);
         this.resetForNewRound();
       }
@@ -2451,16 +2456,16 @@ export class Game {
   }
 
   /**
-   * 为新的一局重置UI
+   * 為新的一局重置UI
    */
   resetForNewRound() {
-    // 清空弃牌
+    // 清空棄牌
     this.discardContainer.removeChildren();
     this.discardedTiles = [];
 
     // 重置所有玩家
     this.players.forEach(p => p.reset());
 
-    console.log("UI已重置，准备新的一局");
+    console.log("UI已重置，準備新的一局");
   }
 }

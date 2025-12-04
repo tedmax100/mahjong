@@ -14,22 +14,22 @@ class MahjongApp {
   }
 
   init() {
-    // 显示启动画面动画
+    // 顯示啟動畫面動畫
     this.showSplashScreen();
 
-    // 绑定UI事件
+    // 綁定UI事件
     this.bindEvents();
   }
 
   showSplashScreen() {
-    // 3秒后隐藏启动画面
+    // 3秒後隱藏啟動畫面
     setTimeout(() => {
       try {
         const splashScreen = document.getElementById('splash-screen');
         if (splashScreen) {
           splashScreen.classList.add('hidden');
 
-          // 再等0.5秒后完全移除元素（等待淡出动画完成）
+          // 再等0.5秒後完全移除元素（等待淡出動畫完成）
           setTimeout(() => {
             if (splashScreen && splashScreen.parentNode) {
               splashScreen.remove();
@@ -43,67 +43,67 @@ class MahjongApp {
   }
 
   bindEvents() {
-    // 快速开始按钮
+    // 快速開始按鈕
     document.getElementById('quick-start-btn').addEventListener('click', () => {
       this.quickStart();
     });
 
-    // 输入框回车
+    // 輸入框回車
     document.getElementById('player-name-input').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         this.quickStart();
       }
     });
 
-    // 创建房间
+    // 創建房間
     document.getElementById('create-room-btn').addEventListener('click', () => {
       this.createRoom();
     });
 
-    // 加入房间
+    // 加入房間
     document.getElementById('join-room-btn').addEventListener('click', () => {
       const roomId = document.getElementById('room-id-input').value.trim();
       if (roomId) {
         this.joinRoom(roomId);
       } else {
-        alert('请输入房间号');
+        alert('請輸入房間號');
       }
     });
 
-    // 分享房间
+    // 分享房間
     document.getElementById('share-room-btn').addEventListener('click', () => {
       this.shareRoom();
     });
 
-    // 添加Bot
+    // 新增Bot
     document.getElementById('add-bot-btn').addEventListener('click', () => {
       this.addBot();
     });
   }
 
   quickStart() {
-    // 获取输入的名字或生成随机名字
+    // 獲取輸入的名字或生成隨機名字
     let playerName = document.getElementById('player-name-input').value.trim();
 
     if (!playerName) {
-      // 随机生成名字
-      const adjectives = ['快乐的', '勇敢的', '聪明的', '幸运的', '神秘的', '强大的', '可爱的', '酷炫的'];
-      const nouns = ['麻将王', '雀神', '元肥', '東協', '西卡', '北麥', '南沾', '中周'];
+      // 隨機生成名字
+      const adjectives = ['快樂的', '勇敢的', '聰明的', '幸運的', '神秘的', '強大的', '可愛的', '酷炫的'];
+      const nouns = ['麻將王', '雀神', '元肥', '東協', '西卡', '北麥', '南沾', '中周'];
       const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
       const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
       playerName = randomAdj + randomNoun;
     }
 
-    // 创建用户对象
+    // 創建使用者物件
     this.user = {
       id: 'player_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11),
       name: playerName,
       picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(playerName)}&background=random&size=40`
     };
 
-    console.log('创建玩家:', this.user);
+    console.log('創建玩家:', this.user);
 
-    // 显示房间选择界面
+    // 顯示房間選擇介面
     this.showRoomScreen();
   }
 
@@ -111,7 +111,7 @@ class MahjongApp {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('room-screen').classList.remove('hidden');
 
-    // 显示用户信息
+    // 顯示使用者資訊
     const userInfo = document.getElementById('user-info');
     document.getElementById('user-avatar').src = this.user.picture;
     document.getElementById('user-name').textContent = this.user.name;
@@ -146,33 +146,33 @@ class MahjongApp {
       if (data.success) {
         this.joinRoom(data.roomId);
       } else {
-        alert('创建房间失败：' + data.error);
+        alert('創建房間失敗：' + data.error);
       }
     } catch (error) {
-      console.error('创建房间失败:', error);
-      alert('创建房间失败，请检查网络连接');
+      console.error('創建房間失敗:', error);
+      alert('創建房間失敗，請檢查網路連線');
     }
   }
 
   async joinRoom(roomId) {
     this.roomId = roomId;
 
-    // 显示房间信息
+    // 顯示房間資訊
     document.getElementById('current-room-id').textContent = roomId;
     document.getElementById('room-info').classList.remove('hidden');
 
-    // 隐藏房间选择界面
+    // 隱藏房間選擇介面
     document.getElementById('room-screen').classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
 
-    // 先初始化Pixi游戏，確保 this.game 準備好
+    // 先初始化Pixi遊戲，確保 this.game 準備好
     await this.initGame();
 
-    // 游戲初始化完成後才連接 WebSocket，避免錯過訊息
+    // 遊戲初始化完成後才連接 WebSocket，避免錯過訊息
     this.ws = new WebSocketClient(roomId, this.user);
     this.ws.onMessage = this.handleServerMessage.bind(this);
 
-    // 將 ws 實例傳給 game，以便發送訊息
+    // 將 ws 實體傳給 game，以便發送訊息
     if (this.game) {
       this.game.setWebSocket(this.ws);
     }
@@ -190,7 +190,7 @@ class MahjongApp {
 
       console.log(`📐 畫布尺寸: ${CANVAS_WIDTH}x${CANVAS_HEIGHT}`);
 
-      // 创建Pixi应用
+      // 創建Pixi應用
       console.log('📱 創建 PixiJS 應用...');
       this.app = new Application();
       await this.app.init({
@@ -205,13 +205,13 @@ class MahjongApp {
       container.appendChild(this.app.canvas);
       console.log('✅ PixiJS 應用創建成功');
 
-      // 创建游戏实例（ws 稍後透過 setWebSocket 設定）
-      console.log('🎲 創建遊戲實例...');
+      // 創建遊戲實體（ws 稍後透過 setWebSocket 設定）
+      console.log('🎲 創建遊戲實體...');
       this.game = new Game(this.app, null);
       await this.game.init();
       console.log('✅ 遊戲初始化完成');
 
-      // 添加窗口大小调整（響應式）
+      // 新增視窗大小調整（響應式）
       window.addEventListener('resize', () => {
         const newWidth = window.innerWidth;
         const newHeight = window.innerHeight;
@@ -223,12 +223,13 @@ class MahjongApp {
       });
     } catch (error) {
       console.error('❌ 遊戲初始化失敗:', error);
-      alert('遊戲初始化失敗，請刷新頁面重試。\n錯誤: ' + error.message);
+      alert('遊戲初始化失敗，請刷新頁面重試。
+錯誤: ' + error.message);
     }
   }
 
   handleServerMessage(message) {
-    console.log('收到服务器消息:', message);
+    console.log('收到伺服器訊息:', message);
 
     switch (message.type) {
       case 'room_update':
@@ -267,17 +268,17 @@ class MahjongApp {
         console.error('伺服器錯誤:', message.message);
         alert(message.message || '發生錯誤');
         // 如果是房間已滿或遊戲已開始，返回房間選擇畫面
-        if (message.message === '房间已满' || message.message === '遊戲已開始') {
+        if (message.message === '房間已滿' || message.message === '遊戲已開始') {
           this.leaveRoom();
         }
         break;
       default:
-        console.warn('未知消息类型:', message.type);
+        console.warn('未知訊息類型:', message.type);
     }
   }
 
   updateRoomInfo(data) {
-    console.log('更新房间信息:', data);
+    console.log('更新房間資訊:', data);
 
     // 檢查是否有新玩家加入
     const oldPlayerCount = this.lastPlayerCount || 0;
@@ -301,7 +302,7 @@ class MahjongApp {
     this.lastPlayerCount = newPlayerCount;
     document.getElementById('player-count').textContent = `${data.playerCount}/4`;
 
-    // 即使游戏还没开始，也更新玩家列表
+    // 即使遊戲還沒開始，也更新玩家列表
     if (this.game) {
       this.game.updatePlayers(data.players);
     }
@@ -309,40 +310,40 @@ class MahjongApp {
 
   addBot() {
     if (!this.ws) {
-      alert('请先创建或加入房间');
+      alert('請先創建或加入房間');
       return;
     }
 
-    // 发送添加Bot消息到服务器
+    // 發送新增Bot訊息到伺服器
     this.ws.sendAction('add_bot', {
       roomId: this.roomId
     });
 
-    console.log('请求添加Bot');
+    console.log('請求新增Bot');
   }
 
   shareRoom() {
     const shareUrl = `${window.location.origin}?room=${this.roomId}`;
-    const shareText = `加入我的麻将游戏！\n房间号：${this.roomId}\n链接：${shareUrl}`;
+    const shareText = `加入我的麻將遊戲！\n房間號：${this.roomId}\n連結：${shareUrl}`;
 
     if (navigator.share) {
       navigator.share({
-        title: '台湾16张麻将',
+        title: '臺灣16張麻將',
         text: shareText,
         url: shareUrl
-      }).catch(err => console.log('分享失败:', err));
+      }).catch(err => console.log('分享失敗:', err));
     } else {
-      // 复制到剪贴板
+      // 複製到剪貼簿
       navigator.clipboard.writeText(shareUrl).then(() => {
-        alert(`房间链接已复制到剪贴板！\n${shareUrl}`);
+        alert(`房間連結已複製到剪貼簿！\n${shareUrl}`);
       }).catch(() => {
-        prompt('复制此链接分享给朋友:', shareUrl);
+        prompt('複製此連結分享給朋友:', shareUrl);
       });
     }
   }
 
   leaveRoom() {
-    // 關閉 WebSocket 連接
+    // 關閉 WebSocket 連線
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -352,7 +353,7 @@ class MahjongApp {
     this.roomId = null;
     this.lastPlayerCount = 0;
 
-    // 銷毀遊戲實例
+    // 銷毀遊戲實體
     if (this.game) {
       this.game.destroy();
       this.game = null;
@@ -373,5 +374,5 @@ class MahjongApp {
   }
 }
 
-// 启动应用
+// 啟動應用
 new MahjongApp();
