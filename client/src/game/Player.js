@@ -83,6 +83,13 @@ export class Player {
     this.name = playerData.name || '玩家';
     this.score = playerData.score || 1000;
 
+    this.updateNameDisplay();
+  }
+
+  /**
+   * 更新玩家名稱顯示
+   */
+  updateNameDisplay() {
     if (this.infoText) {
       this.infoText.text = `${this.name}\n分数: ${this.score}`;
     }

@@ -52,6 +52,13 @@ export class Game {
   }
 
   /**
+   * 設置 WebSocket 實例（用於延後連接）
+   */
+  setWebSocket(ws) {
+    this.ws = ws;
+  }
+
+  /**
    * 記錄玩家手牌狀態（用於 debug）
    */
   logPlayerHand(playerPosition, action = '') {
@@ -251,7 +258,7 @@ export class Game {
             console.log(`聽牌，打出: ${tileType}`);
             this.ws.sendAction('ting', { tile: tileType });
             this.isDeclaringTing = false;
-            const myPlayer = this.players[this.myPosition];
+            const myPlayer = this.players[0]; // 視覺位置 0 是自己
             if (myPlayer) {
               myPlayer.clearHighlight();
             }
@@ -331,9 +338,13 @@ export class Game {
   updatePlayers(playersData) {
     console.log('更新玩家信息:', playersData);
 
-    playersData.forEach((playerData, index) => {
-      if (this.players[index]) {
-        this.players[index].updateInfo(playerData);
+    // 在遊戲開始前，直接按伺服器位置順序更新
+    // 遊戲開始後，startGame 會根據 myPosition 重新排列
+    playersData.forEach((playerData, serverPosition) => {
+      if (this.players[serverPosition]) {
+        this.players[serverPosition].updateInfo(playerData);
+        // 保存玩家的原始伺服器位置
+        this.players[serverPosition].serverPosition = serverPosition;
       }
     });
   }
@@ -429,6 +440,32 @@ export class Game {
       console.log('🎴 你是莊家！起手 17 張，第一次打牌後不摸牌');
     }
 
+    // 🔄 根據 myPosition 重新排列玩家資訊
+    // 保存原始玩家資訊（按伺服器位置）
+    const originalPlayerInfo = this.players.map(p => ({
+      userId: p.userId,
+      name: p.name,
+      picture: p.picture,
+      score: p.score,
+      serverPosition: p.serverPosition
+    }));
+
+    // 重新分配到視覺位置
+    for (let serverPos = 0; serverPos < 4; serverPos++) {
+      const visualPos = this.serverToVisualPosition(serverPos);
+      const info = originalPlayerInfo[serverPos];
+      if (info && this.players[visualPos]) {
+        this.players[visualPos].userId = info.userId;
+        this.players[visualPos].name = info.name;
+        this.players[visualPos].picture = info.picture;
+        this.players[visualPos].score = info.score;
+        this.players[visualPos].serverPosition = serverPos;
+        // 更新顯示
+        this.players[visualPos].updateNameDisplay();
+        console.log(`玩家 ${info.name} (伺服器位置 ${serverPos}) -> 視覺位置 ${visualPos}`);
+      }
+    }
+
     // 初始化牌池（臨時方案：用於本地模擬摸牌）
     this.initializeTilePool();
 
@@ -442,11 +479,37 @@ export class Game {
     this.updateTurnStatus();
   }
 
+  /**
+   * 將伺服器的絕對位置轉換為相對於自己的視覺位置
+   * 自己永遠在下方（視覺位置 0），下家在右邊（1），對家在上方（2），上家在左邊（3）
+   * @param {number} serverPosition - 伺服器給的絕對位置
+   * @returns {number} - 相對於自己的視覺位置
+   */
+  serverToVisualPosition(serverPosition) {
+    // 例如：如果我是位置 2，伺服器位置 2 應該顯示在下方（視覺位置 0）
+    // 伺服器位置 3 應該顯示在右邊（視覺位置 1）
+    // 伺服器位置 0 應該顯示在上方（視覺位置 2）
+    // 伺服器位置 1 應該顯示在左邊（視覺位置 3）
+    return (serverPosition - this.myPosition + 4) % 4;
+  }
+
+  /**
+   * 將視覺位置轉換回伺服器的絕對位置
+   * @param {number} visualPosition - 視覺位置（0=下, 1=右, 2=上, 3=左）
+   * @returns {number} - 伺服器的絕對位置
+   */
+  visualToServerPosition(visualPosition) {
+    return (visualPosition + this.myPosition) % 4;
+  }
+
   dealTiles(data) {
     console.log('发牌:', data);
 
     const { tiles, position } = data;
-    const player = this.players[position];
+    // 將伺服器位置轉換為視覺位置
+    const visualPosition = this.serverToVisualPosition(position);
+    console.log(`發牌: 伺服器位置 ${position} -> 視覺位置 ${visualPosition}`);
+    const player = this.players[visualPosition];
 
     // 播放發牌音效
     this.audioManager.playEffect('deal');
@@ -472,11 +535,11 @@ export class Game {
         }
       });
 
-      console.log(`✅ 玩家 ${position} 發牌完成，已從牌池移除 ${tiles.length} 張牌。牌池剩餘: ${this.tilePool.length}張`);
+      console.log(`✅ 玩家 ${position}(視覺${visualPosition}) 發牌完成，已從牌池移除 ${tiles.length} 張牌。牌池剩餘: ${this.tilePool.length}張`);
 
       // 📋 記錄初始手牌
       setTimeout(() => {
-        this.logPlayerHand(position, '初始手牌');
+        this.logPlayerHand(visualPosition, '初始手牌');
 
         // 如果所有玩家都發牌完成，記錄所有玩家的手牌
         const allDealt = this.players.every(p => p.tiles.length > 0);
@@ -530,14 +593,19 @@ export class Game {
   }
 
   updateTurnStatus() {
+    // currentTurn 是伺服器的絕對位置，轉換為視覺位置
+    const visualTurn = this.serverToVisualPosition(this.currentTurn);
+    console.log(`更新回合狀態: 伺服器回合 ${this.currentTurn} -> 視覺回合 ${visualTurn}`);
+
     // 更新所有玩家的可交互状态
     this.players.forEach((player, index) => {
-      const isMyTurn = (index === this.currentTurn && index === this.myPosition);
+      // index 是視覺位置，視覺位置 0 是自己
+      const isMyTurn = (index === visualTurn && index === 0);
       // 如果玩家已听牌，禁用交互（服务器会自动打牌）
       const canInteract = isMyTurn && !player.isTing;
       player.setInteractive(canInteract);
 
-      // 如果輪到自己，檢查是否能聽牌或自摸
+      // 如果輪到自己（視覺位置 0），檢查是否能聽牌或自摸
       if (isMyTurn) {
         setTimeout(() => {
           this.checkSelfActions();
@@ -549,21 +617,23 @@ export class Game {
   async handleDiscard(playerId, tile) {
     console.log(`玩家 ${playerId} 打出了 ${tile}`);
 
-    // 找到打出牌的玩家
-    let playerPosition = -1;
+    // 找到打出牌的玩家（通過 userId 查找視覺位置）
+    let visualPosition = -1;
     for (let i = 0; i < this.players.length; i++) {
       if (this.players[i].userId === playerId) {
-        playerPosition = i;
+        visualPosition = i;
         break;
       }
     }
 
-    if (playerPosition === -1) {
+    if (visualPosition === -1) {
       console.error('未找到玩家:', playerId);
       return;
     }
 
-    const player = this.players[playerPosition];
+    const player = this.players[visualPosition];
+    // 用於棄牌位置計算（視覺位置）
+    const playerPosition = visualPosition;
 
     // 播放打牌語音
     this.audioManager.playTileVoice(playerId, tile);
@@ -572,8 +642,8 @@ export class Game {
     if (player.isTing) {
       console.log(`🎯 玩家 ${player.name} 聽牌中，自動打出 ${tile}`);
 
-      // 如果是自己聽牌自動打牌，顯示提示
-      if (playerPosition === this.myPosition) {
+      // 如果是自己聽牌自動打牌（視覺位置 0），顯示提示
+      if (visualPosition === 0) {
         this.showAnnouncement(`自動打出 ${this.getTileName(tile)}`, 1500);
       }
     }
@@ -692,15 +762,15 @@ export class Game {
     this.lastDiscardedTile = tile;
 
     // 檢查是否可以執行動作（碰、吃、槓、胡）
-    // 只有當不是自己打的牌時才檢查
-    if (playerPosition !== this.myPosition) {
-      this.checkPossibleActions(tile, playerPosition);
+    // 只有當不是自己打的牌時才檢查（視覺位置 0 是自己）
+    if (visualPosition !== 0) {
+      this.checkPossibleActions(tile, visualPosition);
     } else {
       // 如果是自己打的牌，清除動作按鈕
       this.actionButtons.hide();
       this.pendingActions = [];
       this.possibleTingDiscards = {};
-      const myPlayer = this.players[this.myPosition];
+      const myPlayer = this.players[0]; // 視覺位置 0 是自己
       if (myPlayer) {
         myPlayer.clearHighlight();
       }
@@ -710,34 +780,35 @@ export class Game {
   async handlePlayerDraw(playerId, tile) {
     console.log(`玩家 ${playerId} 摸牌: ${tile}`);
 
-    // 找到摸牌的玩家
-    let playerPosition = -1;
+    // 找到摸牌的玩家（視覺位置）
+    let visualPosition = -1;
     for (let i = 0; i < this.players.length; i++) {
       if (this.players[i].userId === playerId) {
-        playerPosition = i;
+        visualPosition = i;
         break;
       }
     }
 
-    if (playerPosition === -1) {
+    if (visualPosition === -1) {
       console.error('未找到玩家:', playerId);
       return;
     }
 
-    const player = this.players[playerPosition];
+    const player = this.players[visualPosition];
+    const playerPosition = visualPosition;
 
     // 🎯 檢查玩家是否已聽牌
     if (player.isTing) {
       console.log(`🎯 玩家 ${player.name} 已聽牌，摸到 ${tile}，即將自動打出`);
 
-      // 如果是自己聽牌，顯示提示
-      if (playerPosition === this.myPosition) {
+      // 如果是自己聽牌（視覺位置 0），顯示提示
+      if (visualPosition === 0) {
         this.showAnnouncement(`聽牌中，摸到 ${this.getTileName(tile)}`, 1500);
       }
     }
 
-    // 如果是自己，顯示摸到的牌；如果是其他玩家，顯示牌背
-    const tileToAdd = (playerPosition === this.myPosition) ? tile : 'back';
+    // 如果是自己（視覺位置 0），顯示摸到的牌；如果是其他玩家，顯示牌背
+    const tileToAdd = (visualPosition === 0) ? tile : 'back';
 
     // 加入新牌到手牌（等待完成）
     await player.addTile(tileToAdd, this.tileAssets);
@@ -754,8 +825,8 @@ export class Game {
       this.logPlayerHand(playerPosition, `摸牌: ${tile}`);
     }, 100);
 
-    // 如果是自己摸牌，檢查是否可以自摸或聽牌
-    if (playerPosition === this.myPosition) {
+    // 如果是自己摸牌（視覺位置 0），檢查是否可以自摸或聽牌
+    if (visualPosition === 0) {
       // 等待一小段時間，確保牌已經加入並顯示
       setTimeout(() => {
         this.checkSelfActions();
@@ -772,17 +843,18 @@ export class Game {
     // 播放吃牌語音
     this.audioManager.playActionVoice(playerId, 'chi');
 
-    // 找到執行吃牌的玩家
-    let playerPosition = -1;
+    // 找到執行吃牌的玩家（視覺位置）
+    let visualPosition = -1;
     for (let i = 0; i < this.players.length; i++) {
       if (this.players[i].userId === playerId) {
-        playerPosition = i;
+        visualPosition = i;
         break;
       }
     }
+    const playerPosition = visualPosition;
 
-    if (playerPosition !== -1 && chowTiles.length === 3) {
-      const player = this.players[playerPosition];
+    if (visualPosition !== -1 && chowTiles.length === 3) {
+      const player = this.players[visualPosition];
 
       console.log(`🍜 吃牌前手牌 (${player.tiles.length}張):`, player.tiles.map(t => t.type));
 
@@ -825,8 +897,8 @@ export class Game {
         this.logPlayerHand(playerPosition, `吃牌: ${chowTiles.join(',')}`);
       }, 100);
 
-      // 如果是自己吃牌，檢查是否能聽牌或自摸
-      if (playerPosition === this.myPosition) {
+      // 如果是自己吃牌（視覺位置 0），檢查是否能聽牌或自摸
+      if (visualPosition === 0) {
         setTimeout(() => {
           this.checkSelfActions();
         }, 300);
@@ -837,7 +909,7 @@ export class Game {
     this.actionButtons.hide();
     this.pendingActions = [];
     this.possibleTingDiscards = {};
-    const myPlayer = this.players[this.myPosition];
+    const myPlayer = this.players[0]; // 視覺位置 0 是自己
     if (myPlayer) {
       myPlayer.clearHighlight();
     }
@@ -850,17 +922,18 @@ export class Game {
     // 播放碰牌語音
     this.audioManager.playActionVoice(playerId, 'peng');
 
-    // 找到執行碰牌的玩家
-    let playerPosition = -1;
+    // 找到執行碰牌的玩家（視覺位置）
+    let visualPosition = -1;
     for (let i = 0; i < this.players.length; i++) {
       if (this.players[i].userId === playerId) {
-        playerPosition = i;
+        visualPosition = i;
         break;
       }
     }
+    const playerPosition = visualPosition;
 
-    if (playerPosition !== -1) {
-      const player = this.players[playerPosition];
+    if (visualPosition !== -1) {
+      const player = this.players[visualPosition];
 
       // 從手牌中移除2張相同的牌
       let removed = 0;
@@ -894,8 +967,8 @@ export class Game {
         this.logPlayerHand(playerPosition, `碰牌: ${tile}`);
       }, 100);
 
-      // 如果是自己碰牌，檢查是否能聽牌或自摸
-      if (playerPosition === this.myPosition) {
+      // 如果是自己碰牌（視覺位置 0），檢查是否能聽牌或自摸
+      if (visualPosition === 0) {
         setTimeout(() => {
           this.checkSelfActions();
         }, 300);
@@ -906,7 +979,7 @@ export class Game {
     this.actionButtons.hide();
     this.pendingActions = [];
     this.possibleTingDiscards = {};
-    const myPlayer = this.players[this.myPosition];
+    const myPlayer = this.players[0]; // 視覺位置 0 是自己
     if (myPlayer) {
       myPlayer.clearHighlight();
     }
@@ -925,17 +998,18 @@ export class Game {
     // 播放槓牌語音
     this.audioManager.playActionVoice(playerId, 'gang');
 
-    // 找到執行槓牌的玩家
-    let playerPosition = -1;
+    // 找到執行槓牌的玩家（視覺位置）
+    let visualPosition = -1;
     for (let i = 0; i < this.players.length; i++) {
       if (this.players[i].userId === playerId) {
-        playerPosition = i;
+        visualPosition = i;
         break;
       }
     }
+    const playerPosition = visualPosition;
 
-    if (playerPosition !== -1) {
-      const player = this.players[playerPosition];
+    if (visualPosition !== -1) {
+      const player = this.players[visualPosition];
 
       // 只为新杠从手牌中移除牌，而不是为加杠
       if (meld.Type === 'kong_exposed') {
@@ -980,8 +1054,8 @@ export class Game {
         this.logPlayerHand(playerPosition, `槓牌: ${tile} (${meld.Type})`);
       }, 100);
 
-      // 如果是自己槓牌，檢查是否能聽牌或自摸（槓牌後會補牌，所以可能自摸）
-      if (playerPosition === this.myPosition) {
+      // 如果是自己槓牌（視覺位置 0），檢查是否能聽牌或自摸（槓牌後會補牌，所以可能自摸）
+      if (visualPosition === 0) {
         setTimeout(() => {
           this.checkSelfActions();
         }, 300);
@@ -992,7 +1066,7 @@ export class Game {
     this.actionButtons.hide();
     this.pendingActions = [];
     this.possibleTingDiscards = {};
-    const myPlayer = this.players[this.myPosition];
+    const myPlayer = this.players[0]; // 視覺位置 0 是自己
     if (myPlayer) {
       myPlayer.clearHighlight();
     }
@@ -1027,8 +1101,8 @@ export class Game {
     // 顯示聽牌UI
     player.showTingStatus();
 
-    // 如果是自己，顯示提示
-    if (player === this.players[this.myPosition]) {
+    // 如果是自己（視覺位置 0），顯示提示
+    if (player === this.players[0]) {
       this.showAnnouncement('聽牌！', 2000);
     } else {
       // 其他玩家聽牌，也顯示提示
@@ -1256,7 +1330,7 @@ export class Game {
     // 播放按鈕音效
     this.audioManager.playButtonSound();
 
-    const myPlayer = this.players[this.myPosition];
+    const myPlayer = this.players[0]; // 視覺位置 0 是自己
     if (!myPlayer) return;
 
     this.isDeclaringTing = true;
@@ -1450,8 +1524,8 @@ export class Game {
     if (this.selfKongOptions && this.selfKongOptions.length > 0) {
         // UI should let user choose if multiple options. For now, take the first.
         tileToKong = this.selfKongOptions[0];
-        
-        const myPlayer = this.players[this.myPosition];
+
+        const myPlayer = this.players[0]; // 視覺位置 0 是自己
         const hand = myPlayer.tiles.map(t => t.type);
         const handCounts = {};
         for (const tile of hand) {
@@ -1494,7 +1568,7 @@ export class Game {
     // 播放按鈕音效
     this.audioManager.playButtonSound();
 
-    const myPlayer = this.players[this.myPosition];
+    const myPlayer = this.players[0]; // 視覺位置 0 是自己
     const myHand = myPlayer ? myPlayer.tiles.map(t => t.type) : [];
     console.log('當前手牌:', myHand);
     console.log('lastDiscardedTile:', this.lastDiscardedTile);
@@ -1505,6 +1579,7 @@ export class Game {
     let winTile = this.lastDiscardedTile;
 
     // 如果沒有 lastDiscardedTile，說明是自摸
+    // currentTurn 是伺服器位置，myPosition 也是伺服器位置
     if (!this.lastDiscardedTile || this.currentTurn === this.myPosition) {
       isSelfDrawn = true;
       console.log('判定為自摸，尋找胡牌牌型...');
@@ -1572,7 +1647,7 @@ export class Game {
     this.isDeclaringTing = false;
 
     // 清除牌組高亮
-    const myPlayer = this.players[this.myPosition];
+    const myPlayer = this.players[0]; // 視覺位置 0 是自己
     if (myPlayer) {
       myPlayer.clearHighlight();
     }
@@ -1939,7 +2014,7 @@ export class Game {
    * 检查自己可以执行的动作（暗槓/听牌/自摸）
    */
   checkSelfActions() {
-    const myPlayer = this.players[this.myPosition];
+    const myPlayer = this.players[0]; // 視覺位置 0 是自己
     if (!myPlayer) return;
 
     // 如果已经听牌，不再检查其他动作
@@ -2003,7 +2078,8 @@ export class Game {
     console.log('收到可执行动作通知:', { playerId, tile, actions, timeout });
 
     // 检查是否是当前玩家（使用 userId 而不是 id）
-    const myPlayer = this.players[this.myPosition];
+    // 視覺位置 0 是自己
+    const myPlayer = this.players[0];
     console.log('DEBUG: myPlayer.userId =', myPlayer?.userId, 'playerId =', playerId, '是否相等?', myPlayer?.userId === playerId);
 
     if (!myPlayer || myPlayer.userId !== playerId) {

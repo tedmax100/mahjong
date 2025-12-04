@@ -116,6 +116,16 @@ class MahjongApp {
     document.getElementById('user-avatar').src = this.user.picture;
     document.getElementById('user-name').textContent = this.user.name;
     userInfo.classList.remove('hidden');
+
+    // 檢查 URL 是否有房間參數，自動加入房間
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomIdFromUrl = urlParams.get('room');
+    if (roomIdFromUrl) {
+      console.log('從 URL 參數自動加入房間:', roomIdFromUrl);
+      // 清除 URL 參數，避免重複加入
+      window.history.replaceState({}, document.title, window.location.pathname);
+      this.joinRoom(roomIdFromUrl);
+    }
   }
 
   async createRoom() {
@@ -151,16 +161,21 @@ class MahjongApp {
     document.getElementById('current-room-id').textContent = roomId;
     document.getElementById('room-info').classList.remove('hidden');
 
-    // 连接WebSocket
-    this.ws = new WebSocketClient(roomId, this.user);
-    this.ws.onMessage = this.handleServerMessage.bind(this);
-
     // 隐藏房间选择界面
     document.getElementById('room-screen').classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
 
-    // 初始化Pixi游戏
+    // 先初始化Pixi游戏，確保 this.game 準備好
     await this.initGame();
+
+    // 游戲初始化完成後才連接 WebSocket，避免錯過訊息
+    this.ws = new WebSocketClient(roomId, this.user);
+    this.ws.onMessage = this.handleServerMessage.bind(this);
+
+    // 將 ws 實例傳給 game，以便發送訊息
+    if (this.game) {
+      this.game.setWebSocket(this.ws);
+    }
   }
 
   async initGame() {
@@ -190,9 +205,9 @@ class MahjongApp {
       container.appendChild(this.app.canvas);
       console.log('✅ PixiJS 應用創建成功');
 
-      // 创建游戏实例
+      // 创建游戏实例（ws 稍後透過 setWebSocket 設定）
       console.log('🎲 創建遊戲實例...');
-      this.game = new Game(this.app, this.ws);
+      this.game = new Game(this.app, null);
       await this.game.init();
       console.log('✅ 遊戲初始化完成');
 

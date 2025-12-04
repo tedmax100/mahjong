@@ -130,14 +130,16 @@ func (h *Hub) startGame(room *game.Room) {
 	room.GameStarted = true
 	room.StartGame()
 
-	// 发送游戏开始消息
-	startMessage := room.GetGameStartMessage()
-	for _, clientInterface := range room.Clients {
-		client, ok := clientInterface.(*Client)
-		if !ok {
-			continue
+	// 发送游戏开始消息（為每個玩家單獨發送，包含該玩家的位置）
+	for i, player := range room.Players {
+		if clientInterface, ok := room.Clients[player.ID]; ok {
+			client, ok := clientInterface.(*Client)
+			if !ok {
+				continue
+			}
+			startMessage := room.GetGameStartMessage(i)
+			client.Send <- startMessage
 		}
-		client.Send <- startMessage
 	}
 
 	// 发牌
@@ -1161,9 +1163,17 @@ func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *game.Wi
 		// 发牌
 		h.dealTiles(room)
 
-		// 发送游戏开始消息（通知新回合）
-		startMessage := room.GetGameStartMessage()
-		h.broadcast(room, startMessage)
+		// 发送游戏开始消息（為每個玩家單獨發送，包含該玩家的位置）
+		for i, player := range room.Players {
+			if clientInterface, ok := room.Clients[player.ID]; ok {
+				client, ok := clientInterface.(*Client)
+				if !ok {
+					continue
+				}
+				startMessage := room.GetGameStartMessage(i)
+				client.Send <- startMessage
+			}
+		}
 
 		// 检查Bot回合
 		h.CheckAndPlayBotTurn(room, false)

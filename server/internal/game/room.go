@@ -236,13 +236,15 @@ func (r *Room) GetRoomUpdateMessage() []byte {
 	return data
 }
 
-// GetGameStartMessage 获取游戏开始消息
-func (r *Room) GetGameStartMessage() []byte {
+// GetGameStartMessage 获取游戏开始消息（為特定玩家）
+func (r *Room) GetGameStartMessage(playerPosition int) []byte {
 	message := map[string]interface{}{
 		"type": "game_start",
 		"data": map[string]interface{}{
-			"roomId":      r.ID,
-			"currentTurn": r.CurrentTurn,
+			"roomId":         r.ID,
+			"currentTurn":    r.CurrentTurn,
+			"myPosition":     playerPosition, // 玩家自己的位置
+			"dealerPosition": 0,              // 莊家位置（目前固定為 0）
 		},
 	}
 
