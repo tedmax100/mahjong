@@ -85,6 +85,7 @@ func (g *MahjongGame) CalculateScore(player *Player, lastTile string, isSelfDraw
 	// 计算基础分数（底分 * 2^台数）
 	// 台湾16张麻将常见规则：底分10元，每台翻倍
 	baseAmount := 10
+	// #nosec G115 -- baseTai 來自遊戲邏輯，範圍有限 (0-20)，不會溢出
 	result.BaseScore = baseAmount << uint(baseTai) // 相当于 10 * (2 ^ baseTai)
 
 	log.Printf("玩家 %s 胡牌: 台数=%d, 分数=%d", player.Name, baseTai, result.BaseScore)

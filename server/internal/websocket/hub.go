@@ -358,6 +358,7 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 		roomID := room.ID // 保存房間 ID 用於後續檢查
 		go func() {
 			log.Printf("🤖 Bot %s 的回合已开始，等待出牌...", currentPlayer.Name)
+			// #nosec G404 -- Bot 延遲時間不需要加密安全隨機數
 			time.Sleep(time.Duration(1000+rand.Intn(1000)) * time.Millisecond)
 
 			log.Printf("🔒 [CheckAndPlayBotTurn-Bot] 準備獲取鎖")
