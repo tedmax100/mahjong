@@ -1,7 +1,6 @@
 package scoring
 
 import (
-	"log"
 	"mahjong/internal/model"
 	"mahjong/internal/tile"
 )
@@ -104,11 +103,6 @@ func CalculateScore(hand []string, melds []model.Meld, flowers []string, lastTil
 	baseAmount := 10
 	// #nosec G115 -- baseTai 來自遊戲邏輯，範圍有限 (0-20)，不會溢出
 	result.BaseScore = baseAmount << uint(baseTai) // 相當於 10 * (2 ^ baseTai)
-
-	// log.Printf("胡牌: 台數=%d, 分數=%d", baseTai, result.BaseScore)
-	// for _, ht := range result.HandTypes {
-	// 	log.Printf("  - %s: %d 台", ht.Name, ht.Tai)
-	// }
 
 	return result
 }
