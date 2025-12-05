@@ -1,5 +1,7 @@
 # 麻將專案 README
 
+[![Security Scan](https://github.com/tedmax100/mahjong/actions/workflows/security.yml/badge.svg)](https://github.com/tedmax100/mahjong/actions/workflows/security.yml)
+
 這是一個16張台灣麻將的網頁遊戲專案。
 
 ## ✨ 功能亮點
