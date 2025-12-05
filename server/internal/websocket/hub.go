@@ -6,6 +6,7 @@ import (
 	"log"
 	"mahjong/internal/ai"
 	"mahjong/internal/game"
+	"mahjong/internal/scoring"
 	"math/rand"
 	"strings"
 	"sync"
@@ -1247,7 +1248,7 @@ func (h *Hub) BroadcastPossibleActions(room *game.Room, discardedTile string, di
 }
 
 // BroadcastGameWin 廣播遊戲勝利事件並準備下一局
-func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *game.WinResult) {
+func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *scoring.WinResult) {
 	var winnerName string
 	for _, p := range room.Players {
 		if p.ID == winnerID {
