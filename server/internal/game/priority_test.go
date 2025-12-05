@@ -7,10 +7,10 @@ import (
 
 // TestActionPriority 測試動作優先權排序
 func TestActionPriority(t *testing.T) {
-	// 創建房間
+	// 建立房間
 	room := NewRoom("test-room")
 
-	// 添加4個玩家
+	// 添加 4 個玩家
 	players := []struct {
 		id   string
 		name string
@@ -39,11 +39,11 @@ func TestActionPriority(t *testing.T) {
 	t.Run("胡牌優先於碰牌", func(t *testing.T) {
 		room.PendingActions = []PendingAction{}
 
-		// 設置玩家2的手牌，使其可以碰東
+		// 設置玩家 2 的手牌，使其可以碰東
 		room.Players[1].Hand = []string{"dong", "dong", "wan-1", "wan-2"}
 
-		// 設置玩家3的手牌為已經胡牌的狀態（5組面子+1對將 = 17張）
-		// 5組碰 + 2張wan-5作為將牌
+		// 設置玩家 3 的手牌為已經胡牌的狀態（5 組面子+1 對將 = 17 張）
+		// 5 組碰 + 2 張 wan-5 作為將牌
 		room.Players[2].Hand = []string{"wan-5", "wan-5"} // 一對將
 		room.Players[2].Melds = []Meld{
 			{Type: "pong", Tiles: []string{"wan-1", "wan-1", "wan-1"}},
@@ -53,9 +53,9 @@ func TestActionPriority(t *testing.T) {
 			{Type: "pong", Tiles: []string{"dong", "dong", "dong"}},
 		}
 
-		// 玩家2想碰
+		// 玩家 2 想碰
 		room.AddPendingAction("player2", "pong", "dong", nil)
-		// 玩家3想胡（玩家3已經胡牌了）
+		// 玩家 3 想胡（玩家 3 已經胡牌了）
 		room.AddPendingAction("player3", "hu", "dong", nil)
 
 		// 處理動作
@@ -70,7 +70,7 @@ func TestActionPriority(t *testing.T) {
 		}
 
 		if action.PlayerID != "player3" {
-			t.Errorf("期望玩家3執行動作，實際是 %s", action.PlayerID)
+			t.Errorf("期望玩家 3 執行動作，實際是 %s", action.PlayerID)
 		}
 	})
 
@@ -79,15 +79,15 @@ func TestActionPriority(t *testing.T) {
 		room.LastDiscardPlayer = 0
 		room.LastDiscardTile = "wan-2"
 
-		// 設置玩家2（下家）的手牌，使其可以吃萬2（需要萬1和萬3）
+		// 設置玩家 2（下家）的手牌，使其可以吃萬 2（需要萬 1 和萬 3）
 		room.Players[1].Hand = []string{"wan-1", "wan-3", "tong-1", "tong-2"}
 
-		// 設置玩家4的手牌，使其可以碰萬2
+		// 設置玩家 4 的手牌，使其可以碰萬 2
 		room.Players[3].Hand = []string{"wan-2", "wan-2", "tong-5", "tong-6"}
 
-		// 玩家2（下家）想吃
+		// 玩家 2（下家）想吃
 		room.AddPendingAction("player2", "chow", "wan-2", nil)
-		// 玩家4想碰
+		// 玩家 4 想碰
 		room.AddPendingAction("player4", "pong", "wan-2", nil)
 
 		// 處理動作
@@ -106,15 +106,15 @@ func TestActionPriority(t *testing.T) {
 		room.PendingActions = []PendingAction{}
 		room.LastDiscardTile = "dong"
 
-		// 設置玩家2的手牌，使其可以碰東
+		// 設置玩家 2 的手牌，使其可以碰東
 		room.Players[1].Hand = []string{"dong", "dong", "wan-5", "wan-6"}
 
-		// 設置玩家3的手牌，使其可以槓東（手牌有3張，加上打出的1張）
+		// 設置玩家 3 的手牌，使其可以槓東（手牌有 3 張，加上打出的 1 張）
 		room.Players[2].Hand = []string{"dong", "dong", "dong", "tong-1", "tong-2"}
 
-		// 玩家2想碰
+		// 玩家 2 想碰
 		room.AddPendingAction("player2", "pong", "dong", nil)
-		// 玩家3想槓
+		// 玩家 3 想槓
 		room.AddPendingAction("player3", "kong", "dong", nil)
 
 		// 處理動作
@@ -137,7 +137,7 @@ func TestActionPriority(t *testing.T) {
 		room.Players[1].Hand = []string{"dong", "dong", "wan-1", "wan-2"}
 		room.Players[2].Hand = []string{"dong", "dong", "tong-1", "tong-2"}
 
-		// 兩個玩家都想碰，玩家2先提交
+		// 兩個玩家都想碰，玩家 2 先提交
 		room.AddPendingAction("player2", "pong", "dong", nil)
 		time.Sleep(10 * time.Millisecond) // 確保時間戳不同
 		room.AddPendingAction("player3", "pong", "dong", nil)
@@ -150,7 +150,7 @@ func TestActionPriority(t *testing.T) {
 		}
 
 		if action.PlayerID != "player2" {
-			t.Errorf("期望玩家2先執行（先提交），實際是 %s", action.PlayerID)
+			t.Errorf("期望玩家 2 先執行（先提交），實際是 %s", action.PlayerID)
 		}
 	})
 }
@@ -159,7 +159,7 @@ func TestActionPriority(t *testing.T) {
 func TestPriorityOrder(t *testing.T) {
 	room := NewRoom("test-room")
 
-	// 添加4個玩家
+	// 添加 4 個玩家
 	for i := 1; i <= 4; i++ {
 		err := room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
 		if err != nil {
@@ -172,17 +172,17 @@ func TestPriorityOrder(t *testing.T) {
 	room.LastDiscardTile = "wan-5"
 	room.LastDiscardPlayer = 0
 
-	// 設置玩家1（下家）的手牌，使其可以吃萬5
+	// 設置玩家 1（下家）的手牌，使其可以吃萬 5
 	room.Players[0].Hand = []string{"wan-4", "wan-6", "tong-1"}
 
-	// 設置玩家2的手牌，使其可以碰萬5
+	// 設置玩家 2 的手牌，使其可以碰萬 5
 	room.Players[1].Hand = []string{"wan-5", "wan-5", "tong-2"}
 
-	// 設置玩家3的手牌，使其可以槓萬5
+	// 設置玩家 3 的手牌，使其可以槓萬 5
 	room.Players[2].Hand = []string{"wan-5", "wan-5", "wan-5", "tong-3"}
 
-	// 設置玩家4的手牌，使其可以胡（已經胡牌的狀態 = 5組面子 + 1對眼 = 17張）
-	room.Players[3].Hand = []string{"wan-5", "wan-5"} // 需要2張作為將牌
+	// 設置玩家 4 的手牌，使其可以胡（已經胡牌的狀態 = 5 組面子 + 1 對眼 = 17 張）
+	room.Players[3].Hand = []string{"wan-5", "wan-5"} // 需要 2 張作為將牌
 	room.Players[3].Melds = []Meld{
 		{Type: "pong", Tiles: []string{"dong", "dong", "dong"}},
 		{Type: "pong", Tiles: []string{"nan", "nan", "nan"}},
@@ -247,7 +247,7 @@ func TestClearPendingActions(t *testing.T) {
 	room.ClearPendingActions()
 
 	if len(room.PendingActions) != 0 {
-		t.Errorf("期望清空後有0個待處理動作，實際有 %d 個", len(room.PendingActions))
+		t.Errorf("期望清空後有 0 個待處理動作，實際有 %d 個", len(room.PendingActions))
 	}
 
 	if room.IsWaitingForActions {
@@ -307,6 +307,6 @@ func TestMultipleSamePriorityActions(t *testing.T) {
 
 	// 應該是第一個提交的玩家
 	if action.PlayerID != "player1" {
-		t.Errorf("期望玩家1執行（最早提交），實際是 %s", action.PlayerID)
+		t.Errorf("期望玩家 1 執行（最早提交），實際是 %s", action.PlayerID)
 	}
 }

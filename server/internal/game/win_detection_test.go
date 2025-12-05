@@ -4,10 +4,10 @@ import (
 	"testing"
 )
 
-// TestCanHu_PlayerNN_Bug 测试玩家 NN 无法胡牌的 bug 修复
-// 这是真实游戏中发生的场景
+// TestCanHu_PlayerNN_Bug 測試玩家 NN 無法胡牌的 bug 修復
+// 這是真實遊戲中發生的場景
 func TestCanHu_PlayerNN_Bug(t *testing.T) {
-	// 创建测试玩家
+	// 建立測試玩家
 	players := make([]*Player, 4)
 	for i := 0; i < 4; i++ {
 		players[i] = &Player{
@@ -19,44 +19,44 @@ func TestCanHu_PlayerNN_Bug(t *testing.T) {
 
 	game := NewMahjongGame(players)
 
-	t.Run("玩家 NN 的胡牌手型应该被识别（2组吃碰槓 + 11张手牌）", func(t *testing.T) {
-		// 玩家 NN 的手牌（11张）
+	t.Run("玩家 NN 的胡牌手型應該被識別（2 組吃碰槓 + 11 張手牌）", func(t *testing.T) {
+		// 玩家 NN 的手牌（11 張）
 		hand := []string{
 			"tong-1", "tong-2", "tong-2", "tong-3", "tong-3", "tong-4",
 			"tong-6", "tong-6", "tong-6",
 			"xi", "xi",
 		}
 
-		// 玩家 NN 的吃碰槓（2组）
+		// 玩家 NN 的吃碰槓（2 組）
 		melds := []Meld{
 			{Type: "pong", Tiles: []string{"tiao-5", "tiao-5", "tiao-5"}},
 			{Type: "chow", Tiles: []string{"wan-4", "wan-5", "wan-6"}},
 		}
 
-		// 验证胡牌
+		// 驗證胡牌
 		if !game.CanHu(hand, melds) {
-			t.Error("玩家 NN 应该能够胡牌")
+			t.Error("玩家 NN 應該能夠胡牌")
 		}
 	})
 
-	t.Run("验证手牌可以组成正确的牌型", func(t *testing.T) {
+	t.Run("驗證手牌可以組成正確的牌型", func(t *testing.T) {
 		hand := []string{
 			"tong-1", "tong-2", "tong-2", "tong-3", "tong-3", "tong-4",
 			"tong-6", "tong-6", "tong-6",
 			"xi", "xi",
 		}
 
-		// 分析手牌结构：
-		// - 顺子：tong-1 tong-2 tong-3
-		// - 顺子：tong-2 tong-3 tong-4
+		// 分析手牌結構：
+		// - 順子：tong-1 tong-2 tong-3
+		// - 順子：tong-2 tong-3 tong-4
 		// - 刻子：tong-6 tong-6 tong-6
-		// - 对子：xi xi
-		// 总共：3组面子 + 1对眼 = 11张
+		// - 對子：xi xi
+		// 總共：3 組面子 + 1 對眼 = 11 張
 
-		// 加上已有的2组吃碰槓：
+		// 加上已有的 2 組吃碰槓：
 		// - 刻子：tiao-5 tiao-5 tiao-5
-		// - 顺子：wan-4 wan-5 wan-6
-		// 总计：5组面子 + 1对眼 = 17张 ✓
+		// - 順子：wan-4 wan-5 wan-6
+		// 總計：5 組面子 + 1 對眼 = 17 張 ✓
 
 		melds := []Meld{
 			{Type: "pong", Tiles: []string{"tiao-5", "tiao-5", "tiao-5"}},
@@ -64,12 +64,12 @@ func TestCanHu_PlayerNN_Bug(t *testing.T) {
 		}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("完整的17张牌型应该能够胡牌")
+			t.Error("完整的 17 張牌型應該能夠胡牌")
 		}
 	})
 }
 
-// TestCanHu_GroupCounts 测试不同吃碰槓数量下的胡牌判定
+// TestCanHu_GroupCounts 測試不同吃碰槓數量下的胡牌判定
 func TestCanHu_GroupCounts(t *testing.T) {
 	players := make([]*Player, 4)
 	for i := 0; i < 4; i++ {
@@ -82,31 +82,31 @@ func TestCanHu_GroupCounts(t *testing.T) {
 
 	game := NewMahjongGame(players)
 
-	t.Run("0组吃碰槓 - 需要17张手牌（5组 + 1对）", func(t *testing.T) {
-		// 完全没有吃碰槓，手牌需要17张
+	t.Run("0 組吃碰槓 - 需要 17 張手牌（5 組 + 1 對）", func(t *testing.T) {
+		// 完全沒有吃碰槓，手牌需要 17 張
 		hand := []string{
-			"wan-1", "wan-2", "wan-3", // 顺子1
-			"wan-4", "wan-5", "wan-6", // 顺子2
-			"tiao-1", "tiao-2", "tiao-3", // 顺子3
-			"tong-1", "tong-1", "tong-1", // 刻子1
-			"tong-2", "tong-2", "tong-2", // 刻子2
-			"xi", "xi", // 对子
+			"wan-1", "wan-2", "wan-3", // 順子 1
+			"wan-4", "wan-5", "wan-6", // 順子 2
+			"tiao-1", "tiao-2", "tiao-3", // 順子 3
+			"tong-1", "tong-1", "tong-1", // 刻子 1
+			"tong-2", "tong-2", "tong-2", // 刻子 2
+			"xi", "xi", // 對子
 		}
 
 		melds := []Meld{}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("17张手牌（5组+1对）应该能够胡牌")
+			t.Error("17 張手牌（5 組+1 對）應該能夠胡牌")
 		}
 	})
 
-	t.Run("1组吃碰槓 - 需要14张手牌（4组 + 1对）", func(t *testing.T) {
+	t.Run("1 組吃碰槓 - 需要 14 張手牌（4 組 + 1 對）", func(t *testing.T) {
 		hand := []string{
-			"wan-1", "wan-2", "wan-3", // 顺子1
-			"wan-4", "wan-5", "wan-6", // 顺子2
-			"tiao-1", "tiao-2", "tiao-3", // 顺子3
-			"tong-1", "tong-1", "tong-1", // 刻子1
-			"xi", "xi", // 对子
+			"wan-1", "wan-2", "wan-3", // 順子 1
+			"wan-4", "wan-5", "wan-6", // 順子 2
+			"tiao-1", "tiao-2", "tiao-3", // 順子 3
+			"tong-1", "tong-1", "tong-1", // 刻子 1
+			"xi", "xi", // 對子
 		}
 
 		melds := []Meld{
@@ -114,16 +114,16 @@ func TestCanHu_GroupCounts(t *testing.T) {
 		}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("1组吃碰槓 + 14张手牌应该能够胡牌")
+			t.Error("1 組吃碰槓 + 14 張手牌應該能夠胡牌")
 		}
 	})
 
-	t.Run("2组吃碰槓 - 需要11张手牌（3组 + 1对）", func(t *testing.T) {
+	t.Run("2 組吃碰槓 - 需要 11 張手牌（3 組 + 1 對）", func(t *testing.T) {
 		hand := []string{
-			"wan-1", "wan-2", "wan-3", // 顺子1
-			"wan-4", "wan-5", "wan-6", // 顺子2
-			"tiao-1", "tiao-2", "tiao-3", // 顺子3
-			"xi", "xi", // 对子
+			"wan-1", "wan-2", "wan-3", // 順子 1
+			"wan-4", "wan-5", "wan-6", // 順子 2
+			"tiao-1", "tiao-2", "tiao-3", // 順子 3
+			"xi", "xi", // 對子
 		}
 
 		melds := []Meld{
@@ -132,15 +132,15 @@ func TestCanHu_GroupCounts(t *testing.T) {
 		}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("2组吃碰槓 + 11张手牌应该能够胡牌")
+			t.Error("2 組吃碰槓 + 11 張手牌應該能夠胡牌")
 		}
 	})
 
-	t.Run("3组吃碰槓 - 需要8张手牌（2组 + 1对）", func(t *testing.T) {
+	t.Run("3 組吃碰槓 - 需要 8 張手牌（2 組 + 1 對）", func(t *testing.T) {
 		hand := []string{
-			"wan-1", "wan-2", "wan-3", // 顺子1
-			"wan-4", "wan-5", "wan-6", // 顺子2
-			"xi", "xi", // 对子
+			"wan-1", "wan-2", "wan-3", // 順子 1
+			"wan-4", "wan-5", "wan-6", // 順子 2
+			"xi", "xi", // 對子
 		}
 
 		melds := []Meld{
@@ -150,14 +150,14 @@ func TestCanHu_GroupCounts(t *testing.T) {
 		}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("3组吃碰槓 + 8张手牌应该能够胡牌")
+			t.Error("3 組吃碰槓 + 8 張手牌應該能夠胡牌")
 		}
 	})
 
-	t.Run("4组吃碰槓 - 需要5张手牌（1组 + 1对）", func(t *testing.T) {
+	t.Run("4 組吃碰槓 - 需要 5 張手牌（1 組 + 1 對）", func(t *testing.T) {
 		hand := []string{
-			"wan-1", "wan-2", "wan-3", // 顺子1
-			"xi", "xi", // 对子
+			"wan-1", "wan-2", "wan-3", // 順子 1
+			"xi", "xi", // 對子
 		}
 
 		melds := []Meld{
@@ -168,13 +168,13 @@ func TestCanHu_GroupCounts(t *testing.T) {
 		}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("4组吃碰槓 + 5张手牌应该能够胡牌")
+			t.Error("4 組吃碰槓 + 5 張手牌應該能夠胡牌")
 		}
 	})
 
-	t.Run("5组吃碰槓 - 只需要1对（2张手牌）", func(t *testing.T) {
+	t.Run("5 組吃碰槓 - 只需要 1 對（2 張手牌）", func(t *testing.T) {
 		hand := []string{
-			"xi", "xi", // 对子
+			"xi", "xi", // 對子
 		}
 
 		melds := []Meld{
@@ -186,12 +186,12 @@ func TestCanHu_GroupCounts(t *testing.T) {
 		}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("5组吃碰槓 + 1对应该能够胡牌")
+			t.Error("5 組吃碰槓 + 1 對應該能夠胡牌")
 		}
 	})
 }
 
-// TestCanHu_InvalidCases 测试无效的胡牌情况
+// TestCanHu_InvalidCases 測試無效的胡牌情況
 func TestCanHu_InvalidCases(t *testing.T) {
 	players := make([]*Player, 4)
 	for i := 0; i < 4; i++ {
@@ -204,12 +204,12 @@ func TestCanHu_InvalidCases(t *testing.T) {
 
 	game := NewMahjongGame(players)
 
-	t.Run("手牌数量不正确（2组吃碰槓 + 10张手牌）", func(t *testing.T) {
+	t.Run("手牌數量不正確（2 組吃碰槓 + 10 張手牌）", func(t *testing.T) {
 		hand := []string{
 			"wan-1", "wan-2", "wan-3",
 			"wan-4", "wan-5", "wan-6",
 			"tiao-1", "tiao-2", "tiao-3",
-			"xi", // 缺少一张
+			"xi", // 缺少一張
 		}
 
 		melds := []Meld{
@@ -218,13 +218,13 @@ func TestCanHu_InvalidCases(t *testing.T) {
 		}
 
 		if game.CanHu(hand, melds) {
-			t.Error("手牌数量不正确，不应该能够胡牌")
+			t.Error("手牌數量不正確，不應該能夠胡牌")
 		}
 	})
 
-	t.Run("手牌无法组成有效牌型", func(t *testing.T) {
+	t.Run("手牌無法組成有效牌型", func(t *testing.T) {
 		hand := []string{
-			"wan-1", "wan-3", "wan-5", // 无法组成顺子
+			"wan-1", "wan-3", "wan-5", // 無法組成順子
 			"wan-4", "wan-5", "wan-6",
 			"tiao-1", "tiao-2", "tiao-3",
 			"xi", "xi",
@@ -236,16 +236,16 @@ func TestCanHu_InvalidCases(t *testing.T) {
 		}
 
 		if game.CanHu(hand, melds) {
-			t.Error("无法组成有效牌型，不应该能够胡牌")
+			t.Error("無法組成有效牌型，不應該能夠胡牌")
 		}
 	})
 
-	t.Run("缺少对子", func(t *testing.T) {
+	t.Run("缺少對子", func(t *testing.T) {
 		hand := []string{
 			"wan-1", "wan-2", "wan-3",
 			"wan-4", "wan-5", "wan-6",
 			"tiao-1", "tiao-2", "tiao-3",
-			"tong-5", "tong-6", // 不是对子
+			"tong-5", "tong-6", // 不是對子
 		}
 
 		melds := []Meld{
@@ -254,12 +254,12 @@ func TestCanHu_InvalidCases(t *testing.T) {
 		}
 
 		if game.CanHu(hand, melds) {
-			t.Error("缺少对子，不应该能够胡牌")
+			t.Error("缺少對子，不應該能夠胡牌")
 		}
 	})
 }
 
-// TestCanHu_ComplexPatterns 测试复杂的牌型
+// TestCanHu_ComplexPatterns 測試複雜的牌型
 func TestCanHu_ComplexPatterns(t *testing.T) {
 	players := make([]*Player, 4)
 	for i := 0; i < 4; i++ {
@@ -286,11 +286,11 @@ func TestCanHu_ComplexPatterns(t *testing.T) {
 		}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("全是刻子的牌型应该能够胡牌")
+			t.Error("全是刻子的牌型應該能夠胡牌")
 		}
 	})
 
-	t.Run("全是顺子的牌型", func(t *testing.T) {
+	t.Run("全是順子的牌型", func(t *testing.T) {
 		hand := []string{
 			"wan-1", "wan-2", "wan-3",
 			"wan-4", "wan-5", "wan-6",
@@ -304,16 +304,16 @@ func TestCanHu_ComplexPatterns(t *testing.T) {
 		}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("全是顺子的牌型应该能够胡牌")
+			t.Error("全是順子的牌型應該能夠胡牌")
 		}
 	})
 
-	t.Run("混合牌型 - 顺子和刻子", func(t *testing.T) {
+	t.Run("混合牌型 - 順子和刻子", func(t *testing.T) {
 		hand := []string{
-			"wan-1", "wan-2", "wan-3", // 顺子
+			"wan-1", "wan-2", "wan-3", // 順子
 			"tiao-5", "tiao-5", "tiao-5", // 刻子
-			"tong-1", "tong-2", "tong-3", // 顺子
-			"dong", "dong", // 对子
+			"tong-1", "tong-2", "tong-3", // 順子
+			"dong", "dong", // 對子
 		}
 
 		melds := []Meld{
@@ -322,7 +322,7 @@ func TestCanHu_ComplexPatterns(t *testing.T) {
 		}
 
 		if !game.CanHu(hand, melds) {
-			t.Error("混合牌型应该能够胡牌")
+			t.Error("混合牌型應該能夠胡牌")
 		}
 	})
 }

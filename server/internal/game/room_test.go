@@ -74,7 +74,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 		description    string
 	}{
 		{
-			name: "無槓_17張手牌_應該成功",
+			name: "無槓_17 張手牌_應該成功",
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
@@ -84,10 +84,10 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			melds:         []Meld{},
 			kongCount:     0,
 			shouldSucceed: true,
-			description:   "正常情況，17張手牌，無吃碰槓",
+			description:   "正常情況，17 張手牌，無吃碰槓",
 		},
 		{
-			name: "無槓_18張手牌_應該成功",
+			name: "無槓_18 張手牌_應該成功",
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
@@ -97,10 +97,10 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			melds:         []Meld{},
 			kongCount:     0,
 			shouldSucceed: true,
-			description:   "槓後補牌，18張手牌",
+			description:   "槓後補牌，18 張手牌",
 		},
 		{
-			name: "1個槓_18張總牌_應該成功",
+			name: "1 個槓_18 張總牌_應該成功",
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4",
@@ -111,10 +111,10 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			},
 			kongCount:     1,
 			shouldSucceed: true,
-			description:   "1個槓（4張）+ 14張手牌 = 18張（打牌前）",
+			description:   "1 個槓（4 張）+ 14 張手牌 = 18 張（打牌前）",
 		},
 		{
-			name: "1個槓_19張總牌_應該成功",
+			name: "1 個槓_19 張總牌_應該成功",
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
@@ -125,10 +125,10 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			},
 			kongCount:     1,
 			shouldSucceed: true,
-			description:   "1個槓 + 15張手牌 = 19張（槓後補牌，打牌前）",
+			description:   "1 個槓 + 15 張手牌 = 19 張（槓後補牌，打牌前）",
 		},
 		{
-			name: "2個槓_19張總牌_應該成功",
+			name: "2 個槓_19 張總牌_應該成功",
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4",
@@ -140,10 +140,10 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			},
 			kongCount:     2,
 			shouldSucceed: true,
-			description:   "2個槓（8張）+ 11張手牌 = 19張（打牌前）",
+			description:   "2 個槓（8 張）+ 11 張手牌 = 19 張（打牌前）",
 		},
 		{
-			name: "2個槓_20張總牌_應該成功",
+			name: "2 個槓_20 張總牌_應該成功",
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3", "wan-4", "wan-5",
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
@@ -155,10 +155,10 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			},
 			kongCount:     2,
 			shouldSucceed: true,
-			description:   "2個槓 + 12張手牌 = 20張（槓後補牌，打牌前）",
+			description:   "2 個槓 + 12 張手牌 = 20 張（槓後補牌，打牌前）",
 		},
 		{
-			name: "3個槓_20張總牌_應該成功",
+			name: "3 個槓_20 張總牌_應該成功",
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3", "wan-4",
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4",
@@ -170,10 +170,10 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			},
 			kongCount:     3,
 			shouldSucceed: true,
-			description:   "3個槓（12張）+ 8張手牌 = 20張（打牌前）",
+			description:   "3 個槓（12 張）+ 8 張手牌 = 20 張（打牌前）",
 		},
 		{
-			name: "1個槓_但牌數錯誤_應該失敗",
+			name: "1 個槓_但牌數錯誤_應該失敗",
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3",
 			},
@@ -182,10 +182,10 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			},
 			kongCount:     1,
 			shouldSucceed: false,
-			description:   "只有7張總牌（3手牌+4槓），應該拒絕",
+			description:   "只有 7 張總牌（3 手牌+4 槓），應該拒絕",
 		},
 		{
-			name: "2個槓_但牌數錯誤_應該失敗",
+			name: "2 個槓_但牌數錯誤_應該失敗",
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3", "wan-4",
 			},
@@ -195,13 +195,13 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			},
 			kongCount:     2,
 			shouldSucceed: false,
-			description:   "只有12張總牌（4手牌+8槓），預期19或20張，應該拒絕",
+			description:   "只有 12 張總牌（4 手牌+8 槓），預期 19 或 20 張，應該拒絕",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// 創建房間
+			// 建立房間
 			room := NewRoom("test-room")
 
 			// 添加玩家
@@ -242,7 +242,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 
 			// 驗證結果
 			if tc.shouldSucceed && !actualSuccess {
-				t.Errorf("%s: 應該成功但失敗了。總牌數: %d, 槓數: %d, 預期: %d或%d",
+				t.Errorf("%s: 應該成功但失敗了。總牌數: %d, 槓數: %d, 預期: %d 或 %d",
 					tc.description, initialTotalTiles, tc.kongCount, 17+tc.kongCount, 18+tc.kongCount)
 			}
 

@@ -8,7 +8,7 @@ import (
 func TestHandleHu_BasicWin(t *testing.T) {
 	room := NewRoom("test-room")
 
-	// 創建測試玩家（模擬真實遊戲：5張手牌含胡牌 + 4組吃碰槓 = 17張）
+	// 創建測試玩家（模擬真實遊戲：5 張手牌含胡牌 + 4 組吃碰槓 = 17 張）
 	player := &Player{
 		ID:       "player1",
 		Name:     "測試玩家",
@@ -35,7 +35,7 @@ func TestHandleHu_BasicWin(t *testing.T) {
 	isSelfDrawn := true
 
 	t.Logf("手牌總數: %d, 手牌: %v", len(player.Hand), player.Hand)
-	t.Logf("吃碰槓總數: %d組", len(player.Melds))
+	t.Logf("吃碰槓總數: %d 組", len(player.Melds))
 	t.Logf("測試胡牌: winTile=%s, isSelfDrawn=%v", winTile, isSelfDrawn)
 
 	result := room.HandleHu(player.ID, winTile, isSelfDrawn)
@@ -63,7 +63,7 @@ func TestHandleHu_BasicWin(t *testing.T) {
 func TestHandleHu_WithFlowers(t *testing.T) {
 	room := NewRoom("test-room")
 
-	// 創建測試玩家（帶花牌：5張手牌含胡牌 + 4組吃碰槓 = 17張）
+	// 創建測試玩家（帶花牌：5 張手牌含胡牌 + 4 組吃碰槓 = 17 張）
 	player := &Player{
 		ID:       "player1",
 		Name:     "測試玩家",
@@ -152,7 +152,7 @@ func TestHandleHu_InvalidHand(t *testing.T) {
 func TestHandleHu_OtherPlayerDiscard(t *testing.T) {
 	room := NewRoom("test-room")
 
-	// 創建測試玩家（4張手牌 + 4組吃碰槓 + 別人打出的 wan-5 = 17張）
+	// 創建測試玩家（4 張手牌 + 4 組吃碰槓 + 別人打出的 wan-5 = 17 張）
 	player := &Player{
 		ID:       "player1",
 		Name:     "測試玩家",
@@ -179,7 +179,7 @@ func TestHandleHu_OtherPlayerDiscard(t *testing.T) {
 	isSelfDrawn := false
 
 	t.Logf("手牌總數: %d, 手牌: %v", len(player.Hand), player.Hand)
-	t.Logf("吃碰槓總數: %d組", len(player.Melds))
+	t.Logf("吃碰槓總數: %d 組", len(player.Melds))
 	t.Logf("測試吃胡: winTile=%s, isSelfDrawn=%v", winTile, isSelfDrawn)
 
 	result := room.HandleHu(player.ID, winTile, isSelfDrawn)
