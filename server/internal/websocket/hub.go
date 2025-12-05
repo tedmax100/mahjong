@@ -6,6 +6,7 @@ import (
 	"log"
 	"mahjong/internal/ai"
 	"mahjong/internal/game"
+	"mahjong/internal/model"
 	"mahjong/internal/scoring"
 	"math/rand"
 	"strings"
@@ -935,7 +936,7 @@ func (h *Hub) botsReactToDiscard(room *game.Room, discardedTile string, discarde
 			if actionToBroadcast == "chow" {
 				h.BroadcastChowAction(room, bestBot.ID, discardedTile, bestChowCombination)
 			} else if actionToBroadcast == "kong" {
-				var kongMeld game.Meld
+				var kongMeld model.Meld
 				for _, meld := range bestBot.Melds {
 					isKong := (meld.Type == "kong_exposed" || meld.Type == "kong_concealed" || meld.Type == "kong_promoted")
 					if isKong && meld.Tiles[0] == discardedTile {
@@ -1080,7 +1081,7 @@ func (h *Hub) BroadcastChowAction(room *game.Room, playerID, tile string, chowTi
 }
 
 // BroadcastKongAction 廣播槓牌動作（包含完整的槓牌組合和類型）
-func (h *Hub) BroadcastKongAction(room *game.Room, playerID string, meld game.Meld) {
+func (h *Hub) BroadcastKongAction(room *game.Room, playerID string, meld model.Meld) {
 	message := map[string]interface{}{
 		"type": "player_action",
 		"data": map[string]interface{}{

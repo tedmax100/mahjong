@@ -1,6 +1,7 @@
 package game
 
 import (
+	"mahjong/internal/model"
 	"testing"
 )
 
@@ -28,7 +29,7 @@ func TestCanHu_PlayerNN_Bug(t *testing.T) {
 		}
 
 		// 玩家 NN 的吃碰槓（2 組）
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tiao-5", "tiao-5", "tiao-5"}},
 			{Type: "chow", Tiles: []string{"wan-4", "wan-5", "wan-6"}},
 		}
@@ -58,7 +59,7 @@ func TestCanHu_PlayerNN_Bug(t *testing.T) {
 		// - 順子：wan-4 wan-5 wan-6
 		// 總計：5 組面子 + 1 對眼 = 17 張 ✓
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tiao-5", "tiao-5", "tiao-5"}},
 			{Type: "chow", Tiles: []string{"wan-4", "wan-5", "wan-6"}},
 		}
@@ -93,7 +94,7 @@ func TestCanHu_GroupCounts(t *testing.T) {
 			"xi", "xi", // 對子
 		}
 
-		melds := []Meld{}
+		melds := []model.Meld{}
 
 		if !game.CanHu(hand, melds) {
 			t.Error("17 張手牌（5 組+1 對）應該能夠胡牌")
@@ -109,7 +110,7 @@ func TestCanHu_GroupCounts(t *testing.T) {
 			"xi", "xi", // 對子
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tong-2", "tong-2", "tong-2"}},
 		}
 
@@ -126,7 +127,7 @@ func TestCanHu_GroupCounts(t *testing.T) {
 			"xi", "xi", // 對子
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tong-1", "tong-1", "tong-1"}},
 			{Type: "pong", Tiles: []string{"tong-2", "tong-2", "tong-2"}},
 		}
@@ -143,7 +144,7 @@ func TestCanHu_GroupCounts(t *testing.T) {
 			"xi", "xi", // 對子
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tong-1", "tong-1", "tong-1"}},
 			{Type: "pong", Tiles: []string{"tong-2", "tong-2", "tong-2"}},
 			{Type: "chow", Tiles: []string{"tiao-1", "tiao-2", "tiao-3"}},
@@ -160,7 +161,7 @@ func TestCanHu_GroupCounts(t *testing.T) {
 			"xi", "xi", // 對子
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tong-1", "tong-1", "tong-1"}},
 			{Type: "pong", Tiles: []string{"tong-2", "tong-2", "tong-2"}},
 			{Type: "chow", Tiles: []string{"tiao-1", "tiao-2", "tiao-3"}},
@@ -177,7 +178,7 @@ func TestCanHu_GroupCounts(t *testing.T) {
 			"xi", "xi", // 對子
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tong-1", "tong-1", "tong-1"}},
 			{Type: "pong", Tiles: []string{"tong-2", "tong-2", "tong-2"}},
 			{Type: "chow", Tiles: []string{"tiao-1", "tiao-2", "tiao-3"}},
@@ -212,7 +213,7 @@ func TestCanHu_InvalidCases(t *testing.T) {
 			"xi", // 缺少一張
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tong-1", "tong-1", "tong-1"}},
 			{Type: "pong", Tiles: []string{"tong-2", "tong-2", "tong-2"}},
 		}
@@ -230,7 +231,7 @@ func TestCanHu_InvalidCases(t *testing.T) {
 			"xi", "xi",
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tong-1", "tong-1", "tong-1"}},
 			{Type: "pong", Tiles: []string{"tong-2", "tong-2", "tong-2"}},
 		}
@@ -248,7 +249,7 @@ func TestCanHu_InvalidCases(t *testing.T) {
 			"tong-5", "tong-6", // 不是對子
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tong-1", "tong-1", "tong-1"}},
 			{Type: "pong", Tiles: []string{"tong-2", "tong-2", "tong-2"}},
 		}
@@ -280,7 +281,7 @@ func TestCanHu_ComplexPatterns(t *testing.T) {
 			"tong-4", "tong-4",
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"tong-5", "tong-5", "tong-5"}},
 			{Type: "pong", Tiles: []string{"xi", "xi", "xi"}},
 		}
@@ -298,7 +299,7 @@ func TestCanHu_ComplexPatterns(t *testing.T) {
 			"xi", "xi",
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "chow", Tiles: []string{"tiao-1", "tiao-2", "tiao-3"}},
 			{Type: "chow", Tiles: []string{"tong-1", "tong-2", "tong-3"}},
 		}
@@ -316,7 +317,7 @@ func TestCanHu_ComplexPatterns(t *testing.T) {
 			"dong", "dong", // 對子
 		}
 
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"xi", "xi", "xi"}},
 			{Type: "chow", Tiles: []string{"wan-7", "wan-8", "wan-9"}},
 		}
@@ -339,7 +340,7 @@ func TestCanHu_BugFromLogs(t *testing.T) {
 			"tong-3", "tong-3", "tong-3",
 			"tiao-5", "tiao-6", "tiao-6", "tiao-7", "tiao-7", "tiao-8", "tiao-9", "tiao-9",
 		}
-		melds := []Meld{
+		melds := []model.Meld{
 			{Type: "pong", Tiles: []string{"wan-8", "wan-8", "wan-8"}},
 		}
 

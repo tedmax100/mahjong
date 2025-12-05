@@ -304,10 +304,10 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 			if player != nil {
 
-				var kongMeld game.Meld
+				// 使用 model.Meld 替代 game.Meld
+				var kongMeld interface{}
 
 				// 找到對應的槓牌組
-
 				for _, meld := range player.Melds {
 
 					isKong := (meld.Type == "kong_exposed" || meld.Type == "kong_concealed" || meld.Type == "kong_promoted")
@@ -324,16 +324,49 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 				}
 
-				if kongMeld.Type != "" {
+				// 這裡需要特別處理，因為 BroadcastKongAction 需要 model.Meld
+				// 但我們現在沒有引入 model 包，而 game.Meld 已經是 model.Meld
+				// 所以我們可以透過 player.Melds[i] 直接傳遞
+				// 但是為了保持代碼簡潔，我們在 hub.go 已經修改了 BroadcastKongAction 的簽名
+				// 這裡需要確保傳遞正確的類型
+				
+				// 由於我們還沒修改 client.go 引入 model 包
+				// 但 player.Melds 本身就是 []model.Meld (透過 game.Player 定義)
+				// 所以 kongMeld 應該是 model.Meld 類型
+				// 不過這檔案還沒引入 mahjong/internal/model
+				// 所以我等下要加上 import
 
-					c.Hub.BroadcastKongAction(c.Room, c.UserID, kongMeld)
+				if kongMeld != nil {
+					// 因為 kongMeld 是 interface{}，我們需要斷言或者更改上面的變量類型
+					// 但這裡最簡單的是直接傳遞，因為 Hub 方法接受 game.Meld (即 model.Meld)
+					// 等等，hub.go 已經更新為接受 game.Meld (它是 model.Meld 的別名嗎？不是，它是 model.Meld)
+					// 在 room.go 中: Melds []model.Meld
+					// 所以 player.Melds 是 []model.Meld
+					// 所以 meld 是 model.Meld
+					
+					// 為了避免類型問題，我應該讓 hub.go 的 BroadcastKongAction 接受 model.Meld
+					// 而這已經在 hub.go 中完成了 (import model, meld model.Meld)
+					
+					// 所以這裡只需要從 player.Melds 中取出即可
+					
+					// 重新寫這一段邏輯:
+					found := false
+					for _, meld := range player.Melds {
+						isKong := (meld.Type == "kong_exposed" || meld.Type == "kong_concealed" || meld.Type == "kong_promoted")
+						if isKong && meld.Tiles[0] == tile {
+							c.Hub.BroadcastKongAction(c.Room, c.UserID, meld)
+							found = true
+							break
+						}
+					}
 
+					if !found {
+						log.Printf("找不到槓牌組，使用舊版廣播: %s", tile)
+						c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "kong", tile)
+					}
 				} else {
-
 					log.Printf("找不到槓牌組，使用舊版廣播: %s", tile)
-
 					c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "kong", tile)
-
 				}
 
 				// 廣播補牌

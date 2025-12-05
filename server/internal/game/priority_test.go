@@ -1,6 +1,7 @@
 package game
 
 import (
+	"mahjong/internal/model"
 	"testing"
 	"time"
 )
@@ -45,7 +46,7 @@ func TestActionPriority(t *testing.T) {
 		// 設置玩家 3 的手牌為已經胡牌的狀態（5 組面子+1 對將 = 17 張）
 		// 5 組碰 + 2 張 wan-5 作為將牌
 		room.Players[2].Hand = []string{"wan-5", "wan-5"} // 一對將
-		room.Players[2].Melds = []Meld{
+		room.Players[2].Melds = []model.Meld{
 			{Type: "pong", Tiles: []string{"wan-1", "wan-1", "wan-1"}},
 			{Type: "pong", Tiles: []string{"wan-2", "wan-2", "wan-2"}},
 			{Type: "pong", Tiles: []string{"wan-3", "wan-3", "wan-3"}},
@@ -183,7 +184,7 @@ func TestPriorityOrder(t *testing.T) {
 
 	// 設置玩家 4 的手牌，使其可以胡（已經胡牌的狀態 = 5 組面子 + 1 對眼 = 17 張）
 	room.Players[3].Hand = []string{"wan-5", "wan-5"} // 需要 2 張作為將牌
-	room.Players[3].Melds = []Meld{
+	room.Players[3].Melds = []model.Meld{
 		{Type: "pong", Tiles: []string{"dong", "dong", "dong"}},
 		{Type: "pong", Tiles: []string{"nan", "nan", "nan"}},
 		{Type: "pong", Tiles: []string{"xi", "xi", "xi"}},

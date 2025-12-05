@@ -1,6 +1,7 @@
 package game
 
 import (
+	"mahjong/internal/model"
 	"testing"
 )
 
@@ -27,7 +28,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 		for i := 0; i < 16; i++ {
 			player.Hand[i] = "wan-1"
 		}
-		player.Melds = []Meld{} // 沒有吃碰槓
+		player.Melds = []model.Meld{} // 沒有吃碰槓
 
 		totalTiles := len(player.Hand) + len(player.Melds)*3
 		if totalTiles != 16 {
@@ -47,7 +48,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 		for i := 0; i < 14; i++ {
 			player.Hand[i] = "wan-1"
 		}
-		player.Melds = []Meld{
+		player.Melds = []model.Meld{
 			{Type: "pong", Tiles: []string{"dong", "dong", "dong"}},
 		}
 
@@ -70,7 +71,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 		for i := 0; i < 13; i++ {
 			player.Hand[i] = "wan-1"
 		}
-		player.Melds = []Meld{
+		player.Melds = []model.Meld{
 			{Type: "pong", Tiles: []string{"dong", "dong", "dong"}},
 		}
 
@@ -92,7 +93,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			player.Hand[i] = "wan-1"
 		}
-		player.Melds = []Meld{
+		player.Melds = []model.Meld{
 			{Type: "pong", Tiles: []string{"dong", "dong", "dong"}},
 			{Type: "chow", Tiles: []string{"wan-2", "wan-3", "wan-4"}},
 		}
@@ -115,7 +116,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 		for i := 0; i < 13; i++ {
 			player.Hand[i] = "wan-1"
 		}
-		player.Melds = []Meld{
+		player.Melds = []model.Meld{
 			{Type: "kong_exposed", Tiles: []string{"dong", "dong", "dong", "dong"}},
 		}
 
@@ -172,7 +173,7 @@ func TestPlayerHandCountAfterActions(t *testing.T) {
 	t.Run("吃牌後手牌應該減少 2 張", func(t *testing.T) {
 		// 重置玩家
 		player.Hand = []string{"wan-1", "wan-3", "tong-1", "tong-2"}
-		player.Melds = []Meld{}
+		player.Melds = []model.Meld{}
 		initialHandCount := len(player.Hand)
 
 		// 設置上家
@@ -210,7 +211,7 @@ func TestHandCountNeverZero(t *testing.T) {
 	t.Run("玩家有吃碰槓時手牌至少要有 2 張（將牌）", func(t *testing.T) {
 		// 設置玩家有 4 組面子
 		player.Hand = []string{"dong", "dong"}
-		player.Melds = []Meld{
+		player.Melds = []model.Meld{
 			{Type: "pong", Tiles: []string{"wan-1", "wan-1", "wan-1"}},
 			{Type: "pong", Tiles: []string{"wan-2", "wan-2", "wan-2"}},
 			{Type: "pong", Tiles: []string{"wan-3", "wan-3", "wan-3"}},
@@ -237,7 +238,7 @@ func TestHandCountNeverZero(t *testing.T) {
 	t.Run("即使有 5 組面子，手牌也不應該是 0", func(t *testing.T) {
 		// 這是胡牌的狀態，但也不應該手牌是 0
 		player.Hand = []string{"dong", "dong"}
-		player.Melds = []Meld{
+		player.Melds = []model.Meld{
 			{Type: "kong_promoted", Tiles: []string{"wan-1", "wan-1", "wan-1", "wan-1"}},
 			{Type: "pong", Tiles: []string{"wan-2", "wan-2", "wan-2"}},
 			{Type: "pong", Tiles: []string{"wan-3", "wan-3", "wan-3"}},

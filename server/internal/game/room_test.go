@@ -1,6 +1,7 @@
 package game
 
 import (
+	"mahjong/internal/model"
 	"testing"
 )
 
@@ -21,7 +22,7 @@ func TestNextRound(t *testing.T) {
 
 	// Give a player some state to ensure it gets reset
 	room.Players[1].Hand = []string{"wan-1", "wan-2", "wan-3"}
-	room.Players[1].Melds = []Meld{{Type: "pong", Tiles: []string{"tiao-5", "tiao-5", "tiao-5"}}}
+	room.Players[1].Melds = []model.Meld{{Type: "pong", Tiles: []string{"tiao-5", "tiao-5", "tiao-5"}}}
 	room.Players[1].Flowers = []string{"flower-chun"}
 	room.Game.Dealer = 0
 	originalDeckSize := len(room.Game.Deck)
@@ -68,7 +69,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 	testCases := []struct {
 		name           string
 		handTiles      []string
-		melds          []Meld
+		melds          []model.Meld
 		kongCount      int
 		shouldSucceed  bool
 		description    string
@@ -81,7 +82,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 				"tong-1", "tong-2", "tong-3", "tong-4", "tong-5",
 				"dong", "nan",
 			},
-			melds:         []Meld{},
+			melds:         []model.Meld{},
 			kongCount:     0,
 			shouldSucceed: true,
 			description:   "正常情況，17 張手牌，無吃碰槓",
@@ -94,7 +95,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 				"tong-1", "tong-2", "tong-3", "tong-4", "tong-5",
 				"dong", "nan", "xi",
 			},
-			melds:         []Meld{},
+			melds:         []model.Meld{},
 			kongCount:     0,
 			shouldSucceed: true,
 			description:   "槓後補牌，18 張手牌",
@@ -106,7 +107,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4",
 				"tong-1", "tong-2", "tong-3", "tong-4", "tong-5",
 			},
-			melds: []Meld{
+			melds: []model.Meld{
 				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
 			},
 			kongCount:     1,
@@ -120,7 +121,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
 				"tong-1", "tong-2", "tong-3", "tong-4", "tong-5",
 			},
-			melds: []Meld{
+			melds: []model.Meld{
 				{Type: "kong_concealed", Tiles: []string{"dong", "dong", "dong", "dong"}},
 			},
 			kongCount:     1,
@@ -134,7 +135,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4",
 				"tong-1", "tong-2", "tong-3",
 			},
-			melds: []Meld{
+			melds: []model.Meld{
 				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
 				{Type: "kong_concealed", Tiles: []string{"nan", "nan", "nan", "nan"}},
 			},
@@ -149,7 +150,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4", "tiao-5",
 				"tong-1", "tong-2",
 			},
-			melds: []Meld{
+			melds: []model.Meld{
 				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
 				{Type: "kong_promoted", Tiles: []string{"nan", "nan", "nan", "nan"}},
 			},
@@ -163,7 +164,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 				"wan-1", "wan-2", "wan-3", "wan-4",
 				"tiao-1", "tiao-2", "tiao-3", "tiao-4",
 			},
-			melds: []Meld{
+			melds: []model.Meld{
 				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
 				{Type: "kong_concealed", Tiles: []string{"nan", "nan", "nan", "nan"}},
 				{Type: "kong_exposed", Tiles: []string{"xi", "xi", "xi", "xi"}},
@@ -177,7 +178,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3",
 			},
-			melds: []Meld{
+			melds: []model.Meld{
 				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
 			},
 			kongCount:     1,
@@ -189,7 +190,7 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			handTiles: []string{
 				"wan-1", "wan-2", "wan-3", "wan-4",
 			},
-			melds: []Meld{
+			melds: []model.Meld{
 				{Type: "kong_promoted", Tiles: []string{"dong", "dong", "dong", "dong"}},
 				{Type: "kong_concealed", Tiles: []string{"nan", "nan", "nan", "nan"}},
 			},

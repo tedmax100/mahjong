@@ -1,6 +1,7 @@
 package game
 
 import (
+	"mahjong/internal/model"
 	"mahjong/internal/tile"
 	"testing"
 )
@@ -8,7 +9,7 @@ import (
 // TestCanHu 測試胡牌判斷
 func TestCanHu(t *testing.T) {
 	players := []*Player{
-		{ID: "1", Name: "Player1", Position: 0, Hand: make([]string, 0), Melds: make([]Meld, 0), Flowers: make([]string, 0)},
+		{ID: "1", Name: "Player1", Position: 0, Hand: make([]string, 0), Melds: make([]model.Meld, 0), Flowers: make([]string, 0)},
 	}
 	game := NewMahjongGame(players)
 
@@ -21,7 +22,7 @@ func TestCanHu(t *testing.T) {
 		"wan-5", "wan-5", "wan-5", // 刻子
 		"wan-6", "wan-6", // 對眼
 	}
-	if !game.CanHu(hand1, []Meld{}) {
+	if !game.CanHu(hand1, []model.Meld{}) {
 		t.Errorf("應該能胡牌，但判斷為不能胡")
 	}
 
@@ -34,7 +35,7 @@ func TestCanHu(t *testing.T) {
 		"tiao-7", "tiao-8", "tiao-9", // 順子
 		"dong", "dong", // 對眼
 	}
-	if !game.CanHu(hand2, []Meld{}) {
+	if !game.CanHu(hand2, []model.Meld{}) {
 		t.Errorf("應該能胡牌（順子），但判斷為不能胡")
 	}
 
@@ -46,7 +47,7 @@ func TestCanHu(t *testing.T) {
 		"tiao-7", "tiao-8", "tiao-9",
 		"dong", "dong",
 	}
-	if game.CanHu(hand3, []Meld{}) {
+	if game.CanHu(hand3, []model.Meld{}) {
 		t.Errorf("不應該能胡牌，但判斷為能胡")
 	}
 
@@ -57,7 +58,7 @@ func TestCanHu(t *testing.T) {
 		"wan-7", "wan-8", "wan-9", // 順子
 		"dong", "dong", // 對眼
 	}
-	melds4 := []Meld{
+	melds4 := []model.Meld{
 		{Type: "pong", Tiles: []string{"tong-5", "tong-5", "tong-5"}},
 		{Type: "pong", Tiles: []string{"tiao-9", "tiao-9", "tiao-9"}},
 	}
@@ -211,158 +212,6 @@ func TestCheckDraw(t *testing.T) {
 	}
 }
 
-// NOTE: The scoring functions are not in the provided mahjong.go file,
-// so these tests might fail if those functions don't exist.
-// I am commenting them out to be safe.
-/*
-// TestPongPongHu 測試碰碰胡判斷
-func TestPongPongHu(t *testing.T) {
-	player := &Player{
-		Hand: []string{
-			"wan-1", "wan-1", "wan-1",
-			"wan-2", "wan-2", "wan-2",
-			"wan-3", "wan-3", "wan-3",
-			"wan-4", "wan-4", "wan-4",
-			"wan-5", "wan-5",
-		},
-		Melds: []Meld{},
-	}
-
-	game := &MahjongGame{Players: []*Player{player}}
-
-	if !game.isPongPongHu(player) {
-		t.Errorf("應該是碰碰胡")
-	}
-
-	// 測試有順子的情況
-	player2 := &Player{
-		Hand: []string{
-			"wan-1", "wan-2", "wan-3", // 順子
-			"wan-4", "wan-4", "wan-4",
-			"wan-5", "wan-5", "wan-5",
-			"wan-6", "wan-6", "wan-6",
-			"wan-7", "wan-7",
-		},
-		Melds: []Meld{},
-	}
-
-	if game.isPongPongHu(player2) {
-		t.Errorf("有順子不應該是碰碰胡")
-	}
-}
-
-// TestOneSuit 測試清一色判斷
-func TestOneSuit(t *testing.T) {
-	game := &MahjongGame{}
-
-	// 測試 1: 清一色（全是萬子）
-	tiles1 := []string{
-		"wan-1", "wan-1", "wan-1",
-		"wan-2", "wan-3", "wan-4",
-		"wan-5", "wan-6", "wan-7",
-		"wan-8", "wan-8", "wan-8",
-		"wan-9", "wan-9",
-	}
-	if !game.isOneSuit(tiles1) {
-		t.Errorf("應該是清一色")
-	}
-
-	// 測試 2: 不是清一色（有字牌）
-	tiles2 := []string{
-		"wan-1", "wan-1", "wan-1",
-		"wan-2", "wan-3", "wan-4",
-		"dong", "dong", "dong",
-		"wan-8", "wan-8", "wan-8",
-		"wan-9", "wan-9",
-	}
-	if game.isOneSuit(tiles2) {
-		t.Errorf("有字牌不應該是清一色")
-	}
-
-	// 測試 3: 不是清一色（有多種花色）
-	tiles3 := []string{
-		"wan-1", "wan-1", "wan-1",
-		"tong-2", "tong-3", "tong-4",
-		"wan-5", "wan-6", "wan-7",
-		"wan-8", "wan-8", "wan-8",
-		"wan-9", "wan-9",
-	}
-	if game.isOneSuit(tiles3) {
-		t.Errorf("有多種花色不應該是清一色")
-	}
-}
-
-// TestMixedOneSuit 測試混一色判斷
-func TestMixedOneSuit(t *testing.T) {
-	game := &MahjongGame{}
-
-	// 測試 1: 混一色（萬子+字牌）
-	tiles1 := []string{
-		"wan-1", "wan-1", "wan-1",
-		"wan-2", "wan-3", "wan-4",
-		"dong", "dong", "dong",
-		"wan-8", "wan-8", "wan-8",
-		"zhong", "zhong",
-	}
-	if !game.isMixedOneSuit(tiles1) {
-		t.Errorf("應該是混一色")
-	}
-
-	// 測試 2: 不是混一色（純清一色）
-	tiles2 := []string{
-		"wan-1", "wan-1", "wan-1",
-		"wan-2", "wan-3", "wan-4",
-		"wan-5", "wan-6", "wan-7",
-		"wan-8", "wan-8", "wan-8",
-		"wan-9", "wan-9",
-	}
-	if game.isMixedOneSuit(tiles2) {
-		t.Errorf("純清一色不應該算混一色")
-	}
-
-	// 測試 3: 不是混一色（有多種花色）
-	tiles3 := []string{
-		"wan-1", "wan-1", "wan-1",
-		"tong-2", "tong-3", "tong-4",
-		"dong", "dong", "dong",
-		"wan-8", "wan-8", "wan-8",
-		"zhong", "zhong",
-	}
-	if game.isMixedOneSuit(tiles3) {
-		t.Errorf("有多種花色不應該是混一色")
-	}
-}
-
-// TestBigDragons 測試大三元判斷
-func TestBigDragons(t *testing.T) {
-	game := &MahjongGame{}
-
-	// 測試 1: 大三元
-	tiles1 := []string{
-		"zhong", "zhong", "zhong",
-		"fa", "fa", "fa",
-		"bai", "bai", "bai",
-		"wan-1", "wan-1", "wan-1",
-		"wan-2", "wan-2",
-	}
-	if !game.isBigDragons(tiles1) {
-		t.Errorf("應該是大三元")
-	}
-
-	// 測試 2: 不是大三元（缺一種）
-	tiles2 := []string{
-		"zhong", "zhong", "zhong",
-		"fa", "fa", "fa",
-		"wan-1", "wan-1", "wan-1",
-		"wan-2", "wan-2", "wan-2",
-		"wan-3", "wan-3",
-	}
-	if game.isBigDragons(tiles2) {
-		t.Errorf("缺白板不應該是大三元")
-	}
-}
-*/
-
 // TestCanExposedKong tests the logic for an exposed kong, including promoting a pong.
 func TestCanExposedKong(t *testing.T) {
 	game := NewMahjongGame([]*Player{})
@@ -370,7 +219,7 @@ func TestCanExposedKong(t *testing.T) {
 	// Scenario 1: Player has 3 tiles in hand, can kong a discard (from others).
 	player1 := &Player{
 		Hand:  []string{"wan-5", "wan-5", "wan-5", "tiao-1"},
-		Melds: []Meld{},
+		Melds: []model.Meld{},
 	}
 	if !game.CanExposedKong(player1, "wan-5", false) {
 		t.Errorf("TestCanExposedKong: Should be able to exposed kong from 3 tiles in hand when others discard.")
@@ -379,7 +228,7 @@ func TestCanExposedKong(t *testing.T) {
 	// Scenario 2a: Player has an exposed pong, can promote it when self-drawn.
 	player2 := &Player{
 		Hand: []string{"wan-5", "tiao-1", "tiao-2"},
-		Melds: []Meld{
+		Melds: []model.Meld{
 			{Type: "pong", Tiles: []string{"wan-5", "wan-5", "wan-5"}},
 		},
 	}
@@ -395,7 +244,7 @@ func TestCanExposedKong(t *testing.T) {
 	// Scenario 3: Player has only 2 tiles in hand, no pong.
 	player3 := &Player{
 		Hand:  []string{"wan-5", "wan-5", "tiao-1"},
-		Melds: []Meld{},
+		Melds: []model.Meld{},
 	}
 	if game.CanExposedKong(player3, "wan-5", false) {
 		t.Errorf("TestCanExposedKong: Should not be able to kong with only 2 tiles in hand.")
@@ -404,7 +253,7 @@ func TestCanExposedKong(t *testing.T) {
 	// Scenario 4: Player has a pong of a different tile.
 	player4 := &Player{
 		Hand: []string{"tiao-1", "tiao-2"},
-		Melds: []Meld{
+		Melds: []model.Meld{
 			{Type: "pong", Tiles: []string{"tiao-3", "tiao-3", "tiao-3"}},
 		},
 	}
@@ -441,7 +290,7 @@ func TestHandleKong_CannotPromotePongWithOthersDiscard(t *testing.T) {
 		Name:     "Player A",
 		Position: 0,
 		Hand:     []string{"tiao-1", "tiao-2", "tiao-3"},
-		Melds: []Meld{
+		Melds: []model.Meld{
 			{Type: "pong", Tiles: []string{"wan-8", "wan-8", "wan-8"}},
 		},
 	}
@@ -484,7 +333,7 @@ func TestHandleKong_PromotePongWithSelfDraw(t *testing.T) {
 		Name:     "Player A",
 		Position: 0,
 		Hand:     []string{"tiao-1", "tiao-2", "tiao-3", "wan-8"}, // 手上有一張 wan-8
-		Melds: []Meld{
+		Melds: []model.Meld{
 			{Type: "pong", Tiles: []string{"wan-8", "wan-8", "wan-8"}},
 		},
 	}
@@ -552,7 +401,7 @@ func TestCheckTing_UnsortedHand(t *testing.T) {
 	// This hand is unsorted and is waiting for "tong-5" to form a pair,
 	// while "wan-1", "wan-2", "wan-3" will form a chow.
 	hand := []string{"wan-3", "wan-1", "tong-5", "wan-2"}
-	melds := []Meld{
+	melds := []model.Meld{
 		{Type: "pong", Tiles: []string{"tiao-1", "tiao-1", "tiao-1"}},
 		{Type: "pong", Tiles: []string{"tiao-2", "tiao-2", "tiao-2"}},
 		{Type: "pong", Tiles: []string{"tiao-3", "tiao-3", "tiao-3"}},

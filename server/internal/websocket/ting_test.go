@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"mahjong/internal/game"
+	"mahjong/internal/model"
 	"testing"
 	"time"
 )
@@ -24,7 +25,7 @@ func TestDeclareTing(t *testing.T) {
 				"wan-8",
 				"wan-9", "wan-9", "wan-9", "wan-9",
 			},
-			Melds:        []game.Meld{},
+			Melds:        []model.Meld{},
 			IsTing:       false,
 			WinningTiles: []string{},
 		}
@@ -73,7 +74,7 @@ func TestDeclareTing(t *testing.T) {
 				"tiao-1", "tiao-2", "tiao-3",
 				"dong", "nan", "xi", "bei",
 			},
-			Melds:  []game.Meld{},
+			Melds:  []model.Meld{},
 			IsTing: false,
 		}
 
@@ -130,7 +131,7 @@ func TestDeclareTing(t *testing.T) {
 				"wan-7", "wan-7", "wan-7",
 				"wan-8", "wan-9",
 			},
-			Melds: []game.Meld{
+			Melds: []model.Meld{
 				{
 					Type:  "pong",
 					Tiles: []string{"tong-5", "tong-5", "tong-5"},
@@ -261,7 +262,7 @@ func TestTingWithDifferentHandSizes(t *testing.T) {
 	testCases := []struct {
 		name        string
 		hand        []string
-		melds       []game.Meld
+		melds       []model.Meld
 		shouldBeTing bool
 	}{
 		{
@@ -274,7 +275,7 @@ func TestTingWithDifferentHandSizes(t *testing.T) {
 				"wan-8",
 				"wan-9", "wan-9", "wan-9", "wan-9",
 			},
-			melds:        []game.Meld{},
+			melds:        []model.Meld{},
 			shouldBeTing: true,
 		},
 		{
@@ -286,7 +287,7 @@ func TestTingWithDifferentHandSizes(t *testing.T) {
 				"wan-7", "wan-7", "wan-7",
 				"wan-8", "wan-9",
 			},
-			melds: []game.Meld{
+			melds: []model.Meld{
 				{Type: "pong", Tiles: []string{"tong-5", "tong-5", "tong-5"}},
 			},
 			shouldBeTing: true,
@@ -299,7 +300,7 @@ func TestTingWithDifferentHandSizes(t *testing.T) {
 				"tiao-1", "tiao-3", "tiao-5",
 				"dong", "nan", "xi", "bei",
 			},
-			melds:        []game.Meld{},
+			melds:        []model.Meld{},
 			shouldBeTing: false,
 		},
 	}
@@ -339,7 +340,7 @@ func BenchmarkCheckTing(b *testing.B) {
 		"wan-9", "wan-9", "wan-9",
 	}
 
-	melds := []game.Meld{}
+	melds := []model.Meld{}
 
 	player := &game.Player{Hand: hand, Melds: melds}
 	players := []*game.Player{player}
@@ -370,7 +371,7 @@ func TestTingActionBroadcastOrder(t *testing.T) {
 				"wan-8",
 				"wan-9", "wan-9", "wan-9", "wan-9",
 			},
-			Melds:        []game.Meld{},
+			Melds:        []model.Meld{},
 			IsTing:       false,
 			WinningTiles: []string{},
 		}
@@ -576,7 +577,7 @@ func TestAutoDiscardAfterTing(t *testing.T) {
 				"wan-6", "wan-6",
 				"wan-8", "wan-8",
 			},
-			Melds: []game.Meld{
+			Melds: []model.Meld{
 				{Type: "chow", Tiles: []string{"tong-2", "tong-3", "tong-4"}},
 			},
 			IsTing:       true,
@@ -641,7 +642,7 @@ func TestAutoDiscardAfterTing(t *testing.T) {
 				"wan-6", "wan-6",
 				"wan-8", "wan-8",
 			},
-			Melds: []game.Meld{
+			Melds: []model.Meld{
 				{Type: "chow", Tiles: []string{"tong-2", "tong-3", "tong-4"}},
 			},
 			IsTing:       true,
@@ -717,7 +718,7 @@ func TestAutoDiscardAfterTing(t *testing.T) {
 				"tong-2", "tong-2", "tong-2",
 				"wan-6", "wan-6",
 			},
-			Melds: []game.Meld{
+			Melds: []model.Meld{
 				{Type: "chow", Tiles: []string{"tong-2", "tong-3", "tong-4"}},
 			},
 			IsTing:       true,

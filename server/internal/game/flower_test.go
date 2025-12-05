@@ -1,9 +1,40 @@
 package game
 
 import (
+	"mahjong/internal/model"
 	"mahjong/internal/tile"
 	"testing"
 )
+
+// TestIsFlowerTile 測試花牌辨識
+func TestFlowerTileDetection(t *testing.T) {
+	tests := []struct {
+		tile     string
+		isFlower bool
+	}{
+		{"flower-chun", true},
+		{"flower-xia", true},
+		{"flower-qiu", true},
+		{"flower-dong", true},
+		{"flower-mei", true},
+		{"flower-lan", true},
+		{"flower-zhu", true},
+		{"flower-ju", true},
+		{"dong", false},       // 東風牌，不是花牌
+		{"wan-1", false},      // 萬子，不是花牌
+		{"tong-5", false},     // 筒子，不是花牌
+		{"zhong", false},      // 中，不是花牌
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.tile, func(t *testing.T) {
+			result := tile.IsFlower(tt.tile)
+			if result != tt.isFlower {
+				t.Errorf("isFlowerTile(%s) = %v, 期望 %v", tt.tile, result, tt.isFlower)
+			}
+		})
+	}
+}
 
 // TestDrawTileWithFlowerReplacement 測試摸到花牌時的自動補牌
 func TestDrawTileWithFlowerReplacement(t *testing.T) {
@@ -172,7 +203,7 @@ func TestFlowerTilesDoNotCountAsHandTiles(t *testing.T) {
 	t.Run("花牌應該獨立存儲，不計入手牌", func(t *testing.T) {
 		player.Hand = []string{"wan-1", "wan-2", "wan-3"}
 		player.Flowers = []string{"flower-chun", "flower-xia"}
-		player.Melds = []Meld{}
+		player.Melds = []model.Meld{}
 
 		handCount := len(player.Hand)
 		flowerCount := len(player.Flowers)
@@ -199,7 +230,7 @@ func TestFlowerTilesDoNotCountAsHandTiles(t *testing.T) {
 		player.Hand = []string{"wan-1", "wan-2", "wan-3", "wan-4", "wan-5", "wan-6",
 			"wan-7", "wan-8", "wan-9", "tong-1", "tong-2", "tong-3", "dong"}
 		player.Flowers = []string{"flower-chun", "flower-xia", "flower-qiu"}
-		player.Melds = []Meld{
+		player.Melds = []model.Meld{
 			{Type: "pong", Tiles: []string{"nan", "nan", "nan"}},
 		}
 
