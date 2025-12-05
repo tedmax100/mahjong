@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"mahjong/internal/ai"
 	"mahjong/internal/game"
 	"math/rand"
 	"strings"
@@ -482,7 +483,8 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 			}
 
 			if len(currentPlayer.Hand) > 0 {
-				tileToDiscard := room.Game.ChooseDiscardAI(currentPlayer.Hand)
+				// 使用新的 ai 套件
+				tileToDiscard := ai.ChooseDiscard(currentPlayer.Hand)
 				discarderPosition := currentPlayer.Position
 				h.mu.Unlock() // 在調用回應和下一個回合檢查前解鎖
 

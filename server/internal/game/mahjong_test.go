@@ -1,6 +1,7 @@
 package game
 
 import (
+	"mahjong/internal/tile"
 	"testing"
 )
 
@@ -171,19 +172,19 @@ func TestCanChow(t *testing.T) {
 
 // TestIsFlowerTile 測試花牌判斷
 func TestIsFlowerTile(t *testing.T) {
-	if !isFlowerTile("flower-chun") {
+	if !tile.IsFlower("flower-chun") {
 		t.Errorf("flower-chun 應該是花牌")
 	}
 
-	if !isFlowerTile("flower-mei") {
+	if !tile.IsFlower("flower-mei") {
 		t.Errorf("flower-mei 應該是花牌")
 	}
 
-	if isFlowerTile("wan-1") {
+	if tile.IsFlower("wan-1") {
 		t.Errorf("wan-1 不應該是花牌")
 	}
 
-	if isFlowerTile("dong") {
+	if tile.IsFlower("dong") {
 		t.Errorf("dong 不應該是花牌")
 	}
 }

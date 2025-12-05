@@ -1,4 +1,4 @@
-package game
+package ai
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 
 // TestChooseDiscardAI 測試 Bot 出牌邏輯
 func TestChooseDiscardAI(t *testing.T) {
-	game := &MahjongGame{}
+	// game := &MahjongGame{} // No longer needed
 
 	t.Run("優先打出孤立的字牌", func(t *testing.T) {
 		// 手牌中有孤立的 "dong" (東)，應該優先打出
@@ -18,7 +18,7 @@ func TestChooseDiscardAI(t *testing.T) {
 			"wan-5", "wan-6",
 		}
 
-		discard := game.ChooseDiscardAI(hand)
+		discard := ChooseDiscard(hand)
 		if discard != "dong" {
 			t.Errorf("期望打出 dong，實際打出 %s", discard)
 		}
@@ -33,7 +33,7 @@ func TestChooseDiscardAI(t *testing.T) {
 			"wan-4", "wan-5", "wan-6",
 		}
 
-		discard := game.ChooseDiscardAI(hand)
+		discard := ChooseDiscard(hand)
 		if discard != "wan-1" {
 			t.Errorf("期望打出 wan-1，實際打出 %s", discard)
 		}
@@ -48,7 +48,7 @@ func TestChooseDiscardAI(t *testing.T) {
 			"tiao-7", "tiao-8", "tiao-9",
 		}
 
-		discard := game.ChooseDiscardAI(hand)
+		discard := ChooseDiscard(hand)
 		if discard != "tong-5" {
 			t.Errorf("期望打出 tong-5，實際打出 %s", discard)
 		}
@@ -68,7 +68,7 @@ func TestChooseDiscardAI(t *testing.T) {
 			"tiao-3",
 		}
 
-		discard := game.ChooseDiscardAI(hand)
+		discard := ChooseDiscard(hand)
 		if discard != "tiao-3" {
 			t.Errorf("期望打出 tiao-3，實際打出 %s", discard)
 		}
@@ -81,7 +81,7 @@ func TestChooseDiscardAI(t *testing.T) {
 			"tong-2", "tong-2", "tong-2",
 		}
 
-		discard := game.ChooseDiscardAI(hand)
+		discard := ChooseDiscard(hand)
 		// 邏輯是打出 hand[len-1]
 		expected := hand[len(hand)-1]
 		if discard != expected {

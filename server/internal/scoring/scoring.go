@@ -1,7 +1,8 @@
-package game
+package scoring
 
 import (
 	"log"
+	"mahjong/internal/model"
 	"mahjong/internal/tile"
 )
 
@@ -14,22 +15,22 @@ type HandType struct {
 
 // WinResult 代表胡牌結果
 type WinResult struct {
-	HandTypes   []HandType // 所有符合的牌型
-	TotalTai    int        // 總台數
-	BaseScore   int        // 基礎分數
-	IsSelfDrawn bool       // 是否自摸
-	WinningHand []string   // 胡牌時的手牌
-	Melds       []Meld     // 胡牌時的吃碰槓
-	WinTile     string     // 胡的最後一張牌
+	HandTypes   []HandType   // 所有符合的牌型
+	TotalTai    int          // 總台數
+	BaseScore   int          // 基礎分數
+	IsSelfDrawn bool         // 是否自摸
+	WinningHand []string     // 胡牌時的手牌
+	Melds       []model.Meld // 胡牌時的吃碰槓
+	WinTile     string       // 胡的最後一張牌
 }
 
 // CalculateScore 計算台數和得分
-func (g *MahjongGame) CalculateScore(player *Player, lastTile string, isSelfDrawn bool) *WinResult {
+func CalculateScore(hand []string, melds []model.Meld, flowers []string, lastTile string, isSelfDrawn bool) *WinResult {
 	result := &WinResult{
 		HandTypes:   make([]HandType, 0),
 		IsSelfDrawn: isSelfDrawn,
-		WinningHand: player.Hand,
-		Melds:       player.Melds,
+		WinningHand: hand,
+		Melds:       melds,
 		WinTile:     lastTile,
 	}
 
@@ -46,7 +47,20 @@ func (g *MahjongGame) CalculateScore(player *Player, lastTile string, isSelfDraw
 	}
 
 	// 2. 檢查門清（門前清，未碰、槓、吃）
-	if len(player.Melds) == 0 {
+	// 暗槓不算破壞門清
+	isMenQing := true
+	for _, meld := range melds {
+		if meld.Type != "kong_concealed" {
+			isMenQing = false
+			break
+		}
+	}
+	
+	// 如果是吃胡（非自摸），門清要看是否有吃碰槓（暗槓除外），如果有則沒有門清
+	// 但台灣麻將門清自摸是3台（門清1+自摸1+不求人1? 規則不一，這裡假設門清就是沒吃碰明槓）
+	// 簡單判斷：len(melds) == 0 或者只有暗槓
+	
+	if isMenQing {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "門清",
 			Tai:  1,
@@ -55,7 +69,7 @@ func (g *MahjongGame) CalculateScore(player *Player, lastTile string, isSelfDraw
 	}
 
 	// 3. 檢查花牌（每朵 1 台）
-	flowerTai := len(player.Flowers)
+	flowerTai := len(flowers)
 	if flowerTai > 0 {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "花牌",
@@ -77,7 +91,7 @@ func (g *MahjongGame) CalculateScore(player *Player, lastTile string, isSelfDraw
 	}
 
 	// 6. 檢查特殊牌型
-	specialTai := g.checkSpecialHandTypes(player, result)
+	specialTai := checkSpecialHandTypes(hand, melds, result)
 	baseTai += specialTai
 
 	// 7. 檢查番牌型（大三元、大四喜等）
@@ -91,28 +105,28 @@ func (g *MahjongGame) CalculateScore(player *Player, lastTile string, isSelfDraw
 	// #nosec G115 -- baseTai 來自遊戲邏輯，範圍有限 (0-20)，不會溢出
 	result.BaseScore = baseAmount << uint(baseTai) // 相當於 10 * (2 ^ baseTai)
 
-	log.Printf("玩家 %s 胡牌: 台數=%d, 分數=%d", player.Name, baseTai, result.BaseScore)
-	for _, ht := range result.HandTypes {
-		log.Printf("  - %s: %d 台", ht.Name, ht.Tai)
-	}
+	// log.Printf("胡牌: 台數=%d, 分數=%d", baseTai, result.BaseScore)
+	// for _, ht := range result.HandTypes {
+	// 	log.Printf("  - %s: %d 台", ht.Name, ht.Tai)
+	// }
 
 	return result
 }
 
 // checkSpecialHandTypes 檢查特殊牌型
-func (g *MahjongGame) checkSpecialHandTypes(player *Player, result *WinResult) int {
+func checkSpecialHandTypes(hand []string, melds []model.Meld, result *WinResult) int {
 	totalTai := 0
 
 	// 複製手牌+已展示的牌
-	allTiles := make([]string, len(player.Hand))
-	copy(allTiles, player.Hand)
+	allTiles := make([]string, len(hand))
+	copy(allTiles, hand)
 
-	for _, meld := range player.Melds {
+	for _, meld := range melds {
 		allTiles = append(allTiles, meld.Tiles...)
 	}
 
 	// 1. 檢查碰碰胡（全部都是刻子，3 台）
-	if g.isPongPongHu(player) {
+	if isPongPongHu(hand, melds) {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "碰碰胡",
 			Tai:  3,
@@ -121,7 +135,7 @@ func (g *MahjongGame) checkSpecialHandTypes(player *Player, result *WinResult) i
 	}
 
 	// 2. 檢查混一色（只有一種花色+字牌，3 台）
-	if g.isMixedOneSuit(allTiles) {
+	if isMixedOneSuit(allTiles) {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "混一色",
 			Tai:  3,
@@ -130,7 +144,7 @@ func (g *MahjongGame) checkSpecialHandTypes(player *Player, result *WinResult) i
 	}
 
 	// 3. 檢查清一色（只有一種花色，5 台）
-	if g.isOneSuit(allTiles) {
+	if isOneSuit(allTiles) {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "清一色",
 			Tai:  5,
@@ -139,7 +153,7 @@ func (g *MahjongGame) checkSpecialHandTypes(player *Player, result *WinResult) i
 	}
 
 	// 4. 檢查字一色（全部是字牌，8 台）
-	if g.isAllHonors(allTiles) {
+	if isAllHonors(allTiles) {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "字一色",
 			Tai:  8,
@@ -148,7 +162,7 @@ func (g *MahjongGame) checkSpecialHandTypes(player *Player, result *WinResult) i
 	}
 
 	// 5. 檢查小三元（中發白有 2 組+1 對，2 台）
-	if g.isSmallDragons(allTiles) {
+	if isSmallDragons(allTiles) {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "小三元",
 			Tai:  2,
@@ -157,7 +171,7 @@ func (g *MahjongGame) checkSpecialHandTypes(player *Player, result *WinResult) i
 	}
 
 	// 6. 檢查大三元（中發白全有，8 台）
-	if g.isBigDragons(allTiles) {
+	if isBigDragons(allTiles) {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "大三元",
 			Tai:  8,
@@ -166,7 +180,7 @@ func (g *MahjongGame) checkSpecialHandTypes(player *Player, result *WinResult) i
 	}
 
 	// 7. 檢查小四喜（東南西北有 3 組+1 對，2 台）
-	if g.isSmallWinds(allTiles) {
+	if isSmallWinds(allTiles) {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "小四喜",
 			Tai:  2,
@@ -175,7 +189,7 @@ func (g *MahjongGame) checkSpecialHandTypes(player *Player, result *WinResult) i
 	}
 
 	// 8. 檢查大四喜（東南西北全有，8 台）
-	if g.isBigWinds(allTiles) {
+	if isBigWinds(allTiles) {
 		result.HandTypes = append(result.HandTypes, HandType{
 			Name: "大四喜",
 			Tai:  8,
@@ -187,20 +201,20 @@ func (g *MahjongGame) checkSpecialHandTypes(player *Player, result *WinResult) i
 }
 
 // isPongPongHu 檢查是否為碰碰胡
-func (g *MahjongGame) isPongPongHu(player *Player) bool {
+func isPongPongHu(hand []string, melds []model.Meld) bool {
 	// 所有的牌組都必須是刻子（3 張或 4 張相同）
 	// 手牌必須能組成刻子+一對眼
 
 	// 檢查已展示的牌組
-	for _, meld := range player.Melds {
+	for _, meld := range melds {
 		if meld.Type == "chow" { // 如果有吃牌（順子），不是碰碰胡
 			return false
 		}
 	}
 
 	// 檢查手牌是否都能組成刻子
-	tiles := make([]string, len(player.Hand))
-	copy(tiles, player.Hand)
+	tiles := make([]string, len(hand))
+	copy(tiles, hand)
 
 	return canFormPongPongHu(tiles)
 }
@@ -217,11 +231,11 @@ func canFormPongPongHu(tiles []string) bool {
 	}
 
 	t := tiles[0]
-	count := countTile(tiles, t)
+	count := tile.Count(tiles, t)
 
 	// 嘗試組成刻子（3 張）
 	if count >= 3 {
-		newTiles := removeTiles(tiles, t, 3)
+		newTiles := tile.Remove(tiles, t, 3)
 		if canFormPongPongHu(newTiles) {
 			return true
 		}
@@ -229,7 +243,7 @@ func canFormPongPongHu(tiles []string) bool {
 
 	// 嘗試組成對眼（2 張）
 	if count >= 2 && len(tiles) > 2 {
-		newTiles := removeTiles(tiles, t, 2)
+		newTiles := tile.Remove(tiles, t, 2)
 		// 剩餘的必須都是刻子
 		return canFormAllTriples(newTiles)
 	}
@@ -248,18 +262,18 @@ func canFormAllTriples(tiles []string) bool {
 	}
 
 	t := tiles[0]
-	count := countTile(tiles, t)
+	count := tile.Count(tiles, t)
 
 	if count < 3 {
 		return false
 	}
 
-	newTiles := removeTiles(tiles, t, 3)
+	newTiles := tile.Remove(tiles, t, 3)
 	return canFormAllTriples(newTiles)
 }
 
 // isMixedOneSuit 檢查是否為混一色
-func (g *MahjongGame) isMixedOneSuit(tiles []string) bool {
+func isMixedOneSuit(tiles []string) bool {
 	var mainSuit string
 	hasHonor := false
 
@@ -281,7 +295,7 @@ func (g *MahjongGame) isMixedOneSuit(tiles []string) bool {
 }
 
 // isOneSuit 檢查是否為清一色
-func (g *MahjongGame) isOneSuit(tiles []string) bool {
+func isOneSuit(tiles []string) bool {
 	var mainSuit string
 
 	for _, t := range tiles {
@@ -301,7 +315,7 @@ func (g *MahjongGame) isOneSuit(tiles []string) bool {
 }
 
 // isAllHonors 檢查是否為字一色
-func (g *MahjongGame) isAllHonors(tiles []string) bool {
+func isAllHonors(tiles []string) bool {
 	for _, t := range tiles {
 		if !tile.IsHonor(t) {
 			return false
@@ -311,7 +325,7 @@ func (g *MahjongGame) isAllHonors(tiles []string) bool {
 }
 
 // isSmallDragons 檢查是否為小三元
-func (g *MahjongGame) isSmallDragons(tiles []string) bool {
+func isSmallDragons(tiles []string) bool {
 	dragons := []string{"zhong", "fa", "bai"}
 	dragonCount := make(map[string]int)
 
@@ -339,7 +353,7 @@ func (g *MahjongGame) isSmallDragons(tiles []string) bool {
 }
 
 // isBigDragons 檢查是否為大三元
-func (g *MahjongGame) isBigDragons(tiles []string) bool {
+func isBigDragons(tiles []string) bool {
 	dragons := []string{"zhong", "fa", "bai"}
 	dragonCount := make(map[string]int)
 
@@ -362,7 +376,7 @@ func (g *MahjongGame) isBigDragons(tiles []string) bool {
 }
 
 // isSmallWinds 檢查是否為小四喜
-func (g *MahjongGame) isSmallWinds(tiles []string) bool {
+func isSmallWinds(tiles []string) bool {
 	winds := []string{"dong", "nan", "xi", "bei"}
 	windCount := make(map[string]int)
 
@@ -390,7 +404,7 @@ func (g *MahjongGame) isSmallWinds(tiles []string) bool {
 }
 
 // isBigWinds 檢查是否為大四喜
-func (g *MahjongGame) isBigWinds(tiles []string) bool {
+func isBigWinds(tiles []string) bool {
 	winds := []string{"dong", "nan", "xi", "bei"}
 	windCount := make(map[string]int)
 

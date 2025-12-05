@@ -1,38 +1,9 @@
 package game
 
 import (
+	"mahjong/internal/tile"
 	"testing"
 )
-
-// TestIsFlowerTile 測試花牌辨識
-func TestFlowerTileDetection(t *testing.T) {
-	tests := []struct {
-		tile     string
-		isFlower bool
-	}{
-		{"flower-chun", true},
-		{"flower-xia", true},
-		{"flower-qiu", true},
-		{"flower-dong", true},
-		{"flower-mei", true},
-		{"flower-lan", true},
-		{"flower-zhu", true},
-		{"flower-ju", true},
-		{"dong", false},       // 東風牌，不是花牌
-		{"wan-1", false},      // 萬子，不是花牌
-		{"tong-5", false},     // 筒子，不是花牌
-		{"zhong", false},      // 中，不是花牌
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.tile, func(t *testing.T) {
-			result := isFlowerTile(tt.tile)
-			if result != tt.isFlower {
-				t.Errorf("isFlowerTile(%s) = %v, 期望 %v", tt.tile, result, tt.isFlower)
-			}
-		})
-	}
-}
 
 // TestDrawTileWithFlowerReplacement 測試摸到花牌時的自動補牌
 func TestDrawTileWithFlowerReplacement(t *testing.T) {
@@ -217,9 +188,9 @@ func TestFlowerTilesDoNotCountAsHandTiles(t *testing.T) {
 		}
 
 		// 檢查花牌不在手牌中
-		for _, tile := range player.Hand {
-			if isFlowerTile(tile) {
-				t.Errorf("手牌中不應該有花牌: %s", tile)
+		for _, h := range player.Hand {
+			if tile.IsFlower(h) {
+				t.Errorf("手牌中不應該有花牌: %s", h)
 			}
 		}
 	})

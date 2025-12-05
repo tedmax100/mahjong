@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"mahjong/internal/model"
+	"mahjong/internal/scoring"
 	"reflect"
 	"sort"
 	"sync"
@@ -53,14 +55,14 @@ type Room struct {
 type Player struct {
 	ID           string
 	Name         string
-	Position     int      // 0=東, 1=南, 2=西, 3=北
-	Hand         []string // 手牌
+	Position     int          // 0=東, 1=南, 2=西, 3=北
+	Hand         []string     // 手牌
 	Score        int
-	Melds        []Meld   // 已展示的牌組（碰、槓等）
-	Flowers      []string // 花牌
-	IsTing       bool     // 玩家是否已聽牌
-	WinningTiles []string // 聽牌所胡的牌
-	IsBot        bool     // 是否為 Bot（包含斷線由 Bot 代打的玩家）
+	Melds        []model.Meld // 已展示的牌組（碰、槓等）
+	Flowers      []string     // 花牌
+	IsTing       bool         // 玩家是否已聽牌
+	WinningTiles []string     // 聽牌所胡的牌
+	IsBot        bool         // 是否為 Bot（包含斷線由 Bot 代打的玩家）
 }
 
 // StartNoResponseTimer 啟動一個計時器，如果未收到玩家動作則觸發
@@ -179,7 +181,7 @@ func (r *Room) AddPlayer(userID, userName string) error {
 		Position: len(r.Players),
 		Hand:     make([]string, 0, 17),
 		Score:    1000,
-		Melds:    make([]Meld, 0),
+		Melds:    make([]model.Meld, 0),
 		Flowers:  make([]string, 0),
 	}
 
@@ -414,7 +416,7 @@ func (r *Room) HandlePong(userID, tile string) bool {
 	}
 
 	// 添加到已展示的牌組
-	player.Melds = append(player.Melds, Meld{
+	player.Melds = append(player.Melds, model.Meld{
 		Type:  "pong",
 		Tiles: []string{tile, tile, tile},
 	})
@@ -502,7 +504,7 @@ func (r *Room) HandleChow(userID, tile string, chowTiles []string) bool {
 	}
 
 	// 添加到已展示的牌組
-	player.Melds = append(player.Melds, Meld{
+	player.Melds = append(player.Melds, model.Meld{
 		Type:  "chow",
 		Tiles: chowTiles,
 	})
@@ -582,7 +584,7 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) (bool, string) 
 		}
 
 		// 添加到已展示的牌組
-		player.Melds = append(player.Melds, Meld{
+		player.Melds = append(player.Melds, model.Meld{
 			Type:  "kong_concealed",
 			Tiles: []string{tile, tile, tile, tile},
 		})
@@ -634,7 +636,7 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) (bool, string) 
 				}
 			}
 			// 添加到已展示的牌組
-			player.Melds = append(player.Melds, Meld{
+			player.Melds = append(player.Melds, model.Meld{
 				Type:  "kong_exposed",
 				Tiles: []string{tile, tile, tile, tile},
 			})
@@ -671,7 +673,7 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) (bool, string) 
 }
 
 // HandleHu 處理胡牌
-func (r *Room) HandleHu(userID string, winTile string, isSelfDrawn bool) *WinResult {
+func (r *Room) HandleHu(userID string, winTile string, isSelfDrawn bool) *scoring.WinResult {
 	// 找到玩家
 	var player *Player
 	for _, p := range r.Players {
@@ -715,7 +717,8 @@ func (r *Room) HandleHu(userID string, winTile string, isSelfDrawn bool) *WinRes
 	// 使用胡牌的牌作為 lastTile
 	lastTile := winTile
 
-	winResult := r.Game.CalculateScore(player, lastTile, isSelfDrawn)
+	// 使用 scoring package 計算分數
+	winResult := scoring.CalculateScore(player.Hand, player.Melds, player.Flowers, lastTile, isSelfDrawn)
 
 	// 更新玩家分數
 	if isSelfDrawn {
@@ -933,7 +936,7 @@ func (r *Room) NextRound() {
 	// 重置玩家手牌、面子和花牌
 	for _, p := range r.Players {
 		p.Hand = make([]string, 0, 17)
-		p.Melds = make([]Meld, 0)
+		p.Melds = make([]model.Meld, 0)
 		p.Flowers = make([]string, 0)
 		p.IsTing = false
 		p.WinningTiles = nil
