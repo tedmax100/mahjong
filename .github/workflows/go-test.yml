@@ -1,0 +1,71 @@
+name: Go Test & Coverage
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/go-test.yml'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths:
+      - 'server/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: ./server
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Test with Coverage
+      run: |
+        go test -v -coverprofile=coverage.out ./...
+        go tool cover -func=coverage.out -o=coverage.txt
+
+    - name: Update Coverage Badge
+      # Only run this step on push to main/master to avoid conflicts in PRs,
+      # or allow it but be aware it commits to the branch.
+      if: github.event_name == 'push' 
+      run: |
+        # Extract total coverage (e.g., "82.5%")
+        TOTAL=$(grep "total:" coverage.txt | awk '{print $3}')
+        echo "Total Coverage: $TOTAL"
+        
+        # Remove % for comparison
+        VAL=$(echo $TOTAL | sed 's/%//')
+        
+        # Determine color
+        COLOR=red
+        if (( $(echo "$VAL > 50" | bc -l) )); then COLOR=orange; fi
+        if (( $(echo "$VAL > 80" | bc -l) )); then COLOR=green; fi
+        
+        # Go back to root to edit README
+        cd ..
+        
+        # Update README.md using sed (Replace the existing badge link)
+        # Pattern: Go_Coverage-[number]%-color
+        sed -i "s|Go_Coverage-[0-9.]*%25-.*)|Go_Coverage-${VAL}%25-${COLOR})|g" README.md
+        
+        # Configure Git
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Commit and Push if changed
+        if [[ -n $(git status -s README.md) ]]; then
+          git add README.md
+          git commit -m "docs: update coverage badge to ${TOTAL}"
+          git push
+        else
+          echo "No changes to coverage badge."
+        fi
