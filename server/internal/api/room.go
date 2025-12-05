@@ -8,28 +8,28 @@ import (
 	"github.com/google/uuid"
 )
 
-// CreateRoomRequest 创建房间请求
+// CreateRoomRequest 建立房間請求
 type CreateRoomRequest struct {
 	UserID   string `json:"userId"`
 	UserName string `json:"userName"`
 }
 
-// CreateRoom 创建房间API
+// CreateRoom 建立房間 API
 func CreateRoom(hub *websocket.Hub) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req CreateRoomRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error":   "无效的请求",
+				"error":   "無效的請求",
 			})
 			return
 		}
 
-		// 生成房间ID（6位数字）
+		// 生成房間 ID（6 位數字）
 		roomID := generateRoomID()
 
-		// 创建房间
+		// 建立房間
 		hub.CreateRoom(roomID)
 
 		c.JSON(http.StatusOK, gin.H{
@@ -39,7 +39,7 @@ func CreateRoom(hub *websocket.Hub) gin.HandlerFunc {
 	}
 }
 
-// GetRoom 获取房间信息API
+// GetRoom 取得房間資訊 API
 func GetRoom(hub *websocket.Hub) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		roomID := c.Param("roomId")
@@ -48,7 +48,7 @@ func GetRoom(hub *websocket.Hub) gin.HandlerFunc {
 		if room == nil {
 			c.JSON(http.StatusNotFound, gin.H{
 				"success": false,
-				"error":   "房间不存在",
+				"error":   "房間不存在",
 			})
 			return
 		}
@@ -60,9 +60,9 @@ func GetRoom(hub *websocket.Hub) gin.HandlerFunc {
 	}
 }
 
-// generateRoomID 生成6位房间号
+// generateRoomID 生成 6 位房間號
 func generateRoomID() string {
-	// 使用UUID的前6个字符作为房间号
+	// 使用 UUID 的前 6 個字元作為房間號
 	id := uuid.New().String()
 	return id[:6]
 }

@@ -21,11 +21,11 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // 允许所有来源（生产环境应该限制）
+		return true // 允許所有來源（生產環境應該限制）
 	},
 }
 
-// Client 代表一个WebSocket客户端
+// Client 代表一個 WebSocket 客戶端
 type Client struct {
 	Hub      *Hub
 	Conn     *websocket.Conn
@@ -36,16 +36,16 @@ type Client struct {
 	Room     *game.Room
 }
 
-// Message 表示客户端消息
+// Message 表示客戶端訊息
 type Message struct {
 	Type   string                 `json:"type"`
 	Action string                 `json:"action,omitempty"`
 	Data   map[string]interface{} `json:"data,omitempty"`
 }
 
-// readPump 从WebSocket连接读取消息
+// readPump 從 WebSocket 連接讀取訊息
 func (c *Client) readPump() {
-	log.Printf("启动读协程 for %s", c.UserName)
+	log.Printf("啟動讀協程 for %s", c.UserName)
 	defer func() {
 		c.Hub.unregister <- c
 		_ = c.Conn.Close()
@@ -57,21 +57,21 @@ func (c *Client) readPump() {
 	})
 
 	for {
-		log.Printf("等待来自 %s 的消息...", c.UserName)
+		log.Printf("等待來自 %s 的訊息...", c.UserName)
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket错误: %v", err)
+				log.Printf("WebSocket 錯誤: %v", err)
 			}
 			break
 		}
 
-		// 处理消息
+		// 處理訊息
 		c.handleMessage(message)
 	}
 }
 
-// writePump 向WebSocket连接写入消息
+// writePump 向 WebSocket 連接寫入訊息
 func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -107,31 +107,31 @@ func (c *Client) writePump() {
 	}
 }
 
-// handleMessage 处理收到的消息
+// handleMessage 處理收到的訊息
 func (c *Client) handleMessage(data []byte) {
 	var msg Message
 	if err := json.Unmarshal(data, &msg); err != nil {
-		log.Printf("解析消息失败: %v", err)
+		log.Printf("解析訊息失敗: %v", err)
 		return
 	}
 
-	log.Printf("收到消息: %s from %s", msg.Type, c.UserName)
+	log.Printf("收到訊息: %s from %s", msg.Type, c.UserName)
 
 	switch msg.Type {
 	case "join":
-		// 加入房间消息在连接时已处理
+		// 加入房間訊息在連接時已處理
 		log.Printf("玩家 %s 加入", c.UserName)
 
 	case "action":
-		// 处理游戏动作
+		// 處理遊戲動作
 		c.handleGameAction(msg.Action, msg.Data)
 
 	default:
-		log.Printf("未知消息类型: %s", msg.Type)
+		log.Printf("未知訊息類型: %s", msg.Type)
 	}
 }
 
-// handleGameAction 处理游戏动作
+// handleGameAction 處理遊戲動作
 func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 	if c.Room == nil {
 		return
@@ -139,27 +139,27 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 	switch action {
 	case "discard":
-		// 处理出牌
+		// 處理出牌
 		tile, ok := data["tile"].(string)
 		if !ok {
 			return
 		}
 		success, isDraw := c.Room.HandleDiscard(c.UserID, tile)
 
-		// 如果打牌失败，不广播也不继续处理
+		// 如果打牌失敗，不廣播也不繼續處理
 		if !success {
 			return
 		}
 
 		c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "discard", tile)
 
-		// 检查是否流局
+		// 檢查是否流局
 		if isDraw {
 			c.Hub.BroadcastGameDraw(c.Room)
 			return
 		}
 
-		// 获取出牌者的位置
+		// 獲取出牌者的位置
 		var discarderPosition int
 		for _, p := range c.Room.Players {
 			if p.ID == c.UserID {
@@ -168,17 +168,17 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 			}
 		}
 
-		// 检查是否有Bot响应
+		// 檢查是否有 Bot 回應
 
 		actionTaken := c.Hub.botsReactToDiscard(c.Room, tile, discarderPosition)
 
 		if !actionTaken {
 
-			// 检查是否有人类玩家可以响应
+			// 檢查是否有人類玩家可以回應
 
 			hasHumanAction := c.Hub.HasHumanAction(c.Room, tile, discarderPosition)
 
-			// 如果没有Bot响应，则轮到下一个玩家
+			// 如果沒有 Bot 回應，則輪到下一個玩家
 
 			c.Hub.CheckAndPlayBotTurn(c.Room, hasHumanAction)
 
@@ -188,7 +188,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		c.Room.StopNoResponseTimer()
 
-		// 处理吃牌
+		// 處理吃牌
 
 		tile, ok := data["tile"].(string)
 
@@ -198,7 +198,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		}
 
-		// 获取吃牌组合
+		// 獲取吃牌組合
 
 		var chowTiles []string
 
@@ -218,7 +218,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		if len(chowTiles) != 3 {
 
-			log.Printf("吃牌组合无效，长度: %d", len(chowTiles))
+			log.Printf("吃牌組合無效，長度: %d", len(chowTiles))
 
 			return
 
@@ -228,7 +228,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		if success {
 
-			// 广播玩家吃牌动作（需要包含完整的组合信息）
+			// 廣播玩家吃牌動作（需要包含完整的組合資訊）
 
 			c.Hub.BroadcastChowAction(c.Room, c.UserID, tile, chowTiles)
 
@@ -238,7 +238,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		c.Room.StopNoResponseTimer()
 
-		// 处理碰牌
+		// 處理碰牌
 
 		tile, ok := data["tile"].(string)
 
@@ -254,7 +254,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		if success {
 
-			// 广播玩家碰牌动作
+			// 廣播玩家碰牌動作
 
 			c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "pong", tile)
 
@@ -264,7 +264,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		c.Room.StopNoResponseTimer()
 
-		// 处理杠牌
+		// 處理槓牌
 
 		tile, ok := data["tile"].(string)
 
@@ -286,7 +286,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		if success {
 
-			// 杠牌成功后，找到杠牌的玩家和牌组
+			// 槓牌成功後，找到槓牌的玩家和牌組
 
 			var player *game.Player
 
@@ -306,13 +306,13 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 				var kongMeld game.Meld
 
-				// 找到对应的杠牌组
+				// 找到對應的槓牌組
 
 				for _, meld := range player.Melds {
 
 					isKong := (meld.Type == "kong_exposed" || meld.Type == "kong_concealed" || meld.Type == "kong_promoted")
 
-					// 假设杠的牌是唯一的，或者最近的一个
+					// 假設槓的牌是唯一的，或者最近的一個
 
 					if isKong && meld.Tiles[0] == tile {
 
@@ -330,13 +330,13 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 				} else {
 
-					log.Printf("找不到杠牌组，使用旧版广播: %s", tile)
+					log.Printf("找不到槓牌組，使用舊版廣播: %s", tile)
 
 					c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "kong", tile)
 
 				}
 
-				// 广播补牌
+				// 廣播補牌
 
 				if drawnTile != "" {
 
@@ -352,13 +352,13 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		c.Room.StopNoResponseTimer()
 
-		// 处理"过"动作（玩家选择不执行吃/碰/槓/胡）
+		// 處理"過"動作（玩家選擇不執行吃/碰/槓/胡）
 
 		tile, _ := data["tile"].(string)
 
-		log.Printf("玩家 %s 选择过，不执行动作 (tile: %s)", c.UserName, tile)
+		log.Printf("玩家 %s 選擇過，不執行動作 (tile: %s)", c.UserName, tile)
 
-		// 不需要做任何特殊处理，游戏将继续正常流程
+		// 不需要做任何特殊處理，遊戲將繼續正常流程
 
 		// 輪到下一個玩家
 
@@ -366,7 +366,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 	case "check_ting":
 
-		// 检查听牌
+		// 檢查聽牌
 
 		if c.Room.Game == nil {
 
@@ -394,13 +394,13 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		}
 
-		// 遍历玩家手牌，尝试打出每一张并检查是否听牌
+		// 遍歷玩家手牌，嘗試打出每一張並檢查是否聽牌
 
 		var possibleTingDiscards = make(map[string][]string)
 
 		for _, discardCandidate := range player.Hand {
 
-			// 创建一个不包含候选弃牌的临时手牌
+			// 建立一個不包含候選棄牌的臨時手牌
 
 			tempHand := []string{}
 
@@ -430,7 +430,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		}
 
-		// 发送听牌结果给客户端
+		// 發送聽牌結果給客戶端
 
 		tingResultMsg := map[string]interface{}{
 
@@ -445,7 +445,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 	case "ting":
 
-		// 宣布听牌
+		// 宣布聽牌
 
 		tile, ok := data["tile"].(string)
 
@@ -475,7 +475,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		}
 
-		// 验证这是否是一个有效的听牌弃牌 (与上面类似)
+		// 驗證這是否是一個有效的聽牌棄牌 (與上面類似)
 
 		tempHand := []string{}
 
@@ -499,35 +499,35 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		if tingResult.IsTing {
 
-			log.Printf("玩家 %s 宣布听牌，打出 %s", c.UserName, tile)
+			log.Printf("玩家 %s 宣布聽牌，打出 %s", c.UserName, tile)
 
 			player.IsTing = true
 
 			player.WinningTiles = tingResult.WinningTiles
 
-			// 处理出牌
+			// 處理出牌
 
 			success, isDraw := c.Room.HandleDiscard(c.UserID, tile)
 
-			// 如果打牌失败，不广播也不继续处理
+			// 如果打牌失敗，不廣播也不繼續處理
 			if !success {
 				return
 			}
 
-			// 先广播出牌动作（让客户端移除手牌）
+			// 先廣播出牌動作（讓客戶端移除手牌）
 			c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "discard", tile)
 
-			// 再广播听牌动作（显示听牌状态）
+			// 再廣播聽牌動作（顯示聽牌狀態）
 
 			c.Hub.BroadcastPlayerTingAction(c.Room, c.UserID, tile)
 
-			// 检查是否流局
+			// 檢查是否流局
 			if isDraw {
 				c.Hub.BroadcastGameDraw(c.Room)
 				return
 			}
 
-			// 检查是否有Bot响应
+			// 檢查是否有 Bot 回應
 
 			actionTaken := c.Hub.botsReactToDiscard(c.Room, tile, player.Position)
 
@@ -541,9 +541,9 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 		} else {
 
-			log.Printf("玩家 %s 尝试听牌失败，打出 %s", c.UserName, tile)
+			log.Printf("玩家 %s 嘗試聽牌失敗，打出 %s", c.UserName, tile)
 
-			// 可选：发送一个错误消息给客户端
+			// 可選：發送一個錯誤訊息給客戶端
 
 		}
 
@@ -586,7 +586,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 				select {
 				case client.Send <- msgBytes:
 				default:
-					log.Printf("发送聽牌消息失败")
+					log.Printf("發送聽牌訊息失敗")
 				}
 			}
 		} else {
@@ -595,7 +595,7 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 
 	case "hu":
 
-		// 处理胡牌
+		// 處理胡牌
 
 		isSelfDrawn := false
 
@@ -608,36 +608,36 @@ func (c *Client) handleGameAction(action string, data map[string]interface{}) {
 		log.Printf("🎯 [DEBUG] HandleHu 返回結果: winResult != nil = %v", winResult != nil)
 		if winResult != nil {
 			log.Printf("🎯 [DEBUG] winResult 詳情: TotalTai=%d, BaseScore=%d", winResult.TotalTai, winResult.BaseScore)
-			// 广播玩家胡牌动作
+			// 廣播玩家胡牌動作
 			log.Printf("🎯 [DEBUG] 準備廣播玩家胡牌動作")
 			c.Hub.BroadcastPlayerAction(c.Room, c.UserID, "hu", "")
 			log.Printf("🎯 [DEBUG] 玩家胡牌動作已廣播")
-			// 广播游戏胜利
+			// 廣播遊戲勝利
 			log.Printf("🎯 [DEBUG] 準備廣播遊戲勝利")
 			c.Hub.BroadcastGameWin(c.Room, c.UserID, winResult)
 			log.Printf("🎯 [DEBUG] 遊戲勝利已廣播")
 		} else {
-			log.Printf("❌ [DEBUG] winResult 為 nil，不廣播勝利消息")
+			log.Printf("❌ [DEBUG] winResult 為 nil，不廣播勝利訊息")
 		}
 
 	case "add_bot":
-		// 添加Bot玩家
+		// 添加 Bot 玩家
 		c.Hub.addBot(c.Room)
 
 	default:
-		log.Printf("未知游戏动作: %s", action)
+		log.Printf("未知遊戲動作: %s", action)
 	}
 }
 
-// ServeWs 处理WebSocket请求
+// ServeWs 處理 WebSocket 請求
 func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket升级失败: %v", err)
+		log.Printf("WebSocket 升級失敗: %v", err)
 		return
 	}
 
-	// 从查询参数获取房间ID和用户信息
+	// 從查詢參數獲取房間 ID 和使用者資訊
 	roomID := r.URL.Query().Get("room")
 	userID := r.URL.Query().Get("userId")
 	userName := r.URL.Query().Get("userName")
@@ -658,7 +658,7 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 
 	hub.register <- client
 
-	// 启动读写协程
+	// 啟動讀寫協程
 	go client.writePump()
 	go client.readPump()
 }

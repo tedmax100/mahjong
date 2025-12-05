@@ -4,209 +4,209 @@ import (
 	"testing"
 )
 
-// TestCanHu 测试胡牌判断
+// TestCanHu 測試胡牌判斷
 func TestCanHu(t *testing.T) {
 	players := []*Player{
 		{ID: "1", Name: "Player1", Position: 0, Hand: make([]string, 0), Melds: make([]Meld, 0), Flowers: make([]string, 0)},
 	}
 	game := NewMahjongGame(players)
 
-	// 测试1: 简单的胡牌（5组刻子+1对眼 = 17张）
+	// 測試 1: 簡單的胡牌（5 組刻子+1 對眼 = 17 張）
 	hand1 := []string{
 		"wan-1", "wan-1", "wan-1", // 刻子
 		"wan-2", "wan-2", "wan-2", // 刻子
 		"wan-3", "wan-3", "wan-3", // 刻子
 		"wan-4", "wan-4", "wan-4", // 刻子
 		"wan-5", "wan-5", "wan-5", // 刻子
-		"wan-6", "wan-6", // 对眼
+		"wan-6", "wan-6", // 對眼
 	}
 	if !game.CanHu(hand1, []Meld{}) {
-		t.Errorf("应该能胡牌，但判断为不能胡")
+		t.Errorf("應該能胡牌，但判斷為不能胡")
 	}
 
-	// 测试2: 简单的顺子胡牌（5组顺子+1对眼 = 17张）
+	// 測試 2: 簡單的順子胡牌（5 組順子+1 對眼 = 17 張）
 	hand2 := []string{
-		"wan-1", "wan-2", "wan-3", // 顺子
-		"wan-4", "wan-5", "wan-6", // 顺子
-		"wan-7", "wan-8", "wan-9", // 顺子
-		"tong-1", "tong-2", "tong-3", // 顺子
-		"tiao-7", "tiao-8", "tiao-9", // 顺子
-		"dong", "dong", // 对眼
+		"wan-1", "wan-2", "wan-3", // 順子
+		"wan-4", "wan-5", "wan-6", // 順子
+		"wan-7", "wan-8", "wan-9", // 順子
+		"tong-1", "tong-2", "tong-3", // 順子
+		"tiao-7", "tiao-8", "tiao-9", // 順子
+		"dong", "dong", // 對眼
 	}
 	if !game.CanHu(hand2, []Meld{}) {
-		t.Errorf("应该能胡牌（顺子），但判断为不能胡")
+		t.Errorf("應該能胡牌（順子），但判斷為不能胡")
 	}
 
-	// 测试3: 不能胡牌
+	// 測試 3: 不能胡牌
 	hand3 := []string{
-		"wan-1", "wan-2", "wan-4", // 不连续
+		"wan-1", "wan-2", "wan-4", // 不連續
 		"wan-5", "wan-6", "wan-7",
 		"tong-1", "tong-2", "tong-3",
 		"tiao-7", "tiao-8", "tiao-9",
 		"dong", "dong",
 	}
 	if game.CanHu(hand3, []Meld{}) {
-		t.Errorf("不应该能胡牌，但判断为能胡")
+		t.Errorf("不應該能胡牌，但判斷為能胡")
 	}
 
-	// 测试4: 有碰的情况（2组已展示+手牌3组+1对眼 = 17张）
+	// 測試 4: 有碰的情況（2 組已展示+手牌 3 組+1 對眼 = 17 張）
 	hand4 := []string{
-		"wan-1", "wan-2", "wan-3", // 顺子
-		"wan-4", "wan-5", "wan-6", // 顺子
-		"wan-7", "wan-8", "wan-9", // 顺子
-		"dong", "dong", // 对眼
+		"wan-1", "wan-2", "wan-3", // 順子
+		"wan-4", "wan-5", "wan-6", // 順子
+		"wan-7", "wan-8", "wan-9", // 順子
+		"dong", "dong", // 對眼
 	}
 	melds4 := []Meld{
 		{Type: "pong", Tiles: []string{"tong-5", "tong-5", "tong-5"}},
 		{Type: "pong", Tiles: []string{"tiao-9", "tiao-9", "tiao-9"}},
 	}
 	if !game.CanHu(hand4, melds4) {
-		t.Errorf("应该能胡牌（有碰），但判断为不能胡")
+		t.Errorf("應該能胡牌（有碰），但判斷為不能胡")
 	}
 }
 
-// TestCanPong 测试碰牌判断
+// TestCanPong 測試碰牌判斷
 func TestCanPong(t *testing.T) {
 	game := &MahjongGame{}
 
-	// 测试1: 手牌中有2张相同
+	// 測試 1: 手牌中有 2 張相同
 	hand1 := []string{"wan-1", "wan-1", "wan-2", "wan-3"}
 	if !game.CanPong(hand1, "wan-1") {
-		t.Errorf("应该能碰wan-1")
+		t.Errorf("應該能碰 wan-1")
 	}
 
-	// 测试2: 手牌中只有1张
+	// 測試 2: 手牌中只有 1 張
 	hand2 := []string{"wan-1", "wan-2", "wan-3"}
 	if game.CanPong(hand2, "wan-1") {
-		t.Errorf("不应该能碰wan-1（只有1张）")
+		t.Errorf("不應該能碰 wan-1（只有 1 張）")
 	}
 
-	// 测试3: 手牌中有3张
+	// 測試 3: 手牌中有 3 張
 	hand3 := []string{"wan-1", "wan-1", "wan-1", "wan-2"}
 	if !game.CanPong(hand3, "wan-1") {
-		t.Errorf("应该能碰wan-1（有3张）")
+		t.Errorf("應該能碰 wan-1（有 3 張）")
 	}
 }
 
-// TestCanKong 测试杠牌判断
+// TestCanKong 測試槓牌判斷
 func TestCanKong(t *testing.T) {
 	game := &MahjongGame{}
 
-	// 测试1: 手牌中有3张相同
+	// 測試 1: 手牌中有 3 張相同
 	hand1 := []string{"wan-1", "wan-1", "wan-1", "wan-2"}
 	if !game.CanKong(hand1, "wan-1") {
-		t.Errorf("应该能杠wan-1")
+		t.Errorf("應該能槓 wan-1")
 	}
 
-	// 测试2: 手牌中只有2张
+	// 測試 2: 手牌中只有 2 張
 	hand2 := []string{"wan-1", "wan-1", "wan-2", "wan-3"}
 	if game.CanKong(hand2, "wan-1") {
-		t.Errorf("不应该能杠wan-1（只有2张）")
+		t.Errorf("不應該能槓 wan-1（只有 2 張）")
 	}
 
-	// 测试3: 手牌中有4张
+	// 測試 3: 手牌中有 4 張
 	hand3 := []string{"wan-1", "wan-1", "wan-1", "wan-1"}
 	if !game.CanKong(hand3, "wan-1") {
-		t.Errorf("应该能杠wan-1（有4张）")
+		t.Errorf("應該能槓 wan-1（有 4 張）")
 	}
 }
 
-// TestCanChow 测试吃牌判断
+// TestCanChow 測試吃牌判斷
 func TestCanChow(t *testing.T) {
 	game := &MahjongGame{}
 
-	// 测试1: 能吃（wan-2，手牌有wan-1和wan-3）
+	// 測試 1: 能吃（wan-2，手牌有 wan-1 和 wan-3）
 	hand1 := []string{"wan-1", "wan-3", "tong-5", "tiao-7"}
 	combos1 := game.CanChow(hand1, "wan-2")
 	if len(combos1) != 1 {
-		t.Errorf("应该有1种吃牌组合，实际: %d", len(combos1))
+		t.Errorf("應該有 1 種吃牌組合，實際: %d", len(combos1))
 	}
 	expectedCombo1 := []string{"wan-1", "wan-2", "wan-3"}
 	if len(combos1) > 0 && !isSameCombination(combos1[0], expectedCombo1) {
-		t.Errorf("吃牌组合错误，期望: %v，实际: %v", expectedCombo1, combos1[0])
+		t.Errorf("吃牌組合錯誤，期望: %v，實際: %v", expectedCombo1, combos1[0])
 	}
 
-	// 测试2: 能吃（wan-5，手牌有wan-4,wan-6和wan-6,wan-7）- 多种组合
+	// 測試 2: 能吃（wan-5，手牌有 wan-4,wan-6 和 wan-6,wan-7）- 多種組合
 	hand2 := []string{"wan-4", "wan-6", "wan-7", "tong-1"}
 	combos2 := game.CanChow(hand2, "wan-5")
 	if len(combos2) != 2 {
-		t.Errorf("应该有2种吃牌组合，实际: %d", len(combos2))
+		t.Errorf("應該有 2 種吃牌組合，實際: %d", len(combos2))
 	}
 
-	// 测试3: 不能吃（字牌）
+	// 測試 3: 不能吃（字牌）
 	hand3 := []string{"wan-1", "wan-2", "tong-5"}
 	combos3 := game.CanChow(hand3, "dong")
 	if len(combos3) != 0 {
-		t.Errorf("字牌不应该能吃，实际组合数: %d", len(combos3))
+		t.Errorf("字牌不應該能吃，實際組合數: %d", len(combos3))
 	}
 
-	// 测试4: 不能吃（手牌不连续）
+	// 測試 4: 不能吃（手牌不連續）
 	hand4 := []string{"wan-1", "wan-4", "tong-5"}
 	combos4 := game.CanChow(hand4, "wan-2")
 	if len(combos4) != 0 {
-		t.Errorf("手牌不连续不应该能吃，实际组合数: %d", len(combos4))
+		t.Errorf("手牌不連續不應該能吃，實際組合數: %d", len(combos4))
 	}
 
-	// 测试5: 能吃（wan-1，手牌有wan-2和wan-3）
+	// 測試 5: 能吃（wan-1，手牌有 wan-2 和 wan-3）
 	hand5 := []string{"wan-2", "wan-3", "tong-5"}
 	combos5 := game.CanChow(hand5, "wan-1")
 	if len(combos5) != 1 {
-		t.Errorf("应该有1种吃牌组合，实际: %d", len(combos5))
+		t.Errorf("應該有 1 種吃牌組合，實際: %d", len(combos5))
 	}
 
-	// 测试6: 能吃（wan-9，手牌有wan-7和wan-8）
+	// 測試 6: 能吃（wan-9，手牌有 wan-7 和 wan-8）
 	hand6 := []string{"wan-7", "wan-8", "tong-5"}
 	combos6 := game.CanChow(hand6, "wan-9")
 	if len(combos6) != 1 {
-		t.Errorf("应该有1种吃牌组合，实际: %d", len(combos6))
+		t.Errorf("應該有 1 種吃牌組合，實際: %d", len(combos6))
 	}
 
-	// 测试7: 不能吃（不同花色）
+	// 測試 7: 不能吃（不同花色）
 	hand7 := []string{"wan-1", "wan-3", "tong-5"}
 	combos7 := game.CanChow(hand7, "tong-2")
 	if len(combos7) != 0 {
-		t.Errorf("不同花色不应该能吃，实际组合数: %d", len(combos7))
+		t.Errorf("不同花色不應該能吃，實際組合數: %d", len(combos7))
 	}
 }
 
-// TestIsFlowerTile 测试花牌判断
+// TestIsFlowerTile 測試花牌判斷
 func TestIsFlowerTile(t *testing.T) {
 	if !isFlowerTile("flower-chun") {
-		t.Errorf("flower-chun应该是花牌")
+		t.Errorf("flower-chun 應該是花牌")
 	}
 
 	if !isFlowerTile("flower-mei") {
-		t.Errorf("flower-mei应该是花牌")
+		t.Errorf("flower-mei 應該是花牌")
 	}
 
 	if isFlowerTile("wan-1") {
-		t.Errorf("wan-1不应该是花牌")
+		t.Errorf("wan-1 不應該是花牌")
 	}
 
 	if isFlowerTile("dong") {
-		t.Errorf("dong不应该是花牌")
+		t.Errorf("dong 不應該是花牌")
 	}
 }
 
-// TestCheckDraw 测试流局判断
+// TestCheckDraw 測試流局判斷
 func TestCheckDraw(t *testing.T) {
 	players := []*Player{
 		{ID: "1", Name: "Player1", Position: 0},
 	}
 	game := NewMahjongGame(players)
 
-	// 测试1: 牌山充足
+	// 測試 1: 牌山充足
 	if game.CheckDraw() {
-		t.Errorf("牌山充足时不应该流局")
+		t.Errorf("牌山充足時不應該流局")
 	}
 
-	// 测试2: 模拟牌山消耗到8张
+	// 測試 2: 模擬牌山消耗到 8 張
 	for len(game.Deck) > 8 {
 		game.DrawTile()
 	}
 
 	if !game.CheckDraw() {
-		t.Errorf("牌山剩余8张时应该流局")
+		t.Errorf("牌山剩餘 8 張時應該流局")
 	}
 }
 
@@ -214,7 +214,7 @@ func TestCheckDraw(t *testing.T) {
 // so these tests might fail if those functions don't exist.
 // I am commenting them out to be safe.
 /*
-// TestPongPongHu 测试碰碰胡判断
+// TestPongPongHu 測試碰碰胡判斷
 func TestPongPongHu(t *testing.T) {
 	player := &Player{
 		Hand: []string{
@@ -230,13 +230,13 @@ func TestPongPongHu(t *testing.T) {
 	game := &MahjongGame{Players: []*Player{player}}
 
 	if !game.isPongPongHu(player) {
-		t.Errorf("应该是碰碰胡")
+		t.Errorf("應該是碰碰胡")
 	}
 
-	// 测试有顺子的情况
+	// 測試有順子的情況
 	player2 := &Player{
 		Hand: []string{
-			"wan-1", "wan-2", "wan-3", // 顺子
+			"wan-1", "wan-2", "wan-3", // 順子
 			"wan-4", "wan-4", "wan-4",
 			"wan-5", "wan-5", "wan-5",
 			"wan-6", "wan-6", "wan-6",
@@ -246,15 +246,15 @@ func TestPongPongHu(t *testing.T) {
 	}
 
 	if game.isPongPongHu(player2) {
-		t.Errorf("有顺子不应该是碰碰胡")
+		t.Errorf("有順子不應該是碰碰胡")
 	}
 }
 
-// TestOneSuit 测试清一色判断
+// TestOneSuit 測試清一色判斷
 func TestOneSuit(t *testing.T) {
 	game := &MahjongGame{}
 
-	// 测试1: 清一色（全是万子）
+	// 測試 1: 清一色（全是萬子）
 	tiles1 := []string{
 		"wan-1", "wan-1", "wan-1",
 		"wan-2", "wan-3", "wan-4",
@@ -263,10 +263,10 @@ func TestOneSuit(t *testing.T) {
 		"wan-9", "wan-9",
 	}
 	if !game.isOneSuit(tiles1) {
-		t.Errorf("应该是清一色")
+		t.Errorf("應該是清一色")
 	}
 
-	// 测试2: 不是清一色（有字牌）
+	// 測試 2: 不是清一色（有字牌）
 	tiles2 := []string{
 		"wan-1", "wan-1", "wan-1",
 		"wan-2", "wan-3", "wan-4",
@@ -275,10 +275,10 @@ func TestOneSuit(t *testing.T) {
 		"wan-9", "wan-9",
 	}
 	if game.isOneSuit(tiles2) {
-		t.Errorf("有字牌不应该是清一色")
+		t.Errorf("有字牌不應該是清一色")
 	}
 
-	// 测试3: 不是清一色（有多种花色）
+	// 測試 3: 不是清一色（有多種花色）
 	tiles3 := []string{
 		"wan-1", "wan-1", "wan-1",
 		"tong-2", "tong-3", "tong-4",
@@ -287,15 +287,15 @@ func TestOneSuit(t *testing.T) {
 		"wan-9", "wan-9",
 	}
 	if game.isOneSuit(tiles3) {
-		t.Errorf("有多种花色不应该是清一色")
+		t.Errorf("有多種花色不應該是清一色")
 	}
 }
 
-// TestMixedOneSuit 测试混一色判断
+// TestMixedOneSuit 測試混一色判斷
 func TestMixedOneSuit(t *testing.T) {
 	game := &MahjongGame{}
 
-	// 测试1: 混一色（万子+字牌）
+	// 測試 1: 混一色（萬子+字牌）
 	tiles1 := []string{
 		"wan-1", "wan-1", "wan-1",
 		"wan-2", "wan-3", "wan-4",
@@ -304,10 +304,10 @@ func TestMixedOneSuit(t *testing.T) {
 		"zhong", "zhong",
 	}
 	if !game.isMixedOneSuit(tiles1) {
-		t.Errorf("应该是混一色")
+		t.Errorf("應該是混一色")
 	}
 
-	// 测试2: 不是混一色（纯清一色）
+	// 測試 2: 不是混一色（純清一色）
 	tiles2 := []string{
 		"wan-1", "wan-1", "wan-1",
 		"wan-2", "wan-3", "wan-4",
@@ -316,10 +316,10 @@ func TestMixedOneSuit(t *testing.T) {
 		"wan-9", "wan-9",
 	}
 	if game.isMixedOneSuit(tiles2) {
-		t.Errorf("纯清一色不应该算混一色")
+		t.Errorf("純清一色不應該算混一色")
 	}
 
-	// 测试3: 不是混一色（有多种花色）
+	// 測試 3: 不是混一色（有多種花色）
 	tiles3 := []string{
 		"wan-1", "wan-1", "wan-1",
 		"tong-2", "tong-3", "tong-4",
@@ -328,15 +328,15 @@ func TestMixedOneSuit(t *testing.T) {
 		"zhong", "zhong",
 	}
 	if game.isMixedOneSuit(tiles3) {
-		t.Errorf("有多种花色不应该是混一色")
+		t.Errorf("有多種花色不應該是混一色")
 	}
 }
 
-// TestBigDragons 测试大三元判断
+// TestBigDragons 測試大三元判斷
 func TestBigDragons(t *testing.T) {
 	game := &MahjongGame{}
 
-	// 测试1: 大三元
+	// 測試 1: 大三元
 	tiles1 := []string{
 		"zhong", "zhong", "zhong",
 		"fa", "fa", "fa",
@@ -345,10 +345,10 @@ func TestBigDragons(t *testing.T) {
 		"wan-2", "wan-2",
 	}
 	if !game.isBigDragons(tiles1) {
-		t.Errorf("应该是大三元")
+		t.Errorf("應該是大三元")
 	}
 
-	// 测试2: 不是大三元（缺一种）
+	// 測試 2: 不是大三元（缺一種）
 	tiles2 := []string{
 		"zhong", "zhong", "zhong",
 		"fa", "fa", "fa",
@@ -357,7 +357,7 @@ func TestBigDragons(t *testing.T) {
 		"wan-3", "wan-3",
 	}
 	if game.isBigDragons(tiles2) {
-		t.Errorf("缺白板不应该是大三元")
+		t.Errorf("缺白板不應該是大三元")
 	}
 }
 */
@@ -432,7 +432,7 @@ func TestDrawTileFromEnd(t *testing.T) {
 	}
 }
 
-// TestHandleKong_CannotPromotePongWithOthersDiscard 测试不能用别人打出的牌来补杠
+// TestHandleKong_CannotPromotePongWithOthersDiscard 測試不能用別人打出的牌來補槓
 func TestHandleKong_CannotPromotePongWithOthersDiscard(t *testing.T) {
 	// 1. Setup Room and Players
 	playerA := &Player{
@@ -475,14 +475,14 @@ func TestHandleKong_CannotPromotePongWithOthersDiscard(t *testing.T) {
 	}
 }
 
-// TestHandleKong_PromotePongWithSelfDraw 测试可以用自己摸到的牌来补杠
+// TestHandleKong_PromotePongWithSelfDraw 測試可以用自己摸到的牌來補槓
 func TestHandleKong_PromotePongWithSelfDraw(t *testing.T) {
 	// 1. Setup Room and Players
 	playerA := &Player{
 		ID:       "playerA",
 		Name:     "Player A",
 		Position: 0,
-		Hand:     []string{"tiao-1", "tiao-2", "tiao-3", "wan-8"}, // 手上有一张 wan-8
+		Hand:     []string{"tiao-1", "tiao-2", "tiao-3", "wan-8"}, // 手上有一張 wan-8
 		Melds: []Meld{
 			{Type: "pong", Tiles: []string{"wan-8", "wan-8", "wan-8"}},
 		},
@@ -509,7 +509,7 @@ func TestHandleKong_PromotePongWithSelfDraw(t *testing.T) {
 		t.Fatalf("HandleKong should have returned true for a valid promoted kong from self-draw")
 	}
 
-	// 检查槓牌後有補牌
+	// 檢查槓牌後有補牌
 	if drawnTile == "" {
 		t.Error("Expected a supplemental tile to be drawn after kong")
 	} else {

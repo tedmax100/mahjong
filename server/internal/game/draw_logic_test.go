@@ -21,7 +21,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 
 	player := room.Players[0]
 
-	t.Run("正常輪次應該摸牌（總牌數16）", func(t *testing.T) {
+	t.Run("正常輪次應該摸牌（總牌數 16）", func(t *testing.T) {
 		// 設置玩家手牌為 16 張
 		player.Hand = make([]string, 16)
 		for i := 0; i < 16; i++ {
@@ -41,7 +41,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 		}
 	})
 
-	t.Run("吃/碰/槓後不應該摸牌（總牌數17）", func(t *testing.T) {
+	t.Run("吃/碰/槓後不應該摸牌（總牌數 17）", func(t *testing.T) {
 		// 設置玩家手牌為 14 張，加上 1 組碰（3 張）= 17 張
 		player.Hand = make([]string, 14)
 		for i := 0; i < 14; i++ {
@@ -53,7 +53,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 
 		totalTiles := len(player.Hand) + len(player.Melds)*3
 		if totalTiles != 17 {
-			t.Fatalf("預期總牌數 17（手牌14 + 碰1組），實際 %d", totalTiles)
+			t.Fatalf("預期總牌數 17（手牌 14 + 碰 1 組），實際 %d", totalTiles)
 		}
 
 		// 不應該摸牌
@@ -63,7 +63,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 		}
 	})
 
-	t.Run("吃碰槓後的下一輪應該摸牌（總牌數16）", func(t *testing.T) {
+	t.Run("吃碰槓後的下一輪應該摸牌（總牌數 16）", func(t *testing.T) {
 		// 設置玩家手牌為 13 張，加上 1 組碰（3 張）= 16 張
 		// 這是碰牌後出牌的狀態
 		player.Hand = make([]string, 13)
@@ -76,7 +76,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 
 		totalTiles := len(player.Hand) + len(player.Melds)*3
 		if totalTiles != 16 {
-			t.Fatalf("預期總牌數 16（手牌13 + 碰1組），實際 %d", totalTiles)
+			t.Fatalf("預期總牌數 16（手牌 13 + 碰 1 組），實際 %d", totalTiles)
 		}
 
 		// 應該摸牌
@@ -99,7 +99,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 
 		totalTiles := len(player.Hand) + len(player.Melds)*3
 		if totalTiles != 16 {
-			t.Fatalf("預期總牌數 16（手牌10 + 2組），實際 %d", totalTiles)
+			t.Fatalf("預期總牌數 16（手牌 10 + 2 組），實際 %d", totalTiles)
 		}
 
 		// 應該摸牌
@@ -109,7 +109,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 		}
 	})
 
-	t.Run("槓牌的情況（4張算3張）", func(t *testing.T) {
+	t.Run("槓牌的情況（4 張算 3 張）", func(t *testing.T) {
 		// 設置玩家手牌為 13 張，加上 1 組槓（4 張，但算 3 張）= 16 張
 		player.Hand = make([]string, 13)
 		for i := 0; i < 13; i++ {
@@ -122,7 +122,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 		// 注意：槓牌雖然有 4 張，但在計算時仍算 3 張（一組面子）
 		totalTiles := len(player.Hand) + len(player.Melds)*3
 		if totalTiles != 16 {
-			t.Fatalf("預期總牌數 16（手牌13 + 槓1組×3），實際 %d", totalTiles)
+			t.Fatalf("預期總牌數 16（手牌 13 + 槓 1 組×3），實際 %d", totalTiles)
 		}
 	})
 }
@@ -141,7 +141,7 @@ func TestPlayerHandCountAfterActions(t *testing.T) {
 
 	player := room.Players[0]
 
-	t.Run("碰牌後手牌應該減少2張", func(t *testing.T) {
+	t.Run("碰牌後手牌應該減少 2 張", func(t *testing.T) {
 		// 設置手牌
 		player.Hand = []string{"dong", "dong", "wan-1", "wan-2", "wan-3", "wan-4"}
 		initialHandCount := len(player.Hand)
@@ -169,7 +169,7 @@ func TestPlayerHandCountAfterActions(t *testing.T) {
 		}
 	})
 
-	t.Run("吃牌後手牌應該減少2張", func(t *testing.T) {
+	t.Run("吃牌後手牌應該減少 2 張", func(t *testing.T) {
 		// 重置玩家
 		player.Hand = []string{"wan-1", "wan-3", "tong-1", "tong-2"}
 		player.Melds = []Meld{}
@@ -207,7 +207,7 @@ func TestHandCountNeverZero(t *testing.T) {
 
 	player := room.Players[0]
 
-	t.Run("玩家有吃碰槓時手牌至少要有2張（將牌）", func(t *testing.T) {
+	t.Run("玩家有吃碰槓時手牌至少要有 2 張（將牌）", func(t *testing.T) {
 		// 設置玩家有 4 組面子
 		player.Hand = []string{"dong", "dong"}
 		player.Melds = []Meld{
@@ -234,7 +234,7 @@ func TestHandCountNeverZero(t *testing.T) {
 		}
 	})
 
-	t.Run("即使有5組面子，手牌也不應該是0", func(t *testing.T) {
+	t.Run("即使有 5 組面子，手牌也不應該是 0", func(t *testing.T) {
 		// 這是胡牌的狀態，但也不應該手牌是 0
 		player.Hand = []string{"dong", "dong"}
 		player.Melds = []Meld{

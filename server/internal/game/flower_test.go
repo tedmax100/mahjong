@@ -64,7 +64,7 @@ func TestDrawTileWithFlowerReplacement(t *testing.T) {
 		// 摸牌（應該先摸到 flower-chun，然後自動補牌摸到 wan-1）
 		drawnTile := room.Game.DrawTileWithFlowerReplacement(player)
 
-		// 應該摸到萬1（花牌被自動替換）
+		// 應該摸到萬 1（花牌被自動替換）
 		if drawnTile != "wan-1" {
 			t.Errorf("期望摸到 wan-1（補牌後），實際摸到 %s", drawnTile)
 		}
@@ -97,7 +97,7 @@ func TestDrawTileWithFlowerReplacement(t *testing.T) {
 
 		drawnTile := room.Game.DrawTileWithFlowerReplacement(player)
 
-		// 應該摸到萬2（兩張花牌都被自動替換）
+		// 應該摸到萬 2（兩張花牌都被自動替換）
 		if drawnTile != "wan-2" {
 			t.Errorf("期望摸到 wan-2，實際摸到 %s", drawnTile)
 		}
@@ -234,7 +234,7 @@ func TestFlowerTilesDoNotCountAsHandTiles(t *testing.T) {
 
 		// 總牌數 = 手牌 + 吃碰槓
 		totalTiles := len(player.Hand) + len(player.Melds)*3
-		expectedTotal := 13 + 3 // 13 張手牌 + 1 組碰（3張）
+		expectedTotal := 13 + 3 // 13 張手牌 + 1 組碰（3 張）
 
 		if totalTiles != expectedTotal {
 			t.Errorf("總牌數應該是 %d（不含花牌），實際 %d", expectedTotal, totalTiles)
@@ -258,7 +258,7 @@ func TestFlowerTileScoring(t *testing.T) {
 	room.StartGame()
 	player := room.Players[0]
 
-	t.Run("每張花牌應該加1台", func(t *testing.T) {
+	t.Run("每張花牌應該加 1 台", func(t *testing.T) {
 		player.Flowers = []string{"flower-chun"}
 		// TODO: 實作花牌台數計算時，這裡可以添加測試
 		// 目前只測試花牌數量
