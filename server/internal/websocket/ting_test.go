@@ -10,7 +10,7 @@ import (
 // TestDeclareTing 測試宣告聽牌功能
 func TestDeclareTing(t *testing.T) {
 	t.Run("宣告聽牌成功", func(t *testing.T) {
-		// 創建一個聽牌的手牌（16張，台灣16張麻將）
+		// 創建一個聽牌的手牌（16 張，台灣 16 張麻將）
 		// 例如：萬-1,1,1,2,3,4,5,6,7,7,7,8,9,9,9,9
 		player := &game.Player{
 			ID:       "player1",
@@ -55,7 +55,7 @@ func TestDeclareTing(t *testing.T) {
 		}
 
 		if len(player.WinningTiles) == 0 {
-			t.Error("聽牌玩家應該有WinningTiles")
+			t.Error("聽牌玩家應該有 WinningTiles")
 		}
 
 		t.Logf("聽牌成功，聽: %v", player.WinningTiles)
@@ -117,8 +117,8 @@ func TestDeclareTing(t *testing.T) {
 	})
 
 	t.Run("有吃碰槓後的聽牌檢查", func(t *testing.T) {
-		// 創建一個有碰牌且聽牌的手牌（13張手牌+1組碰 = 16張總計）
-		// 手牌: 萬1,1,1,2,3,4,5,6,7,7,7,8,9 (台灣16張麻將)
+		// 創建一個有碰牌且聽牌的手牌（13 張手牌+1 組碰 = 16 張總計）
+		// 手牌: 萬 1,1,1,2,3,4,5,6,7,7,7,8,9 (台灣 16 張麻將)
 		player := &game.Player{
 			ID:       "player1",
 			Name:     "測試玩家",
@@ -265,7 +265,7 @@ func TestTingWithDifferentHandSizes(t *testing.T) {
 		shouldBeTing bool
 	}{
 		{
-			name: "16張手牌聽牌（台灣16張麻將）",
+			name: "16 張手牌聽牌（台灣 16 張麻將）",
 			hand: []string{
 				"wan-1", "wan-1", "wan-1",
 				"wan-2", "wan-3",
@@ -278,7 +278,7 @@ func TestTingWithDifferentHandSizes(t *testing.T) {
 			shouldBeTing: true,
 		},
 		{
-			name: "13張手牌+1組碰聽牌（台灣16張麻將）",
+			name: "13 張手牌+1 組碰聽牌（台灣 16 張麻將）",
 			hand: []string{
 				"wan-1", "wan-1", "wan-1",
 				"wan-2", "wan-3",
@@ -356,7 +356,7 @@ func BenchmarkCheckTing(b *testing.B) {
 
 // TestTingActionBroadcastOrder 測試聽牌時的廣播順序
 func TestTingActionBroadcastOrder(t *testing.T) {
-	t.Run("聽牌時應先廣播discard再廣播ting", func(t *testing.T) {
+	t.Run("聽牌時應先廣播 discard 再廣播 ting", func(t *testing.T) {
 		// 創建一個聽牌的手牌
 		player := &game.Player{
 			ID:       "player1",
@@ -384,7 +384,7 @@ func TestTingActionBroadcastOrder(t *testing.T) {
 			CurrentTurn: 0,
 		}
 
-		// 記錄廣播的消息順序（實際應用中應透過Hub廣播檢查）
+		// 記錄廣播的消息順序（實際應用中應透過 Hub 廣播檢查）
 		broadcastedActions := []string{}
 
 		// 模擬處理聽牌動作
@@ -425,8 +425,8 @@ func TestTingActionBroadcastOrder(t *testing.T) {
 		t.Logf("廣播順序正確: %v", broadcastedActions)
 	})
 
-	t.Run("驗證discard動作包含正確的牌", func(t *testing.T) {
-		// 創建手牌（17張，符合打牌前的牌數要求）
+	t.Run("驗證 discard 動作包含正確的牌", func(t *testing.T) {
+		// 創建手牌（17 張，符合打牌前的牌數要求）
 		player := &game.Player{
 			ID:       "player1",
 			Name:     "測試玩家",
@@ -467,7 +467,7 @@ func TestTingActionBroadcastOrder(t *testing.T) {
 		t.Logf("出牌記錄正確: 打出 %s", lastDiscard)
 	})
 
-	t.Run("驗證ting動作包含聽牌資訊", func(t *testing.T) {
+	t.Run("驗證 ting 動作包含聽牌資訊", func(t *testing.T) {
 		player := &game.Player{
 			ID:           "player1",
 			Name:         "測試玩家",
@@ -475,7 +475,7 @@ func TestTingActionBroadcastOrder(t *testing.T) {
 			WinningTiles: []string{"wan-1", "wan-4", "wan-7"},
 		}
 
-		// 構建ting廣播消息（應該包含winningTiles）
+		// 構建 ting 廣播消息（應該包含 winningTiles）
 		message := map[string]interface{}{
 			"type": "player_action",
 			"data": map[string]interface{}{
@@ -503,17 +503,17 @@ func TestTingActionBroadcastOrder(t *testing.T) {
 		}
 
 		if len(winningTiles) != 3 {
-			t.Errorf("預期聽3張牌，實際: %d", len(winningTiles))
+			t.Errorf("預期聽 3 張牌，實際: %d", len(winningTiles))
 		}
 
-		t.Logf("ting動作消息正確，聽: %v", winningTiles)
+		t.Logf("ting 動作消息正確，聽: %v", winningTiles)
 	})
 }
 
 // TestConcurrentTingDeclarations 測試並發聽牌宣告
 func TestConcurrentTingDeclarations(t *testing.T) {
 	t.Run("多個玩家同時宣告聽牌", func(t *testing.T) {
-		// 創建4個玩家
+		// 創建 4 個玩家
 		players := make([]*game.Player, 4)
 		for i := 0; i < 4; i++ {
 			players[i] = &game.Player{
@@ -543,7 +543,7 @@ func TestConcurrentTingDeclarations(t *testing.T) {
 			}(i)
 		}
 
-		// 等待所有goroutine完成
+		// 等待所有 goroutine 完成
 		for i := 0; i < 4; i++ {
 			<-done
 		}
@@ -554,7 +554,7 @@ func TestConcurrentTingDeclarations(t *testing.T) {
 				t.Errorf("玩家 %d 應該已聽牌", i)
 			}
 			if len(player.WinningTiles) == 0 {
-				t.Errorf("玩家 %d 應該有WinningTiles", i)
+				t.Errorf("玩家 %d 應該有 WinningTiles", i)
 			}
 		}
 	})
