@@ -522,7 +522,11 @@ export class Player {
         if (meldType === 'kong_concealed' && (i === 0 || i === 3)) {
             texture = tileAssets['back'];
         } else {
-            texture = tileAssets[tileType] || tileAssets['back'];
+            texture = tileAssets[tileType];
+            if (!texture) {
+                console.warn(`⚠️ displayMelds: 找不到牌面貼圖 "${tileType}"，使用牌背。可用的 key:`, Object.keys(tileAssets || {}).slice(0, 10));
+                texture = tileAssets['back'];
+            }
         }
         
         const tileSprite = new Sprite(texture);

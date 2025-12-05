@@ -223,8 +223,7 @@ class MahjongApp {
       });
     } catch (error) {
       console.error('❌ 遊戲初始化失敗:', error);
-      alert('遊戲初始化失敗，請刷新頁面重試。
-錯誤: ' + error.message);
+      alert('遊戲初始化失敗，請刷新頁面重試。\n錯誤: ' + error.message);
     }
   }
 

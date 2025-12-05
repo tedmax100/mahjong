@@ -1258,13 +1258,16 @@ func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *scoring
 		}
 	}
 
+	countdown := 7 // 倒計時秒數
+	animationDelay := 5 // 前端動畫延遲秒數
+
 	message := map[string]interface{}{
 		"type": "game_win",
 		"data": map[string]interface{}{
 			"winnerId":    winnerID,
 			"winnerName":  winnerName,
 			"winResult":   result,
-			"countdown":   8, // 告知前端倒計時秒數
+			"countdown":   countdown, // 告知前端倒計時秒數
 		},
 	}
 
@@ -1272,14 +1275,15 @@ func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *scoring
 	log.Printf("廣播遊戲勝利: 玩家 %s (%s) 胡牌", winnerName, winnerID)
 	h.broadcast(room, msgBytes)
 
-	// 8 秒後開始新的一局
+	// 等待前端動畫 + 倒計時完成後開始新的一局
+	totalWaitTime := countdown + animationDelay
 	go func() {
-		time.Sleep(8 * time.Second)
+		time.Sleep(time.Duration(totalWaitTime) * time.Second)
 
 		h.mu.Lock()
 		// 檢查遊戲是否還未開始新的一局
 		if !room.GameStarted {
-			log.Printf("8 秒倒計時結束，開始新的一局...")
+			log.Printf("%d 秒等待結束（動畫 %d 秒 + 倒計時 %d 秒），開始新的一局...", totalWaitTime, animationDelay, countdown)
 			room.NextRound()
 		} else {
 			log.Printf("新的一局已在倒計時期間開始，取消自動開始")

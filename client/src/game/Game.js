@@ -195,8 +195,8 @@ ${'='.repeat(60)}`);
       'flower-chun': 'chun', 'flower-xia': 'xia', 'flower-qiu': 'qiu', 'flower-dong': 'dong',
       'flower-mei': 'mei', 'flower-lan': 'lan', 'flower-zhu': 'zhu', 'flower-ju': 'ju',
 
-      // 牌背
-      'back': 'pback1'
+      // 牌背 (使用大尺寸的牌背圖片，與其他牌面尺寸一致)
+      'back': 'pbaseBig'
     };
 
     // 載入所有素材
