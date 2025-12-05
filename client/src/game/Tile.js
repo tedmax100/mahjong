@@ -18,22 +18,27 @@ export class Tile {
   }
 
   async create() {
-    // 載入牌底圖片
-    let baseTexture;
-    try {
-      baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
-    } catch (error) {
-      console.warn('無法載入牌底圖片，使用預設', error);
+    // 對於牌背類型（對手的手牌），不需要顯示牌底，直接顯示牌背圖片
+    const isBackTile = this.type === 'back';
+
+    // 載入牌底圖片（僅對正面牌需要）
+    if (!isBackTile) {
+      let baseTexture;
+      try {
+        baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
+      } catch (error) {
+        console.warn('無法載入牌底圖片，使用預設', error);
+      }
+
+      // 創建牌底 sprite（如果有載入成功）
+      if (baseTexture) {
+        this.baseSprite = new Sprite(baseTexture);
+        this.baseSprite.anchor.set(0, 0); // 左上角對齊
+        this.container.addChild(this.baseSprite);
+      }
     }
 
-    // 創建牌底 sprite（如果有載入成功）
-    if (baseTexture) {
-      this.baseSprite = new Sprite(baseTexture);
-      this.baseSprite.anchor.set(0, 0); // 左上角對齊
-      this.container.addChild(this.baseSprite);
-    }
-
-    // 創建牌面 sprite
+    // 創建牌面 sprite（對於牌背類型，這就是牌背圖片）
     this.sprite = new Sprite(this.texture);
     this.sprite.anchor.set(0, 0); // 左上角對齊
     this.sprite.interactive = true;
@@ -44,8 +49,8 @@ export class Tile {
     this.sprite.on('pointerover', () => this.onHover());
     this.sprite.on('pointerout', () => this.onHoverOut());
 
-    // 針對筒子微調
-    if (this.type.startsWith('tong-')) {
+    // 針對筒子微調（牌背不需要）
+    if (!isBackTile && this.type.startsWith('tong-')) {
       this.sprite.y = 8; // 往下移8個像素
     }
 
