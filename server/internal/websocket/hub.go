@@ -277,7 +277,11 @@ func (h *Hub) addBot(room *game.Room) {
 	}
 
 	botNames := []string{"机器人·小智", "机器人·阿尔法", "机器人·贝塔", "机器人·伽马"}
-	botName := botNames[len(room.Players)%len(botNames)]
+	playerCount := len(room.Players)
+	if playerCount < 0 {
+		playerCount = 0
+	}
+	botName := botNames[playerCount%len(botNames)]
 	botID := "bot_" + room.ID + "_" + string(rune('A'+len(room.Players)))
 
 	if err := room.AddPlayer(botID, botName); err != nil {
