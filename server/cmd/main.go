@@ -3,12 +3,19 @@ package main
 import (
 	"log"
 	"mahjong/internal/api"
+	"mahjong/internal/logger"
 	"mahjong/internal/websocket"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	// 初始化 logger（同時輸出到 stdout 和檔案）
+	if err := logger.Init(); err != nil {
+		log.Fatal("Logger 初始化失敗:", err)
+	}
+	defer logger.Close()
+
 	// 建立 Gin 路由
 	r := gin.Default()
 

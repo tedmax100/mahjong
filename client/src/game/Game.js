@@ -108,17 +108,11 @@ ${'='.repeat(60)}`);
     this.table = new Table(this.app.screen.width, this.app.screen.height);
     this.container.addChild(this.table.container);
 
-    // 新增牌山容器
-    this.container.addChild(this.wallContainer);
-
     // 新增棄牌區域容器
     this.container.addChild(this.discardContainer);
 
     // 創建玩家區域
     this.createPlayers();
-
-    // 創建牌山視覺
-    this.createWalls();
 
     // 創建動作按鈕（非同步初始化）
     this.actionButtons = new ActionButtons(this.app.screen.width, this.app.screen.height);
@@ -695,7 +689,7 @@ ${'='.repeat(60)}`);
     // 棄牌包含牌底和牌面，實際佔用空間更大
     const tileWidth = 53.4375 * scale;  // 縮小至56.25%（原95）
     const tileHeight = 64.6875 * scale; // 縮小至56.25%（原115）
-    const spacing = 18; // 增加間距避免重疊
+    const spacing = 25; // 增加間距避免重疊
 
     // 計算該玩家已經打出的牌數
     const playerDiscards = this.discardedTiles.filter(d => d.playerPosition === playerPosition);
@@ -1871,11 +1865,6 @@ ${winner} 胡牌 (${winType})
     this.players.forEach(player => {
       player.resize(width, height);
     });
-
-    // 重新創建牌山以適應新的螢幕尺寸
-    if (this.wallContainer) {
-      this.createWalls();
-    }
 
     // 調整動作按鈕位置
     if (this.actionButtons) {

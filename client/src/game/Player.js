@@ -493,17 +493,31 @@ export class Player {
 
   /**
    * 顯示所有吃/碰/槓牌組
+   * 各玩家的面子放在手牌外側，牌面朝向該玩家所在的邊
    */
   async displayMelds(tileAssets) {
     this.meldsContainer.removeChildren();
 
     const tileWidth = 60;
     const tileHeight = 80;
-    const groupSpacing = 20; // 增加牌組間距
+    const groupSpacing = 10; // 牌組間距
+    const gapFromHand = tileWidth * 0.8; // 與手牌的間距（約一張牌寬度）
     let currentOffset = 0;
 
     const { Sprite, Container, Assets } = await import('pixi.js');
     const baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
+
+    // 計算手牌的邊界位置（根據實際手牌數量）
+    const handTileCount = this.tiles.length || 13;
+    const handTileWidth = tileWidth * 0.75; // 底部玩家手牌縮放
+    const handSpacing = 5;
+    const handWidth = handTileCount * handTileWidth + (handTileCount - 1) * handSpacing;
+
+    // 側邊玩家（左右）的手牌高度計算
+    const sideScale = 0.6;
+    const sideHandSpacing = 12;
+    const sideTileHeight = tileHeight * sideScale;
+    const sideHandHeight = handTileCount * (sideTileHeight + sideHandSpacing);
 
     for (const meld of this.melds) {
       const meldGroup = new Container();
@@ -528,59 +542,72 @@ export class Player {
                 texture = tileAssets['back'];
             }
         }
-        
+
         const tileSprite = new Sprite(texture);
         if (tileType.startsWith('tong-')) {
             tileSprite.y = 5;
         }
         tileContainer.addChild(tileSprite);
-        
+
         const isKong = meldType && meldType.includes('kong');
         const isFourthTile = i === 3;
 
         if (isKong && isFourthTile) {
-            // For promoted kong, place on top of one of the existing 3 tiles.
-            // For concealed kong, place on top of the middle ones.
+            // 槓牌第四張疊在第二張上方
             const baseTileIndex = 1;
             tileContainer.x = baseTileIndex * (tileWidth + 5);
             tileContainer.y = -tileHeight * 0.1;
         } else {
-            tileContainer.x = i * (tileWidth + 5); // Add spacing
+            tileContainer.x = i * (tileWidth + 5);
         }
 
         meldGroup.addChild(tileContainer);
       }
-      
+
       const groupWidth = (meldTiles.length === 4 ? 3 : meldTiles.length) * (tileWidth + 5);
+      const scale = 0.75;
 
       switch (this.position) {
-        case 'bottom':
-          meldGroup.scale.set(0.8);
-          meldGroup.x = this.screenWidth - 180 - currentOffset;
-          meldGroup.y = this.screenHeight - 120;
-          currentOffset += groupWidth * 0.8 + groupSpacing;
+        case 'bottom': {
+          // 底部玩家：面子在手牌右邊，與手牌保持間距，Y軸與手牌相同
+          meldGroup.scale.set(scale);
+          const handRightEdge = this.screenWidth / 2 + handWidth / 2;
+          meldGroup.x = handRightEdge + gapFromHand * 2 + currentOffset; // 再往右移更多
+          meldGroup.y = this.screenHeight - 180; // 與手牌 Y 軸相同
+          currentOffset += groupWidth * scale + groupSpacing;
           break;
-        case 'right':
-          meldGroup.scale.set(0.7);
-          meldGroup.x = this.screenWidth - 80;
-          meldGroup.y = 150 + currentOffset;
-          meldGroup.rotation = Math.PI / 2;
-          currentOffset += groupWidth * 0.7 + groupSpacing;
-          break;
-        case 'top':
-           meldGroup.scale.set(0.8);
-          meldGroup.x = 150 + currentOffset;
-          meldGroup.y = 100;
-          meldGroup.rotation = Math.PI;
-          currentOffset += groupWidth * 0.8 + groupSpacing;
-          break;
-        case 'left':
-          meldGroup.scale.set(0.7);
-          meldGroup.x = 80;
-          meldGroup.y = this.screenHeight - 150 - currentOffset;
+        }
+        case 'right': {
+          // 右側玩家：牌面向右，由上至下排列
+          meldGroup.scale.set(sideScale);
+          meldGroup.x = this.screenWidth - 200;
+          // 由上往下排列，使用 currentOffset
+          meldGroup.y = 200 + currentOffset;
           meldGroup.rotation = -Math.PI / 2;
-          currentOffset += groupWidth * 0.7 + groupSpacing;
+          currentOffset += groupWidth * sideScale + groupSpacing;
           break;
+        }
+        case 'top': {
+          // 上方玩家：牌面向上，由左至右排列
+          // 第一組在左邊，第二組在第一組右邊
+          meldGroup.scale.set(sideScale);
+          // 由左往右排列，使用 currentOffset
+          meldGroup.x = 500 + currentOffset + groupWidth * sideScale;
+          meldGroup.y = 150;
+          meldGroup.rotation = Math.PI; // 牌面朝上（翻轉180度）
+          currentOffset += groupWidth * sideScale + groupSpacing;
+          break;
+        }
+        case 'left': {
+          // 左側玩家：牌面向左，由上至下排列
+          meldGroup.scale.set(sideScale);
+          meldGroup.x = 200;
+          // 由上往下排列，使用 currentOffset
+          meldGroup.y = 200 + currentOffset + groupWidth * sideScale;
+          meldGroup.rotation = Math.PI / 2;
+          currentOffset += groupWidth * sideScale + groupSpacing;
+          break;
+        }
       }
       this.meldsContainer.addChild(meldGroup);
     }

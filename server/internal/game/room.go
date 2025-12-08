@@ -252,7 +252,7 @@ func (r *Room) GetGameStartMessage(playerPosition int) []byte {
 			"roomId":         r.ID,
 			"currentTurn":    r.CurrentTurn,
 			"myPosition":     playerPosition, // 玩家自己的位置
-			"dealerPosition": 0,              // 莊家位置（目前固定為 0）
+			"dealerPosition": r.Game.Dealer,  // 莊家位置
 		},
 	}
 

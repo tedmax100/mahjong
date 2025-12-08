@@ -6,6 +6,7 @@ import (
 	"log"
 	"mahjong/internal/ai"
 	"mahjong/internal/game"
+	"mahjong/internal/logger"
 	"mahjong/internal/model"
 	"mahjong/internal/scoring"
 	"math/rand"
@@ -199,6 +200,11 @@ func (h *Hub) broadcastPlayerLeftNoLock(room *game.Room, playerID, playerName st
 
 // startGame 開始遊戲
 func (h *Hub) startGame(room *game.Room) {
+	// 清空 log 檔案，開始新局
+	if err := logger.ClearLog(); err != nil {
+		log.Printf("清空 log 檔案失敗: %v", err)
+	}
+
 	log.Printf("房間 %s 開始遊戲", room.ID)
 
 	room.GameStarted = true
@@ -391,6 +397,9 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 			// 只有在正常輪次（總牌數 16 張）才摸牌
 			// 如果剛吃/碰/槓完（總牌數 17 張），不摸牌直接出牌
 			if totalTiles == 16 {
+				// 記錄摸牌前的花牌數量
+				flowerCountBefore := len(currentPlayer.Flowers)
+
 				// 使用 DrawTileWithFlowerReplacement 自動處理花牌
 				drawnTile := room.Game.DrawTileWithFlowerReplacement(currentPlayer)
 				if drawnTile != "" {
@@ -398,10 +407,11 @@ func (h *Hub) CheckAndPlayBotTurn(room *game.Room, withDelay bool) {
 						currentPlayer.Name, drawnTile, len(currentPlayer.Hand), len(currentPlayer.Melds), len(currentPlayer.Flowers))
 					currentPlayer.Hand = append(currentPlayer.Hand, drawnTile)
 
-					// 如果摸牌過程中補了花牌，記錄並廣播
-					if len(currentPlayer.Flowers) > 0 {
+					// 如果摸牌過程中補了花牌，廣播給前端
+					if len(currentPlayer.Flowers) > flowerCountBefore {
+						newFlowers := currentPlayer.Flowers[flowerCountBefore:]
 						log.Printf("Bot %s 的花牌: %v", currentPlayer.Name, currentPlayer.Flowers)
-						// TODO: 廣播花牌給前端
+						h.BroadcastFlowerTiles(room, currentPlayer.ID, newFlowers)
 					}
 
 					// 檢查 Bot 是否已聽牌
@@ -1283,6 +1293,10 @@ func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *scoring
 		h.mu.Lock()
 		// 檢查遊戲是否還未開始新的一局
 		if !room.GameStarted {
+			// 清空 log 檔案，開始新局
+			if err := logger.ClearLog(); err != nil {
+				log.Printf("清空 log 檔案失敗: %v", err)
+			}
 			log.Printf("%d 秒等待結束（動畫 %d 秒 + 倒計時 %d 秒），開始新的一局...", totalWaitTime, animationDelay, countdown)
 			room.NextRound()
 		} else {
@@ -1291,6 +1305,9 @@ func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *scoring
 			return
 		}
 		h.mu.Unlock()
+
+		// 廣播房間更新（確保客戶端有最新的玩家資訊）
+		h.broadcastRoomUpdate(room)
 
 		// 發牌
 		h.dealTiles(room)
