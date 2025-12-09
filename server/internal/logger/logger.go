@@ -21,7 +21,7 @@ func Init() error {
 	defer mu.Unlock()
 
 	var err error
-	logFile, err = os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logFile, err = os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return fmt.Errorf("無法開啟 log 檔案: %v", err)
 	}
@@ -47,12 +47,14 @@ func ClearLog() error {
 
 	// 關閉現有檔案
 	if logFile != nil {
-		logFile.Close()
+		if err := logFile.Close(); err != nil {
+			return fmt.Errorf("無法關閉 log 檔案: %v", err)
+		}
 	}
 
 	// 以清空模式重新開啟檔案
 	var err error
-	logFile, err = os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	logFile, err = os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("無法清空 log 檔案: %v", err)
 	}
@@ -78,7 +80,9 @@ func Close() {
 	defer mu.Unlock()
 
 	if logFile != nil {
-		logFile.Close()
+		if err := logFile.Close(); err != nil {
+			log.Printf("關閉 log 檔案失敗: %v", err)
+		}
 		logFile = nil
 	}
 }
