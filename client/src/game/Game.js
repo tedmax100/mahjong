@@ -780,6 +780,13 @@ ${'='.repeat(60)}`);
   async handlePlayerDraw(playerId, tile) {
     console.log(`玩家 ${playerId} 摸牌: ${tile}`);
 
+    // 🌸 檢查是否是花牌，如果是則交給 handleFlower 處理
+    if (tile && tile.startsWith('flower-')) {
+      console.log(`🌸 摸到花牌 ${tile}，轉交給 handleFlower 處理`);
+      await this.handleFlower(playerId, [tile]);
+      return;
+    }
+
     // 找到摸牌的玩家（視覺位置）
     let visualPosition = -1;
     for (let i = 0; i < this.players.length; i++) {
@@ -1216,8 +1223,7 @@ ${'='.repeat(60)}`);
       }
       flowerContainer.addChild(flowerSprite);
 
-      // 縮小花牌顯示
-      flowerContainer.scale.set(0.5);
+      // 不在這裡縮放，由 positionFlowers 統一處理 flowersContainer 的縮放
 
       player.flowersList.push({ container: flowerContainer, type: flower });
       player.flowersContainer.addChild(flowerContainer);
@@ -1243,43 +1249,71 @@ ${'='.repeat(60)}`);
 
   /**
    * 根據玩家視覺位置排列花牌
+   * 花牌放在吃碰槓牌組的右邊（繼續排列），保持相同面向
    */
   positionFlowers(player, visualPosition) {
-    const tileWidth = 40;
-    const tileHeight = 55;
+    const tileWidth = 60;
+    const tileHeight = 80;
     const spacing = 5;
+    const groupSpacing = 15; // 與吃碰槓牌組的間距
+
+    // 計算吃碰槓牌組佔用的總寬度
+    const meldsCount = player.melds ? player.melds.length : 0;
+    // 每組面子約 3 張牌寬（槓牌第4張疊在上面）
+    const meldGroupWidth = 3 * (tileWidth + 5);
+    const scale = visualPosition === 0 ? 0.75 : 0.6;
+    const meldsOffset = meldsCount * (meldGroupWidth * scale + 10);
+
+    // 計算手牌邊界（用於底部玩家）
+    const handTileCount = player.tiles ? player.tiles.length : 13;
+    const handTileWidth = tileWidth * 0.75;
+    const handSpacing = 5;
+    const handWidth = handTileCount * handTileWidth + (handTileCount - 1) * handSpacing;
+    const gapFromHand = tileWidth * 0.8;
 
     player.flowersList.forEach((flower, index) => {
-      const col = index % 4;
-      const row = Math.floor(index / 4);
+      // 重置旋轉（會在下面根據位置設置）
+      flower.container.rotation = 0;
+      flower.container.scale.set(1); // 重置縮放，會用 flowersContainer 統一縮放
 
       switch (visualPosition) {
-        case 0: // 自己 (底部) - 花牌在右下角
+        case 0: { // 自己 (底部) - 花牌在吃碰槓右邊，水平排列
+          const handRightEdge = this.app.screen.width / 2 + handWidth / 2;
+          player.flowersContainer.x = handRightEdge + gapFromHand * 2 + meldsOffset + groupSpacing;
+          player.flowersContainer.y = this.app.screen.height - 180;
+          player.flowersContainer.rotation = 0;
+          player.flowersContainer.scale.set(scale);
+          flower.container.x = index * (tileWidth + spacing);
+          flower.container.y = 0;
+          break;
+        }
+        case 1: { // 右邊玩家 - 花牌在吃碰槓下方，垂直排列
           player.flowersContainer.x = this.app.screen.width - 200;
-          player.flowersContainer.y = this.app.screen.height - 80;
-          flower.container.x = col * (tileWidth + spacing);
-          flower.container.y = row * (tileHeight + spacing);
+          player.flowersContainer.y = 200 + meldsOffset + groupSpacing;
+          player.flowersContainer.rotation = -Math.PI / 2;
+          player.flowersContainer.scale.set(scale);
+          flower.container.x = index * (tileWidth + spacing);
+          flower.container.y = 0;
           break;
-        case 1: // 右邊玩家 - 花牌在右上角
-          player.flowersContainer.x = this.app.screen.width - 80;
-          player.flowersContainer.y = 100;
-          flower.container.x = 0;
-          flower.container.y = index * (tileHeight * 0.5 + spacing);
-          flower.container.rotation = Math.PI / 2;
+        }
+        case 2: { // 上方玩家 - 花牌在吃碰槓右邊，水平排列（翻轉180度）
+          player.flowersContainer.x = 500 + meldsOffset + groupSpacing + (player.flowersList.length * (tileWidth + spacing) * scale);
+          player.flowersContainer.y = 150;
+          player.flowersContainer.rotation = Math.PI;
+          player.flowersContainer.scale.set(scale);
+          flower.container.x = index * (tileWidth + spacing);
+          flower.container.y = 0;
           break;
-        case 2: // 上方玩家 - 花牌在左上角
-          player.flowersContainer.x = 150;
-          player.flowersContainer.y = 80;
-          flower.container.x = col * (tileWidth + spacing);
-          flower.container.y = row * (tileHeight + spacing);
+        }
+        case 3: { // 左邊玩家 - 花牌在吃碰槓下方，垂直排列
+          player.flowersContainer.x = 200;
+          player.flowersContainer.y = 200 + meldsOffset + groupSpacing + (player.flowersList.length * (tileWidth + spacing) * scale);
+          player.flowersContainer.rotation = Math.PI / 2;
+          player.flowersContainer.scale.set(scale);
+          flower.container.x = index * (tileWidth + spacing);
+          flower.container.y = 0;
           break;
-        case 3: // 左邊玩家 - 花牌在左下角
-          player.flowersContainer.x = 80;
-          player.flowersContainer.y = this.app.screen.height - 200;
-          flower.container.x = 0;
-          flower.container.y = index * (tileHeight * 0.5 + spacing);
-          flower.container.rotation = -Math.PI / 2;
-          break;
+        }
       }
     });
   }

@@ -498,6 +498,12 @@ export class Player {
   async displayMelds(tileAssets) {
     this.meldsContainer.removeChildren();
 
+    // 檢查 tileAssets 是否有效
+    if (!tileAssets || Object.keys(tileAssets).length === 0) {
+      console.error('❌ displayMelds: tileAssets 為空或未定義');
+      return;
+    }
+
     const tileWidth = 60;
     const tileHeight = 80;
     const groupSpacing = 10; // 牌組間距
@@ -541,6 +547,12 @@ export class Player {
                 console.warn(`⚠️ displayMelds: 找不到牌面貼圖 "${tileType}"，使用牌背。可用的 key:`, Object.keys(tileAssets || {}).slice(0, 10));
                 texture = tileAssets['back'];
             }
+        }
+
+        // 最終檢查：如果 texture 仍然為空，跳過這張牌的創建
+        if (!texture) {
+            console.error(`❌ displayMelds: 無法獲取紋理 "${tileType}"，跳過此牌`);
+            continue;
         }
 
         const tileSprite = new Sprite(texture);
