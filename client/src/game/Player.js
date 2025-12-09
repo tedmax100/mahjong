@@ -592,10 +592,10 @@ export class Player {
         case 'right': {
           // 右側玩家：牌面向右，由上至下排列
           meldGroup.scale.set(sideScale);
-          meldGroup.x = this.screenWidth - 200;
+          meldGroup.x = this.screenWidth - 120;
           // 由上往下排列，使用 currentOffset
           meldGroup.y = 200 + currentOffset;
-          meldGroup.rotation = -Math.PI / 2;
+          meldGroup.rotation = Math.PI / 2;
           currentOffset += groupWidth * sideScale + groupSpacing;
           break;
         }
@@ -604,7 +604,7 @@ export class Player {
           // 第一組在左邊，第二組在第一組右邊
           meldGroup.scale.set(sideScale);
           // 由左往右排列，使用 currentOffset
-          meldGroup.x = 500 + currentOffset + groupWidth * sideScale;
+          meldGroup.x = 500 + currentOffset;
           meldGroup.y = 150;
           meldGroup.rotation = Math.PI; // 牌面朝上（翻轉180度）
           currentOffset += groupWidth * sideScale + groupSpacing;
@@ -615,7 +615,7 @@ export class Player {
           meldGroup.scale.set(sideScale);
           meldGroup.x = 200;
           // 由上往下排列，使用 currentOffset
-          meldGroup.y = 200 + currentOffset + groupWidth * sideScale;
+          meldGroup.y = 200 + currentOffset;
           meldGroup.rotation = Math.PI / 2;
           currentOffset += groupWidth * sideScale + groupSpacing;
           break;

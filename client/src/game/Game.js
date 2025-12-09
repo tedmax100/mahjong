@@ -1288,16 +1288,16 @@ ${'='.repeat(60)}`);
           break;
         }
         case 1: { // 右邊玩家 - 花牌在吃碰槓下方，垂直排列
-          player.flowersContainer.x = this.app.screen.width - 200;
+          player.flowersContainer.x = this.app.screen.width - 120;
           player.flowersContainer.y = 200 + meldsOffset + groupSpacing;
-          player.flowersContainer.rotation = -Math.PI / 2;
+          player.flowersContainer.rotation = Math.PI / 2;
           player.flowersContainer.scale.set(scale);
           flower.container.x = index * (tileWidth + spacing);
           flower.container.y = 0;
           break;
         }
         case 2: { // 上方玩家 - 花牌在吃碰槓右邊，水平排列（翻轉180度）
-          player.flowersContainer.x = 500 + meldsOffset + groupSpacing + (player.flowersList.length * (tileWidth + spacing) * scale);
+          player.flowersContainer.x = 500 + meldsOffset + groupSpacing;
           player.flowersContainer.y = 150;
           player.flowersContainer.rotation = Math.PI;
           player.flowersContainer.scale.set(scale);
@@ -1307,7 +1307,7 @@ ${'='.repeat(60)}`);
         }
         case 3: { // 左邊玩家 - 花牌在吃碰槓下方，垂直排列
           player.flowersContainer.x = 200;
-          player.flowersContainer.y = 200 + meldsOffset + groupSpacing + (player.flowersList.length * (tileWidth + spacing) * scale);
+          player.flowersContainer.y = 200 + meldsOffset + groupSpacing;
           player.flowersContainer.rotation = Math.PI / 2;
           player.flowersContainer.scale.set(scale);
           flower.container.x = index * (tileWidth + spacing);
