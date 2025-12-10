@@ -8,6 +8,7 @@ import { MahjongLogic } from './MahjongLogic.js';
 import { AssetLoader } from './AssetLoader.js';
 import { WinningHandDisplay } from './WinningHandDisplay.js';
 import { DiscardManager } from './DiscardManager.js';
+import { ChowSelectionUI } from './ChowSelectionUI.js';
 
 /**
  * 主遊戲類
@@ -45,10 +46,12 @@ export class Game {
     this.possibleTingDiscards = {};
     this.isDeclaringTing = false;
     this.selfKongOptions = [];
+    this.chowSelectionUI = null;
 
     // 遊戲公告
     this.announcementText = null;
     this.winningHandContainer = null;
+    this.endScreenContainer = null;
 
     // 音效管理器
     this.audioManager = new AudioManager();
@@ -128,8 +131,14 @@ ${'='.repeat(60)}`);
     // 啟用容器的 zIndex 排序，確保層級正確
     this.container.sortableChildren = true;
 
+    // 預載入牌底紋理（所有 Tile 共享）
+    await Tile.preloadBaseTexture();
+
     // 載入素材 (Using AssetLoader)
     this.tileAssets = await this.assetLoader.load();
+
+    // 初始化吃牌選擇 UI
+    this.chowSelectionUI = new ChowSelectionUI(this.container, this.app.screen, this.tileAssets);
 
 
     // 創建牌桌
@@ -177,8 +186,8 @@ ${'='.repeat(60)}`);
     this.winningHandContainer.visible = false;
     this.winningHandContainer.zIndex = 11000;
     this.container.addChild(this.winningHandContainer);
-    // Initialize with empty assets first, update after load
-    this.winningHandDisplayHandler = new WinningHandDisplay(this.winningHandContainer, this.app.screen, {}); 
+    // Initialize with loaded tile assets
+    this.winningHandDisplayHandler = new WinningHandDisplay(this.winningHandContainer, this.app.screen, this.tileAssets); 
 
     // 顯示等待文字
     this.showWaitingText();
@@ -370,6 +379,13 @@ ${'='.repeat(60)}`);
 
   startGame(data) {
     console.log('遊戲開始!', data);
+
+    // At the start of a new round, clean up the UI from the previous round.
+    if (this.endScreenContainer) {
+      this.container.removeChild(this.endScreenContainer);
+      this.endScreenContainer = null;
+    }
+    this.resetForNewRound();
 
     // 播放遊戲背景音樂和骰子音效
     this.audioManager.playBGM('game');
@@ -770,10 +786,11 @@ ${'='.repeat(60)}`);
       player.rearrangeTiles();
 
       // 新增吃牌組到顯示區域
-      await player.addMeld({
+      player.addMeld({
         type: 'chow',
         tiles: chowTiles
-      }, this.tileAssets);
+      });
+      await player.updateOpenLayout(this.tileAssets);
 
       // 從棄牌堆中移除最後一張（被吃的牌）
       this.discardManager.removeLastDiscard();
@@ -849,10 +866,11 @@ ${'='.repeat(60)}`);
       player.rearrangeTiles();
 
       // 新增碰牌組到顯示區域
-      await player.addMeld({
+      player.addMeld({
         type: 'pong',
         tiles: [tile, tile, tile]
-      }, this.tileAssets);
+      });
+      await player.updateOpenLayout(this.tileAssets);
 
       // 從棄牌堆中移除最後一張（被碰的牌）
       this.discardManager.removeLastDiscard();
@@ -967,7 +985,8 @@ ${'='.repeat(60)}`);
       player.rearrangeTiles();
 
       // 新增槓牌組到顯示區域
-      await player.addMeld(meld, this.tileAssets);
+      player.addMeld(meld);
+      await player.updateOpenLayout(this.tileAssets);
 
       // 如果是明槓，從棄牌堆中移除最後一張（被槓的牌）
       if (meld.Type === 'kong_exposed') {
@@ -1045,142 +1064,31 @@ ${'='.repeat(60)}`);
   async handleFlower(playerId, flowers) {
     console.log(`玩家 ${playerId} 摸到花牌:`, flowers);
 
-    // 找到該玩家的視覺位置
-    let visualPosition = -1;
-    for (let i = 0; i < this.players.length; i++) {
-      if (this.players[i].userId === playerId) {
-        visualPosition = i;
-        break;
-      }
-    }
-
-    if (visualPosition === -1) {
+    const player = this.players.find(p => p.userId === playerId);
+    if (!player) {
       console.error('未找到玩家:', playerId);
       return;
     }
+    
+    const visualPosition = this.serverToVisualPosition(player.serverPosition);
 
-    const player = this.players[visualPosition];
-
-    // 初始化花牌容器（如果還沒有）
-    if (!player.flowersContainer) {
-      player.flowersContainer = new Container();
-      player.flowersList = [];
-      player.container.addChild(player.flowersContainer);
-    }
-
-    // 為每張花牌創建顯示
     for (const flower of flowers) {
-      const texture = this.tileAssets[flower] || this.tileAssets['back'];
-      const flowerSprite = new Sprite(texture);
-
-      // 載入牌底
-      let baseTexture;
-      try {
-        baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
-      } catch (error) {
-        console.warn('無法載入花牌牌底', error);
-      }
-
-      const flowerContainer = new Container();
-      if (baseTexture) {
-        const baseSprite = new Sprite(baseTexture);
-        flowerContainer.addChild(baseSprite);
-      }
-      flowerContainer.addChild(flowerSprite);
-
-      // 不在這裡縮放，由 positionFlowers 統一處理 flowersContainer 的縮放
-
-      player.flowersList.push({ container: flowerContainer, type: flower });
-      player.flowersContainer.addChild(flowerContainer);
+      player.addFlower(flower);
     }
 
-    // 根據玩家位置排列花牌
-    this.positionFlowers(player, visualPosition);
+    // Call the unified layout update
+    await player.updateOpenLayout(this.tileAssets);
 
-    // 其他玩家（非自己）摸到花牌時，從手牌移除對應數量的白牌
+    // For other players, remove a corresponding number of placeholder tiles from their hand
     if (visualPosition !== 0) {
       for (let i = 0; i < flowers.length && player.tiles.length > 0; i++) {
         const tileToRemove = player.tiles.pop();
         tileToRemove.destroy();
       }
-      // 重新排列手牌
-      player.tiles.forEach((tile, index) => {
-        player.positionTile(tile, index);
-      });
+      player.rearrangeTiles();
     }
 
-    console.log(`✅ 花牌顯示完成，玩家 ${player.name} 現有 ${player.flowersList.length} 張花牌`);
-  }
-
-  /**
-   * 根據玩家視覺位置排列花牌
-   * 花牌放在吃碰槓牌組的右邊（繼續排列），保持相同面向
-   */
-  positionFlowers(player, visualPosition) {
-    const tileWidth = 60;
-    const tileHeight = 80;
-    const spacing = 5;
-    const groupSpacing = 15; // 與吃碰槓牌組的間距
-
-    // 計算吃碰槓牌組佔用的總寬度
-    const meldsCount = player.melds ? player.melds.length : 0;
-    // 每組面子約 3 張牌寬（槓牌第4張疊在上面）
-    const meldGroupWidth = 3 * (tileWidth + 5);
-    const scale = visualPosition === 0 ? 0.75 : 0.6;
-    const meldsOffset = meldsCount * (meldGroupWidth * scale + 10);
-
-    // 計算手牌邊界（用於底部玩家）
-    const handTileCount = player.tiles ? player.tiles.length : 13;
-    const handTileWidth = tileWidth * 0.75;
-    const handSpacing = 5;
-    const handWidth = handTileCount * handTileWidth + (handTileCount - 1) * handSpacing;
-    const gapFromHand = tileWidth * 0.8;
-
-    player.flowersList.forEach((flower, index) => {
-      // 重置旋轉（會在下面根據位置設置）
-      flower.container.rotation = 0;
-      flower.container.scale.set(1); // 重置縮放，會用 flowersContainer 統一縮放
-
-      switch (visualPosition) {
-        case 0: { // 自己 (底部) - 花牌在吃碰槓右邊，水平排列
-          const handRightEdge = this.app.screen.width / 2 + handWidth / 2;
-          player.flowersContainer.x = handRightEdge + gapFromHand * 2 + meldsOffset + groupSpacing;
-          player.flowersContainer.y = this.app.screen.height - 180;
-          player.flowersContainer.rotation = 0;
-          player.flowersContainer.scale.set(scale);
-          flower.container.x = index * (tileWidth + spacing);
-          flower.container.y = 0;
-          break;
-        }
-        case 1: { // 右邊玩家 - 花牌在吃碰槓下方，垂直排列
-          player.flowersContainer.x = this.app.screen.width - 120;
-          player.flowersContainer.y = 200 + meldsOffset + groupSpacing;
-          player.flowersContainer.rotation = Math.PI / 2;
-          player.flowersContainer.scale.set(scale);
-          flower.container.x = index * (tileWidth + spacing);
-          flower.container.y = 0;
-          break;
-        }
-        case 2: { // 上方玩家 - 花牌在吃碰槓右邊，水平排列（翻轉180度）
-          player.flowersContainer.x = 500 + meldsOffset + groupSpacing;
-          player.flowersContainer.y = 150;
-          player.flowersContainer.rotation = Math.PI;
-          player.flowersContainer.scale.set(scale);
-          flower.container.x = index * (tileWidth + spacing);
-          flower.container.y = 0;
-          break;
-        }
-        case 3: { // 左邊玩家 - 花牌在吃碰槓下方，垂直排列
-          player.flowersContainer.x = 200;
-          player.flowersContainer.y = 200 + meldsOffset + groupSpacing;
-          player.flowersContainer.rotation = Math.PI / 2;
-          player.flowersContainer.scale.set(scale);
-          flower.container.x = index * (tileWidth + spacing);
-          flower.container.y = 0;
-          break;
-        }
-      }
-    });
+    console.log(`✅ 花牌處理完成，玩家 ${player.name} 現有 ${player.flowers.length} 張花牌`);
   }
 
   showAnnouncement(text, duration = 3000) {
@@ -1475,7 +1383,9 @@ ${winner} 胡牌 (${winType})
     if (this.lastDiscardedTile && this.pendingActions.chow) {
       if (this.pendingActions.chow.length > 1) {
         // 如果有多個吃牌組合，提示玩家選擇
-        this.promptChowSelection(this.pendingActions.chow);
+        this.chowSelectionUI.promptSelection(this.pendingActions.chow, this.lastDiscardedTile, (selectedCombination) => {
+          this.sendAction('chow', this.lastDiscardedTile, selectedCombination);
+        });
       } else if (this.pendingActions.chow.length === 1) {
         // 只有一個組合，直接執行
         const combination = this.pendingActions.chow[0];
@@ -1610,15 +1520,21 @@ ${winner} 胡牌 (${winType})
     this.audioManager.playButtonSound();
 
     // 清理吃牌選擇介面（如果存在）
-    this.clearChowSelection();
+    this.chowSelectionUI.clear();
+
+    // 立即隱藏按鈕，避免重複點擊
+    this.actionButtons.hide();
+    this.pendingActions = [];
+
+    // 清除動作超時計時器，避免重複發送 pass
+    if (this.actionTimeout) {
+      clearTimeout(this.actionTimeout);
+      this.actionTimeout = null;
+    }
 
     // 發送過的動作到伺服器
     if (this.lastDiscardedTile) {
       this.sendAction('pass', this.lastDiscardedTile);
-    } else {
-      // 如果沒有 lastDiscardedTile，只是隱藏按鈕
-      this.actionButtons.hide();
-      this.pendingActions = [];
     }
 
     this.possibleTingDiscards = {};
@@ -1826,7 +1742,7 @@ ${winner} 胡牌 (${winType})
         this.actionButtons.hide();
       }
       // 清理吃牌選擇介面（如果存在）
-      this.clearChowSelection();
+      this.chowSelectionUI.clear();
     }, timeout * 1000);
   }
 
@@ -1911,35 +1827,21 @@ ${winner} 胡牌 (${winType})
     detailsText.y = this.app.screen.height / 2;
     endScreenContainer.addChild(detailsText);
 
-    // 倒數計時文字
-    const countdownText = new Text({
-      text: `${countdown}秒後開始新局`,
+    // 等待下一局開始的提示
+    const waitingText = new Text({
+      text: '等待伺服器開始新的一局...',
       style: {
         fontSize: 28,
         fill: 0xCCCCCC,
       }
     });
-    countdownText.anchor.set(0.5);
-    countdownText.x = this.app.screen.width / 2;
-    countdownText.y = this.app.screen.height / 2 + 100;
-    endScreenContainer.addChild(countdownText);
-
-    this.container.addChild(endScreenContainer);
-
-    // 倒數計時邏輯
-    let remaining = countdown;
-    const countdownInterval = setInterval(() => {
-      remaining--;
-      if (remaining > 0) {
-        countdownText.text = `${remaining}秒後開始新局`;
-      } else {
-        clearInterval(countdownInterval);
-        // 伺服器會自動開始新的一局，客戶端等待 game_start 訊息
-        // 清理介面
-        this.container.removeChild(endScreenContainer);
-        this.resetForNewRound();
-      }
-    }, 1000);
+    waitingText.anchor.set(0.5);
+    waitingText.x = this.app.screen.width / 2;
+    waitingText.y = this.app.screen.height / 2 + 100;
+    endScreenContainer.addChild(waitingText);
+    
+    this.endScreenContainer = endScreenContainer;
+    this.container.addChild(this.endScreenContainer);
   }
 
   /**

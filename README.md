@@ -30,6 +30,14 @@
 *   `Node.js` (建議版本 18+) 及 `npm`
 *   (選用) `cloudflared` - 若要使用 `make start` 功能，會自動為您安裝。
 
+執行 LLM
+```bash
+docker compose up -d
+
+## 選用qwen 2.5 1.b
+docker exec -it qwen_server ollama run qwen2.5:1.5b
+```
+
 #### 2. 安裝依賴
 
 進入專案根目錄，執行以下指令來安裝前後端的所有依賴項目：

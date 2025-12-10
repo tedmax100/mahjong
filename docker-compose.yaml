@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  qwen-server:
+    image: ollama/ollama:latest
+    container_name: qwen_server
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_storage:/root/.ollama
+    # 如果您有 NVIDIA 顯卡，請取消註解以下 deploy 區塊以啟用 GPU 加速
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  ollama_storage:

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>台湾16张麻将</title>
+  <title>臺灣16張麻將</title>
   <style>
     * {
       margin: 0;
@@ -23,7 +23,7 @@
       position: relative;
     }
 
-    /* 登入界面 */
+    /* 登入介面 */
     #login-screen {
       position: absolute;
       top: 0;
@@ -80,7 +80,7 @@
       transform: translateY(-2px);
     }
 
-    /* 房间界面 */
+    /* 房間介面 */
     #room-screen {
       position: absolute;
       top: 0;
@@ -155,7 +155,7 @@
       background: #38a169;
     }
 
-    /* 游戏界面 */
+    /* 遊戲介面 */
     #game-container {
       width: 100%;
       height: 100%;
@@ -175,7 +175,7 @@
       height: 100% !important;
     }
 
-    /* 用户信息 */
+    /* 使用者資訊 */
     .user-info {
       position: absolute;
       top: 20px;
@@ -213,7 +213,7 @@
       font-size: 14px;
     }
 
-    /* 启动画面 */
+    /* 啟動畫面 */
     #splash-screen {
       position: fixed;
       top: 0;
@@ -266,64 +266,64 @@
       text-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
   </style>
-  <script type="module" crossorigin src="/assets/index-BqucLekh.js"></script>
+  <script type="module" crossorigin src="/assets/index-BE9-nhNf.js"></script>
 </head>
 <body>
-  <!-- 启动画面 -->
+  <!-- 啟動畫面 -->
   <div id="splash-screen">
-    <div class="splash-title">🀄 台灣16張麻將</div>
+    <div class="splash-title">🀄 臺灣16張麻將</div>
   </div>
 
   <div id="app">
-    <!-- 登入界面 -->
+    <!-- 登入介面 -->
     <div id="login-screen">
       <div class="login-box">
-        <h1>🀄 台湾16张麻将</h1>
-        <p>四人线上对战</p>
+        <h1>🀄 臺灣16張麻將</h1>
+        <p>四人線上對戰</p>
         <div style="margin: 20px 0;">
           <input
             type="text"
             id="player-name-input"
-            placeholder="输入你的名字（或留空随机生成）"
+            placeholder="輸入你的名字（或留空隨機生成）"
             style="width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px;"
             maxlength="20"
           >
         </div>
         <button class="google-btn" id="quick-start-btn" style="width: 100%; background: #667eea; color: white; border: none;">
-          🎮 开始游戏
+          🎮 開始遊戲
         </button>
       </div>
     </div>
 
-    <!-- 房间选择界面 -->
+    <!-- 房間介面 -->
     <div id="room-screen" class="hidden">
       <div class="room-box">
-        <h2>选择游戏模式</h2>
+        <h2>選擇遊戲模式</h2>
         <div class="room-actions">
-          <button id="create-room-btn">创建新房间</button>
+          <button id="create-room-btn">創建新房間</button>
           <div class="room-input">
-            <input type="text" id="room-id-input" placeholder="输入房间号">
-            <button id="join-room-btn" class="secondary">加入房间</button>
+            <input type="text" id="room-id-input" placeholder="輸入房間號">
+            <button id="join-room-btn" class="secondary">加入房間</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 游戏界面 -->
+    <!-- 遊戲介面 -->
     <div id="game-container" class="hidden"></div>
 
-    <!-- 用户信息 -->
+    <!-- 使用者資訊 -->
     <div class="user-info hidden" id="user-info">
       <img class="user-avatar" id="user-avatar" src="" alt="">
       <span id="user-name"></span>
     </div>
 
-    <!-- 房间信息 -->
+    <!-- 房間資訊 -->
     <div class="room-info hidden" id="room-info">
-      <div><strong>房间号：</strong><span id="current-room-id"></span></div>
+      <div><strong>房間號：</strong><span id="current-room-id"></span></div>
       <div><strong>玩家：</strong><span id="player-count">1/4</span></div>
-      <button class="share-btn" id="share-room-btn">分享房间</button>
-      <button class="share-btn" id="add-bot-btn" style="background: #48bb78;">🤖 添加Bot</button>
+      <button class="share-btn" id="share-room-btn">分享房間</button>
+      <button class="share-btn" id="add-bot-btn" style="background: #48bb78;">🤖 新增Bot</button>
     </div>
   </div>
 

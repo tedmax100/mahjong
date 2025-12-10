@@ -165,7 +165,7 @@ func NewRoom(id string) *Room {
 }
 
 // AddPlayer 新增玩家到房間
-func (r *Room) AddPlayer(userID, userName string) error {
+func (r *Room) AddPlayer(userID, userName string, isBot bool) error {
 	// 檢查遊戲是否已經開始
 	if r.GameStarted {
 		return errors.New("遊戲已開始")
@@ -183,10 +183,11 @@ func (r *Room) AddPlayer(userID, userName string) error {
 		Score:    1000,
 		Melds:    make([]model.Meld, 0),
 		Flowers:  make([]string, 0),
+		IsBot:    isBot,
 	}
 
 	r.Players = append(r.Players, player)
-	log.Printf("玩家 %s 加入房間 %s (位置: %d)", userName, r.ID, player.Position)
+	log.Printf("玩家 %s 加入房間 %s (位置: %d, IsBot: %v)", userName, r.ID, player.Position, isBot)
 
 	return nil
 }
@@ -244,15 +245,20 @@ func (r *Room) GetRoomUpdateMessage() []byte {
 	return data
 }
 
-// GetGameStartMessage 取得遊戲開始訊息（為特定玩家）
-func (r *Room) GetGameStartMessage(playerPosition int) []byte {
+// GetGameStartMessage 取得遊戲開始訊息（不包含牌）
+func (r *Room) GetGameStartMessage(playerIndex int) []byte {
+	if playerIndex < 0 || playerIndex >= len(r.Players) {
+		return []byte{}
+	}
+	player := r.Players[playerIndex]
+
 	message := map[string]interface{}{
 		"type": "game_start",
 		"data": map[string]interface{}{
 			"roomId":         r.ID,
 			"currentTurn":    r.CurrentTurn,
-			"myPosition":     playerPosition, // 玩家自己的位置
-			"dealerPosition": r.Game.Dealer,  // 莊家位置
+			"myPosition":     player.Position,
+			"dealerPosition": r.Game.Dealer,
 		},
 	}
 
@@ -265,7 +271,6 @@ func (r *Room) GetDealTilesMessage(playerIndex int) []byte {
 	if playerIndex < 0 || playerIndex >= len(r.Players) {
 		return []byte{}
 	}
-
 	player := r.Players[playerIndex]
 
 	message := map[string]interface{}{

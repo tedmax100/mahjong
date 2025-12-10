@@ -66,7 +66,7 @@ func (h *Hub) registerClient(client *Client) {
 		log.Printf("建立新房間: %s", client.RoomID)
 	}
 
-	if err := room.AddPlayer(client.UserID, client.UserName); err != nil {
+	if err := room.AddPlayer(client.UserID, client.UserName, false); err != nil {
 		log.Printf("玩家加入房間失敗: %v", err)
 		h.mu.Unlock() // Unlock before sending to channel
 		// 發送具體的錯誤訊息
@@ -222,6 +222,9 @@ func (h *Hub) startGame(room *game.Room) {
 		}
 	}
 
+	// 等待一小段時間，確保 game_start 訊息先被客戶端處理
+	time.Sleep(100 * time.Millisecond)
+
 	// 發牌
 	h.dealTiles(room)
 
@@ -293,7 +296,7 @@ func (h *Hub) addBot(room *game.Room) {
 	botName := botNames[playerCount%len(botNames)]
 	botID := "bot_" + room.ID + "_" + string(rune('A'+len(room.Players)))
 
-	if err := room.AddPlayer(botID, botName); err != nil {
+	if err := room.AddPlayer(botID, botName, true); err != nil {
 		log.Printf("添加 Bot 失敗: %v", err)
 		h.mu.Unlock()
 		return
@@ -1309,9 +1312,6 @@ func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *scoring
 		// 廣播房間更新（確保客戶端有最新的玩家資訊）
 		h.broadcastRoomUpdate(room)
 
-		// 發牌
-		h.dealTiles(room)
-
 		// 發送遊戲開始訊息（為每個玩家單獨發送，包含該玩家的位置）
 		for i, player := range room.Players {
 			if clientInterface, ok := room.Clients[player.ID]; ok {
@@ -1323,6 +1323,9 @@ func (h *Hub) BroadcastGameWin(room *game.Room, winnerID string, result *scoring
 				client.Send <- startMessage
 			}
 		}
+
+		// 發牌
+		h.dealTiles(room)
 
 		// 檢查 Bot 回合
 		h.CheckAndPlayBotTurn(room, false)

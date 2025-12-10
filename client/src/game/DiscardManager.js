@@ -156,8 +156,10 @@ export class DiscardManager {
         const tileWidth = 53.4375 * scale;
         const tileHeight = 64.6875 * scale;
         const spacing = 25;
+        const rowSpacing = 10; // 排與排之間的額外間距
 
-        const maxTilesPerRow = (playerPosition === 1 || playerPosition === 3) ? 8 : 10;
+        // 左右兩側改為每排 7 張
+        const maxTilesPerRow = (playerPosition === 1 || playerPosition === 3) ? 7 : 10;
         const row = Math.floor(discardIndex / maxTilesPerRow);
         const col = discardIndex % maxTilesPerRow;
 
@@ -165,19 +167,21 @@ export class DiscardManager {
         switch (playerPosition) {
             case 0:
                 x = centerX - (maxTilesPerRow * (tileWidth + spacing)) / 2 + col * (tileWidth + spacing) + tileWidth / 2;
-                y = centerY + 200 + row * (tileHeight + spacing);
+                y = centerY + 200 + row * (tileHeight + spacing + rowSpacing);
                 break;
             case 1:
-                x = centerX + 400 + row * (tileWidth + spacing);
-                y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing) + tileHeight / 2;
+                // 右側玩家：每排 7 張，滿了往左換行（離中心更近）
+                x = centerX + 400 - row * (tileWidth + spacing + rowSpacing);
+                y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing + 10) + tileHeight / 2;
                 break;
             case 2:
                 x = centerX + (maxTilesPerRow * (tileWidth + spacing)) / 2 - col * (tileWidth + spacing) - tileWidth / 2;
-                y = centerY - 280 + row * (tileHeight + spacing);
+                y = centerY - 280 - row * (tileHeight + spacing + rowSpacing);
                 break;
             case 3:
-                x = centerX - 400 - row * (tileWidth + spacing);
-                y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing) + tileHeight / 2;
+                // 左側玩家：每排 7 張，滿了往右換行（離中心更近）
+                x = centerX - 400 + row * (tileWidth + spacing + rowSpacing);
+                y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing + 10) + tileHeight / 2;
                 break;
         }
         return { x, y };

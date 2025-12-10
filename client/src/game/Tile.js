@@ -4,6 +4,32 @@ import { Sprite, Container, Assets } from 'pixi.js';
  * 麻將牌類
  */
 export class Tile {
+  // 靜態變數：預載入的牌底紋理（所有 Tile 共享）
+  static baseTexture = null;
+  static baseTextureLoading = null;
+
+  /**
+   * 預載入牌底紋理（應在遊戲初始化時呼叫一次）
+   */
+  static async preloadBaseTexture() {
+    if (Tile.baseTexture) return Tile.baseTexture;
+    if (Tile.baseTextureLoading) return Tile.baseTextureLoading;
+
+    Tile.baseTextureLoading = Assets.load('/assets/tiles/carddown/basefdown.png')
+      .then(texture => {
+        Tile.baseTexture = texture;
+        Tile.baseTextureLoading = null;
+        return texture;
+      })
+      .catch(error => {
+        console.warn('無法載入牌底圖片', error);
+        Tile.baseTextureLoading = null;
+        return null;
+      });
+
+    return Tile.baseTextureLoading;
+  }
+
   constructor(type, texture, faceUp = true) {
     this.type = type; // 例如: 'wan-1', 'tong-5', 'dong'
     this.texture = texture;
@@ -17,25 +43,15 @@ export class Tile {
     this.create();
   }
 
-  async create() {
+  create() {
     // 對於牌背類型（對手的手牌），不需要顯示牌底，直接顯示牌背圖片
     const isBackTile = this.type === 'back';
 
-    // 載入牌底圖片（僅對正面牌需要）
-    if (!isBackTile) {
-      let baseTexture;
-      try {
-        baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
-      } catch (error) {
-        console.warn('無法載入牌底圖片，使用預設', error);
-      }
-
-      // 創建牌底 sprite（如果有載入成功）
-      if (baseTexture) {
-        this.baseSprite = new Sprite(baseTexture);
-        this.baseSprite.anchor.set(0, 0); // 左上角對齊
-        this.container.addChild(this.baseSprite);
-      }
+    // 創建牌底 sprite（使用預載入的紋理，僅對正面牌需要）
+    if (!isBackTile && Tile.baseTexture) {
+      this.baseSprite = new Sprite(Tile.baseTexture);
+      this.baseSprite.anchor.set(0, 0); // 左上角對齊
+      this.container.addChild(this.baseSprite);
     }
 
     // 創建牌面 sprite（對於牌背類型，這就是牌背圖片）

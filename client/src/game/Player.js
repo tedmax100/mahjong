@@ -15,6 +15,7 @@ export class Player {
     this.tiles = [];
     this.discardedTiles = [];
     this.melds = []; // 吃/碰/槓的牌組 [{type: 'chow'|'pong'|'kong', tiles: [...]}]
+    this.flowers = []; // 花牌 // 吃/碰/槓的牌組 [{type: 'chow'|'pong'|'kong', tiles: [...]}]
     this.meldsContainer = new Container(); // 用於顯示吃/碰/槓牌組的容器
     this.name = '';
     this.score = 1000;
@@ -139,13 +140,10 @@ export class Player {
     // 排序手牌
     const sortedTiles = this.sortTiles([...tilesData]);
 
-    // 創建新牌（等待所有牌創建完成）
+    // 創建新牌（同步創建，因為牌底紋理已預載入）
     for (const tileType of sortedTiles) {
       const texture = tileAssets[tileType] || tileAssets['back'];
       const tile = new Tile(tileType, texture);
-
-      // 等待牌創建完成（包括牌底載入）
-      await new Promise(resolve => setTimeout(resolve, 10));
 
       // 只有底部玩家（自己）的牌可以點擊
       if (this.position === 'bottom') {
@@ -172,29 +170,33 @@ export class Player {
     let spacing = 5; // 預設間距
 
     switch (this.position) {
-      case 'bottom':
+      case 'bottom': {
         // 底部 - 水平排列
-        // 計算最佳間距，確保牌不重疊
-        const availableWidth = this.screenWidth - 120; // 左右各留 60px 邊距（更靠近邊緣）
-        const totalTileWidth = totalTiles * tileWidth;
-        const totalSpacingWidth = availableWidth - totalTileWidth;
+        // We now treat hand + melds as a single block and center it.
 
-        if (totalSpacingWidth > 0) {
-          // 有足夠空間，平均分配間距
-          spacing = Math.min(totalSpacingWidth / (totalTiles - 1 || 1), 15); // 增加最大間距至15px
-        } else {
-          // 空間不足，縮小間距但不重疊
-          spacing = Math.max((availableWidth / totalTiles) - tileWidth, 2); // 最小2px間距
-        }
+        const meldsWidth = this.meldsContainer.width;
+        const spacingBetweenHandAndMelds = meldsWidth > 0 ? 30 : 0; // Gap between hand and melds
 
-        const startX = this.screenWidth / 2 - (totalTiles * tileWidth + (totalTiles - 1) * spacing) / 2;
+        // Use a fixed spacing for hand tiles to ensure consistency
+        const handSpacing = 20;
+        const handWidth = totalTiles * tileWidth + (totalTiles > 0 ? (totalTiles - 1) * handSpacing : 0);
 
+        const totalLayoutWidth = handWidth + spacingBetweenHandAndMelds + meldsWidth;
+        const startX = (this.screenWidth / 2) - (totalLayoutWidth / 2);
+
+        // Position hand tile
         tile.setPosition(
-          startX + index * (tileWidth + spacing),
-          this.screenHeight - 180  // 更靠近底部
+          startX + index * (tileWidth + handSpacing),
+          this.screenHeight - 180
         );
-        tile.setScale(0.75); // 縮小牌底和牌面至75%
+        tile.setScale(0.75);
+
+        // Position the entire melds container to the right of the hand
+        // This is done for every tile, which is redundant but ensures it's updated correctly
+        this.meldsContainer.x = startX + handWidth + spacingBetweenHandAndMelds;
+        this.meldsContainer.y = this.screenHeight - 180;
         break;
+      }
 
       case 'right':
         // 右側 - 垂直排列
@@ -325,13 +327,10 @@ export class Player {
     });
     this.tiles = [];
 
-    // 按照排序後的順序重新創建所有牌
+    // 按照排序後的順序重新創建所有牌（同步創建，因為牌底紋理已預載入）
     for (const type of sortedTypes) {
       const texture = tileAssets[type] || tileAssets['back'];
       const tile = new Tile(type, texture);
-
-      // 等待牌創建完成（包括牌底載入）
-      await new Promise(resolve => setTimeout(resolve, 10));
 
       // 只有底部玩家（自己）的牌可以點擊
       if (this.position === 'bottom') {
@@ -460,169 +459,155 @@ export class Player {
    * @param {Object} meldData - {type: 'chow'|'pong'|'kong', tiles: [...]} 
    * @param {Object} tileAssets - 牌面素材
    */
-  async addMeld(meldData, tileAssets) {
-    // Note: meldData keys from the server are capitalized (Type, Tiles), but local ones might be lowercase.
+  addFlower(flowerType) {
+    this.flowers.push(flowerType);
+  }
+
+  /**
+   * 新增吃/碰/槓牌組 (只更新數據)
+   * @param {Object} meldData - {type: 'chow'|'pong'|'kong', tiles: [...]} 
+   */
+  addMeld(meldData) {
     const meldType = meldData.Type || meldData.type;
     const meldTiles = meldData.Tiles || meldData.tiles;
 
-    // Handle promotion from pong to kong to prevent duplicate melds
     if (meldType === 'kong_promoted') {
       const tile = meldTiles[0];
-      const pongIndex = this.melds.findIndex(m => {
-        const mType = m.Type || m.type;
-        const mTiles = m.Tiles || m.tiles;
-        return mType === 'pong' && mTiles[0] === tile;
-      });
-
+      const pongIndex = this.melds.findIndex(m => (m.Type || m.type) === 'pong' && (m.Tiles || m.tiles)[0] === tile);
       if (pongIndex !== -1) {
-        // Replace the existing pong with the new promoted kong data
         this.melds[pongIndex] = meldData;
-        console.log(`✅ Player ${this.id} promoted pong to kong for tile: ${tile}`);
       } else {
-        // This case indicates a logic error upstream, but we add the meld to avoid data loss.
         console.error(`Could not find a pong to promote for tile ${tile}. Adding kong as a new meld.`);
         this.melds.push(meldData);
       }
     } else {
-      // For chow, pong, or other new kong types, just add the new meld
       this.melds.push(meldData);
     }
-
-    await this.displayMelds(tileAssets);
   }
 
   /**
-   * 顯示所有吃/碰/槓牌組
-   * 各玩家的面子放在手牌外側，牌面朝向該玩家所在的邊
+   * 統一更新所有明牌（吃碰槓+花牌）的顯示
    */
-  async displayMelds(tileAssets) {
+  async updateOpenLayout(tileAssets) {
     this.meldsContainer.removeChildren();
 
-    // 檢查 tileAssets 是否有效
     if (!tileAssets || Object.keys(tileAssets).length === 0) {
-      console.error('❌ displayMelds: tileAssets 為空或未定義');
+      console.error('❌ updateOpenLayout: tileAssets is empty or undefined');
       return;
     }
 
-    const tileWidth = 60;
-    const tileHeight = 80;
-    const groupSpacing = 10; // 牌組間距
-    const gapFromHand = tileWidth * 0.8; // 與手牌的間距（約一張牌寬度）
-    let currentOffset = 0;
+        const tileWidth = 60;
+        const tileHeight = 80;
+        const groupSpacing = 25; // Increased from 15
+        const gapFromHand = tileWidth * 0.8;
+        let currentOffset = 0;
 
-    const { Sprite, Container, Assets } = await import('pixi.js');
-    const baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
+        const { Sprite, Container, Assets } = await import('pixi.js');
+        const baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
 
-    // 計算手牌的邊界位置（根據實際手牌數量）
-    const handTileCount = this.tiles.length || 13;
-    const handTileWidth = tileWidth * 0.75; // 底部玩家手牌縮放
-    const handSpacing = 5;
-    const handWidth = handTileCount * handTileWidth + (handTileCount - 1) * handSpacing;
+        const handTileCount = this.tiles.length || 13;
+        const handTileWidth = tileWidth * 0.75;
+        const handSpacing = 5;
+        const handWidth = handTileCount * handTileWidth + (handTileCount - 1) * handSpacing;
 
-    // 側邊玩家（左右）的手牌高度計算
-    const sideScale = 0.6;
-    const sideHandSpacing = 12;
-    const sideTileHeight = tileHeight * sideScale;
-    const sideHandHeight = handTileCount * (sideTileHeight + sideHandSpacing);
-
-    for (const meld of this.melds) {
-      const meldGroup = new Container();
-      const meldType = meld.Type || meld.type;
-      const meldTiles = meld.Tiles || meld.tiles;
-
-      // Create tiles with bases
-      for (let i = 0; i < meldTiles.length; i++) {
-        const tileType = meldTiles[i];
-        const tileContainer = new Container();
-        const baseSprite = new Sprite(baseTexture);
-        tileContainer.addChild(baseSprite);
-
-        // For concealed kong, all 4 tiles are face down (green back)
-        let texture;
-        if (meldType === 'kong_concealed') {
-            // 暗槓：4張牌全部顯示為牌背（綠色）
-            texture = tileAssets['back'];
-        } else {
-            texture = tileAssets[tileType];
-            if (!texture) {
-                console.warn(`⚠️ displayMelds: 找不到牌面貼圖 "${tileType}"，使用牌背。可用的 key:`, Object.keys(tileAssets || {}).slice(0, 10));
-                texture = tileAssets['back'];
+        // 1. 渲染吃碰槓牌組
+        for (const meld of this.melds) {
+            const meldGroup = new Container();
+            const meldType = meld.Type || meld.type;
+            let meldTiles = meld.Tiles || meld.tiles;
+            
+            if (meldType === 'chow') {
+                meldTiles = this.sortTiles([...meldTiles]);
             }
+            
+            for (let i = 0; i < meldTiles.length; i++) {
+                const tileType = meldTiles[i];
+                const tileContainer = new Container();
+                const baseSprite = new Sprite(baseTexture);
+                tileContainer.addChild(baseSprite);
+
+                let texture = (meldType === 'kong_concealed') ? tileAssets['back'] : tileAssets[tileType];
+                if (!texture) {
+                    console.warn(`⚠️ updateOpenLayout: Missing texture for "${tileType}", using back.`);
+                    texture = tileAssets['back'];
+                }
+
+                const tileSprite = new Sprite(texture);
+                if (tileType.startsWith('tong-')) tileSprite.y = 5;
+                tileContainer.addChild(tileSprite);
+
+                const isKong = meldType && meldType.includes('kong');
+                if (isKong && i === 3) {
+                    tileContainer.x = 1 * (tileWidth + 35); // Special positioning for 4th tile in a kong
+                    tileContainer.y = -tileHeight * 0.1;
+                } else {
+                    tileContainer.x = i * (tileWidth + 35); // Horizontal spacing *within* a group
+                }
+                meldGroup.addChild(tileContainer);
+            }
+
+            const groupWidth = (meldTiles.length === 4 ? 3 : meldTiles.length) * (tileWidth + 35);
+            const scale = this.position === 'bottom' ? 0.75 : 0.6;
+            
+            this.positionOpenGroup(meldGroup, scale, groupWidth, currentOffset, handWidth, gapFromHand);
+            currentOffset += groupWidth * scale + groupSpacing;
+            this.meldsContainer.addChild(meldGroup);
         }
+        
+        // 2. 渲染花牌
+        if (this.flowers.length > 0) {
+            const flowerGroup = new Container();
+            for (let i = 0; i < this.flowers.length; i++) {
+                const tileType = this.flowers[i];
+                const tileContainer = new Container();
+                const baseSprite = new Sprite(baseTexture);
+                tileContainer.addChild(baseSprite);
 
-        // 最終檢查：如果 texture 仍然為空，跳過這張牌的創建
-        if (!texture) {
-            console.error(`❌ displayMelds: 無法獲取紋理 "${tileType}"，跳過此牌`);
-            continue;
+                const texture = tileAssets[tileType] || tileAssets['back'];
+                const tileSprite = new Sprite(texture);
+                if (tileType.startsWith('tong-')) tileSprite.y = 5;
+                tileContainer.addChild(tileSprite);
+                tileContainer.x = i * (tileWidth + 35);
+                flowerGroup.addChild(tileContainer);
+            }
+            
+            const groupWidth = this.flowers.length * (tileWidth + 35);
+            const scale = this.position === 'bottom' ? 0.75 : 0.6;
+            
+            this.positionOpenGroup(flowerGroup, scale, groupWidth, currentOffset, handWidth, gapFromHand);
+            this.meldsContainer.addChild(flowerGroup);
         }
+  }
 
-        const tileSprite = new Sprite(texture);
-        if (tileType.startsWith('tong-')) {
-            tileSprite.y = 5;
-        }
-        tileContainer.addChild(tileSprite);
+  positionOpenGroup(group, scale, groupWidth, offset, handWidth, gapFromHand) {
+    group.scale.set(scale);
 
-        const isKong = meldType && meldType.includes('kong');
-        const isFourthTile = i === 3;
-
-        if (isKong && isFourthTile) {
-            // 槓牌第四張疊在第二張上方
-            const baseTileIndex = 1;
-            tileContainer.x = baseTileIndex * (tileWidth + 5);
-            tileContainer.y = -tileHeight * 0.1;
-        } else {
-            tileContainer.x = i * (tileWidth + 5);
-        }
-
-        meldGroup.addChild(tileContainer);
+    switch (this.position) {
+      case 'bottom': {
+        // For the bottom player, groups are positioned horizontally within the meldsContainer.
+        // The container itself is positioned by the positionTile function.
+        group.x = offset;
+        group.y = 0;
+        break;
       }
-
-      const groupWidth = (meldTiles.length === 4 ? 3 : meldTiles.length) * (tileWidth + 5);
-      const scale = 0.75;
-
-      switch (this.position) {
-        case 'bottom': {
-          // 底部玩家：面子在手牌右邊，與手牌保持間距，Y軸與手牌相同
-          meldGroup.scale.set(scale);
-          const handRightEdge = this.screenWidth / 2 + handWidth / 2;
-          meldGroup.x = handRightEdge + gapFromHand * 2 + currentOffset; // 再往右移更多
-          meldGroup.y = this.screenHeight - 180; // 與手牌 Y 軸相同
-          currentOffset += groupWidth * scale + groupSpacing;
-          break;
-        }
-        case 'right': {
-          // 右側玩家：牌面向右，由上至下排列
-          meldGroup.scale.set(sideScale);
-          meldGroup.x = this.screenWidth - 120;
-          // 由上往下排列，使用 currentOffset
-          meldGroup.y = 200 + currentOffset;
-          meldGroup.rotation = Math.PI / 2;
-          currentOffset += groupWidth * sideScale + groupSpacing;
-          break;
-        }
-        case 'top': {
-          // 上方玩家：牌面向上，由左至右排列
-          // 第一組在左邊，第二組在第一組右邊
-          meldGroup.scale.set(sideScale);
-          // 由左往右排列，使用 currentOffset
-          meldGroup.x = 500 + currentOffset;
-          meldGroup.y = 150;
-          meldGroup.rotation = Math.PI; // 牌面朝上（翻轉180度）
-          currentOffset += groupWidth * sideScale + groupSpacing;
-          break;
-        }
-        case 'left': {
-          // 左側玩家：牌面向左，由上至下排列
-          meldGroup.scale.set(sideScale);
-          meldGroup.x = 200;
-          // 由上往下排列，使用 currentOffset
-          meldGroup.y = 200 + currentOffset;
-          meldGroup.rotation = Math.PI / 2;
-          currentOffset += groupWidth * sideScale + groupSpacing;
-          break;
-        }
+      case 'right': {
+        group.x = this.screenWidth - 120;
+        group.y = 200 + offset;
+        group.rotation = Math.PI / 2;
+        break;
       }
-      this.meldsContainer.addChild(meldGroup);
+      case 'top': {
+        group.x = 500 + offset;
+        group.y = 150;
+        group.rotation = Math.PI;
+        break;
+      }
+      case 'left': {
+        group.x = 200;
+        group.y = 200 + offset;
+        group.rotation = Math.PI / 2;
+        break;
+      }
     }
   }
 
@@ -708,7 +693,8 @@ export class Player {
 
     // 清除吃碰槓
     this.meldsContainer.removeChildren();
-    this.melds = [];
+    this.melds = []; // 吃/碰/槓的牌組 [{type: 'chow'|'pong'|'kong', tiles: [...]}]
+    this.flowers = []; // 花牌
 
     // 重置狀態
     this.isTing = false;

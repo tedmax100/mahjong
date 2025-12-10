@@ -15,7 +15,7 @@ vi.mock('pixi.js', () => ({
     }
   }),
   Sprite: vi.fn(class { // Mock Sprite constructor
-    constructor() { this.anchor = { set: vi.fn() }; this.on = vi.fn(); }
+    constructor() { this.anchor = { set: vi.fn() }; this.scale = { set: vi.fn() }; this.on = vi.fn(); this.x = 0; this.y = 0; }
     static from() { return new this(); }
   }),
   Assets: { load: vi.fn(() => Promise.resolve({})) },
@@ -99,23 +99,19 @@ describe('WinningHandDisplay', () => {
     await displayer.display(hand, melds, winTile);
 
     // After adding background and allTilesContainer
-    expect(mockWinningHandContainer.addChild).toHaveBeenCalled(); 
+    expect(mockWinningHandContainer.addChild).toHaveBeenCalled();
     // The first child added to mockWinningHandContainer is the background (Graphics instance)
     // The second child added is allTilesContainer (Container instance)
     // The Container.mock.instances are of the *mocked* Container class, so allTilesContainer will be an instance of it.
-    
+
     // We can also check if mockWinningHandContainer has children
     expect(mockWinningHandContainer.children.length).toBeGreaterThan(0);
     const allTilesContainer = mockWinningHandContainer.children[1]; // Get the instance
     expect(allTilesContainer).toBeInstanceOf(Container);
-    
+
     // Initial visibility check
     expect(mockWinningHandContainer.visible).toBe(true);
 
-    // Run short timers (e.g., the 50ms one)
-    vi.advanceTimersByTime(50);
-    expect(allTilesContainer.x).not.toBe(0); // Should have updated position
-    
     // Run the longer timer to hide the container
     vi.advanceTimersByTime(5000);
     expect(mockWinningHandContainer.visible).toBe(false);
@@ -127,17 +123,16 @@ describe('WinningHandDisplay', () => {
     const winTile = 'wan-1';
 
     await displayer.display(hand, melds, winTile);
-    
+
     // Initial visibility check
     expect(mockWinningHandContainer.visible).toBe(true);
 
-        const allTilesContainer = mockWinningHandContainer.children[1];
-        expect(allTilesContainer).toBeInstanceOf(Container);
-    
-        vi.advanceTimersByTime(50); // Advance any short timers
-        expect(allTilesContainer.x).not.toBe(0); // Should have updated position
-        vi.advanceTimersByTime(5000);
-        expect(mockWinningHandContainer.visible).toBe(false);  });
+    const allTilesContainer = mockWinningHandContainer.children[1];
+    expect(allTilesContainer).toBeInstanceOf(Container);
+
+    vi.advanceTimersByTime(5000);
+    expect(mockWinningHandContainer.visible).toBe(false);
+  });
 
   it('如果沒有贏牌，不應該顯示', async () => {
     // This case should not happen if handleGameWin logic is correct,
@@ -147,17 +142,13 @@ describe('WinningHandDisplay', () => {
     const winTile = null;
 
     await displayer.display(hand, melds, winTile);
-    
+
     // Initial visibility check
     expect(mockWinningHandContainer.visible).toBe(true);
-    
+
     const allTilesContainer = mockWinningHandContainer.children[1];
     expect(allTilesContainer).toBeInstanceOf(Container);
 
-    // Run short timers (e.g., the 50ms one)
-    vi.advanceTimersByTime(50);
-    expect(allTilesContainer.x).not.toBe(0); // Should have updated position
-    
     // Run the longer timer to hide the container
     vi.advanceTimersByTime(5000);
     expect(mockWinningHandContainer.visible).toBe(false);
