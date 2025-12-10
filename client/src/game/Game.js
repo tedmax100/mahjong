@@ -5,6 +5,7 @@ import { Player } from './Player.js';
 import { ActionButtons } from './ActionButtons.js';
 import { AudioManager } from './AudioManager.js';
 import { MahjongLogic } from './MahjongLogic.js';
+import { AssetLoader } from './AssetLoader.js';
 
 /**
  * 主遊戲類
@@ -50,6 +51,9 @@ export class Game {
 
     // 音效管理器
     this.audioManager = new AudioManager();
+    
+    // 素材載入器
+    this.assetLoader = new AssetLoader(this.app.renderer);
   }
 
   /**
@@ -123,8 +127,8 @@ ${'='.repeat(60)}`);
     // 啟用容器的 zIndex 排序，確保層級正確
     this.container.sortableChildren = true;
 
-    // 載入素材
-    await this.loadAssets();
+    // 載入素材 (Using AssetLoader)
+    this.tileAssets = await this.assetLoader.load();
 
     // 創建牌桌
     this.table = new Table(this.app.screen.width, this.app.screen.height);
@@ -179,78 +183,6 @@ ${'='.repeat(60)}`);
     this.audioManager.playBGM('menu');
 
     console.log('✅ Game initialized successfully');
-  }
-
-  async loadAssets() {
-    console.log('開始載入麻將牌素材...');
-
-    // 對應內部牌名到新圖片檔名
-    const tileMapping = {
-      // 萬子 (w = 萬)
-      'wan-1': '1wf', 'wan-2': '2wf', 'wan-3': '3wf',
-      'wan-4': '4wf', 'wan-5': '5wf', 'wan-6': '6wf',
-      'wan-7': '7wf', 'wan-8': '8wf', 'wan-9': '9wf',
-
-      // 筒子 (t = 筒)
-      'tong-1': '1tf', 'tong-2': '2tf', 'tong-3': '3tf',
-      'tong-4': '4tf', 'tong-5': '5tf', 'tong-6': '6tf',
-      'tong-7': '7tf', 'tong-8': '8tf', 'tong-9': '9tf',
-
-      // 條子 (tt = 條)
-      'tiao-1': '1ttf', 'tiao-2': '2ttf', 'tiao-3': '3ttf',
-      'tiao-4': '4ttf', 'tiao-5': '5ttf', 'tiao-6': '6ttf',
-      'tiao-7': '7ttf', 'tiao-8': '8ttf', 'tiao-9': '9ttf',
-
-      // 風牌 (z1-z4)
-      'dong': 'z1f', 'nan': 'z2f', 'xi': 'z3f', 'bei': 'z4f',
-
-      // 三元牌 (z5-z7)
-      'zhong': 'z5f', 'fa': 'z6f', 'bai': 'z7f',
-
-      // 花牌
-      'flower-chun': 'chun', 'flower-xia': 'xia', 'flower-qiu': 'qiu', 'flower-dong': 'dong',
-      'flower-mei': 'mei', 'flower-lan': 'lan', 'flower-zhu': 'zhu', 'flower-ju': 'ju',
-
-      // 牌背 (使用大尺寸的牌背圖片，與其他牌面尺寸一致)
-      'back': 'pbaseBig'
-    };
-
-    // 載入所有素材
-    for (const [tileType, fileName] of Object.entries(tileMapping)) {
-      try {
-        const texture = await Assets.load(`/assets/tiles/carddown/${fileName}.png`);
-        this.tileAssets[tileType] = texture;
-      } catch (error) {
-        console.warn(`載入素材失敗: ${fileName}.png`, error);
-        // 創建佔位紋理
-        this.tileAssets[tileType] = this.createPlaceholderTexture(tileType);
-      }
-    }
-
-    console.log('素材載入完成');
-  }
-
-  createPlaceholderTexture(type) {
-    // 創建臨時佔位圖
-    const graphics = new Graphics();
-    graphics.rect(0, 0, 60, 80);
-    graphics.fill(0xF5F0E8);
-    graphics.stroke({ width: 2, color: 0x8B7355 });
-
-    const text = new Text({
-      text: type,
-      style: {
-        fontSize: 10,
-        fill: 0x000000,
-        wordWrap: true,
-        wordWrapWidth: 55
-      }
-    });
-    text.x = 30 - text.width / 2;
-    text.y = 40 - text.height / 2;
-    graphics.addChild(text);
-
-    return this.app.renderer.generateTexture(graphics);
   }
 
   createPlayers() {
