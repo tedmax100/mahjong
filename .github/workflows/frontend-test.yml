@@ -1,0 +1,68 @@
+name: Frontend Test & Coverage
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'client/**'
+      - '.github/workflows/frontend-test.yml'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths:
+      - 'client/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: ./client
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Test with Coverage
+      run: npx vitest run --coverage
+
+    - name: Update Coverage Badge
+      if: github.event_name == 'push'
+      run: |
+        # Extract total statement coverage
+        TOTAL=$(jq '.total.statements.pct' coverage/coverage-summary.json)
+        echo "Total Coverage: $TOTAL"
+        
+        # Determine color
+        COLOR=red
+        if (( $(echo "$TOTAL > 50" | bc -l) )); then COLOR=orange; fi
+        if (( $(echo "$TOTAL > 80" | bc -l) )); then COLOR=green; fi
+        
+        # Go back to root to edit README
+        cd ..
+        
+        # Update README.md using sed
+        # Pattern: Frontend_Coverage-[number]%25-[color]
+        # Note: We use -E for extended regex to be safe, but standard sed should work with the pipe delimiter
+        sed -i "s|Frontend_Coverage-[0-9.]*%25-[a-zA-Z]*)|Frontend_Coverage-${TOTAL}%25-${COLOR})|g" README.md
+        
+        # Configure Git
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Commit and Push if changed
+        if [[ -n $(git status -s README.md) ]]; then
+          git add README.md
+          git commit -m "docs: update frontend coverage badge to ${TOTAL}%"
+          git push
+        else
+          echo "No changes to coverage badge."
+        fi
