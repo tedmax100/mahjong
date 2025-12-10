@@ -177,7 +177,8 @@ ${'='.repeat(60)}`);
     this.winningHandContainer.visible = false;
     this.winningHandContainer.zIndex = 11000;
     this.container.addChild(this.winningHandContainer);
-    this.winningHandDisplayHandler = new WinningHandDisplay(this.winningHandContainer, this.app.screen, this.tileAssets);
+    // Initialize with empty assets first, update after load
+    this.winningHandDisplayHandler = new WinningHandDisplay(this.winningHandContainer, this.app.screen, {}); 
 
     // 顯示等待文字
     this.showWaitingText();
