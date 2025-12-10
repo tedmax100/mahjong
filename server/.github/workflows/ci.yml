@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  # Backend (Go) Test & Coverage
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Test and Coverage (Go)
+      run: |
+        go test -v -coverprofile=coverage.out ./...
+        # Calculate coverage percentage
+        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "GO_COVERAGE=$COVERAGE" >> $GITHUB_ENV
+        echo "Go Coverage: $COVERAGE%"
+
+    # 產生徽章 (需要設定 Gist 和 Secret)
+    # 若不需要徽章，這一步可以移除
+    # - name: Create Go Coverage Badge
+    #   uses: schneegans/dynamic-badges-action@v1.7.0
+    #   if: github.ref == 'refs/heads/main'
+    #   with:
+    #     auth: ${{ secrets.GIST_SECRET }}
+    #     gistID: ${{ secrets.GIST_ID }}
+    #     filename: go-coverage.json
+    #     label: Go Coverage
+    #     message: ${{ env.GO_COVERAGE }}%
+    #     color: green
+
+  # Frontend (Node.js) Test & Coverage
+  # 請確保您的前端程式碼有 package.json 並且定義了測試腳本
+  frontend-test:
+    runs-on: ubuntu-latest
+    # 如果前端在子目錄，請取消註解並修改以下路徑
+    # defaults:
+    #   run:
+    #     working-directory: ./client 
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        # cache: 'npm' # 如果有 package-lock.json 可以開啟
+
+    # 檢查是否有 package.json，如果沒有則跳過
+    - name: Check for package.json
+      id: check_package
+      run: |
+        if [ -f "package.json" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "No package.json found, skipping frontend tests."
+        fi
+
+    - name: Install Dependencies
+      if: steps.check_package.outputs.exists == 'true'
+      run: npm install
+
+    - name: Run Tests with Coverage
+      if: steps.check_package.outputs.exists == 'true'
+      # 假設您的測試指令是 npm run test:coverage
+      # 並且使用 Jest/Vitest 產生 coverage-summary.json
+      run: |
+        # npm run test:coverage 
+        # 這裡僅作示範，請替換為您實際的測試指令
+        echo "Running frontend tests..."
+        
+        # 範例：解析 Jest 的 json-summary 報告獲取覆蓋率
+        # COVERAGE=$(cat coverage/coverage-summary.json | jq -r '.total.lines.pct')
+        # echo "FE_COVERAGE=$COVERAGE" >> $GITHUB_ENV
+
+    # 產生前端徽章
+    # - name: Create Frontend Coverage Badge
+    #   uses: schneegans/dynamic-badges-action@v1.7.0
+    #   if: github.ref == 'refs/heads/main'
+    #   with:
+    #     auth: ${{ secrets.GIST_SECRET }}
+    #     gistID: ${{ secrets.GIST_ID }}
+    #     filename: frontend-coverage.json
+    #     label: Frontend Coverage
+    #     message: ${{ env.FE_COVERAGE }}%
+    #     color: blue
