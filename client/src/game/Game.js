@@ -130,7 +130,7 @@ ${'='.repeat(60)}`);
 
     // 載入素材 (Using AssetLoader)
     this.tileAssets = await this.assetLoader.load();
-    this.winningHandDisplayHandler.tileAssets = this.tileAssets; // Update handler with loaded assets
+
 
     // 創建牌桌
     this.table = new Table(this.app.screen.width, this.app.screen.height);
