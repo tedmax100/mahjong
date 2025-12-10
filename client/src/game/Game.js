@@ -52,6 +52,138 @@ export class Game {
   }
 
   /**
+   * 檢查是否可以胡牌 (Simplified client-side check)
+   */
+  canHu(hand, tile, meldCount = null) {
+    if (meldCount === null) {
+        // Fallback if meldCount not provided, check current player
+        const player = this.players[this.myPosition];
+        meldCount = player ? player.melds.length : 0;
+    }
+
+    const fullHand = [...hand, tile];
+    const requiredMelds = 5 - meldCount;
+    // Standard hand size check: 16 tiles + 1 winning tile = 17 total. 
+    // Each meld reduces hand size by 3.
+    // 0 melds: 5*3 + 2 = 17 tiles
+    // 1 meld: 4*3 + 2 = 14 tiles
+    // ...
+    const requiredTiles = requiredMelds * 3 + 2;
+
+    if (fullHand.length !== requiredTiles) {
+      return false;
+    }
+
+    const tileCount = {};
+    fullHand.forEach(t => {
+      tileCount[t] = (tileCount[t] || 0) + 1;
+    });
+
+    for (const [t, count] of Object.entries(tileCount)) {
+      if (count >= 2) {
+        const remainingTiles = { ...tileCount };
+        remainingTiles[t] -= 2;
+
+        if (this.canFormMelds(remainingTiles, requiredMelds)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 檢查剩餘的牌是否能組成指定數量的面子
+   */
+  canFormMelds(tileCount, meldsNeeded) {
+    const tiles = { ...tileCount };
+
+    Object.keys(tiles).forEach(key => {
+      if (tiles[key] === 0) delete tiles[key];
+    });
+
+    if (Object.keys(tiles).length === 0 && meldsNeeded === 0) {
+      return true;
+    }
+
+    if (Object.keys(tiles).length === 0 || meldsNeeded === 0) {
+      return false;
+    }
+
+    const firstTile = Object.keys(tiles).sort()[0];
+    const count = tiles[firstTile];
+
+    // 嘗試組成刻子
+    if (count >= 3) {
+      const newTiles = { ...tiles };
+      newTiles[firstTile] -= 3;
+      if (newTiles[firstTile] === 0) delete newTiles[firstTile];
+
+      if (this.canFormMelds(newTiles, meldsNeeded - 1)) {
+        return true;
+      }
+    }
+
+    // 嘗試組成順子
+    const match = firstTile.match(/^(wan|tong|tiao)-(\d)$/);
+    if (match) {
+      const suit = match[1];
+      const num = parseInt(match[2]);
+
+      if (num <= 7) {
+        const tile2 = `${suit}-${num + 1}`;
+        const tile3 = `${suit}-${num + 2}`;
+
+        if (tiles[tile2] >= 1 && tiles[tile3] >= 1) {
+          const newTiles = { ...tiles };
+          newTiles[firstTile] -= 1;
+          newTiles[tile2] -= 1;
+          newTiles[tile3] -= 1;
+
+          if (newTiles[firstTile] === 0) delete newTiles[firstTile];
+          if (newTiles[tile2] === 0) delete newTiles[tile2];
+          if (newTiles[tile3] === 0) delete newTiles[tile3];
+
+          if (this.canFormMelds(newTiles, meldsNeeded - 1)) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 檢查是否聽牌 (Simplified client-side check)
+   */
+  checkReadyHand(hand) {
+    const player = this.players[this.myPosition];
+    const meldCount = player ? player.melds.length : 0;
+    const allPossibleTiles = [];
+
+    ['wan', 'tong', 'tiao'].forEach(suit => {
+      for (let num = 1; num <= 9; num++) {
+        allPossibleTiles.push(`${suit}-${num}`);
+      }
+    });
+
+    ['dong', 'nan', 'xi', 'bei', 'zhong', 'fa', 'bai'].forEach(tile => {
+      allPossibleTiles.push(tile);
+    });
+
+    const readyTiles = [];
+    for (const tile of allPossibleTiles) {
+      if (this.canHu(hand, tile, meldCount)) {
+        readyTiles.push(tile);
+      }
+    }
+
+    return readyTiles;
+  }
+
+  /**
    * 設定 WebSocket 實體（用於延後連接）
    */
   setWebSocket(ws) {

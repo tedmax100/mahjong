@@ -1,153 +1,52 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { Game } from './Game.js';
 
-/**
- * 測試輔助類 - 提取 Game 類中的純邏輯方法進行測試
- * 這樣可以避免依賴 PixiJS 和其他 UI 元件
- */
-class MahjongLogic {
-  constructor() {
-    this.players = [
+// Mock PixiJS dependencies
+vi.mock('pixi.js', () => ({
+  Application: class {},
+  Container: class {
+    constructor() { this.children = []; this.addChild = () => {}; this.removeChildren = () => {}; }
+  },
+  Graphics: class {},
+  Sprite: class {},
+  Text: class {},
+  Assets: { load: () => Promise.resolve({}) }
+}));
+
+// Mock other dependencies
+vi.mock('./AudioManager.js', () => ({
+  AudioManager: class {
+    constructor() {
+      this.playEffect = () => {};
+      this.playButtonSound = () => {};
+    }
+  }
+}));
+
+vi.mock('./WebSocketClient.js', () => ({
+  WebSocketClient: class {}
+}));
+
+describe('麻將胡牌判斷測試 (Game.js)', () => {
+  let game;
+
+  beforeEach(() => {
+    // Mock PIXI App
+    const mockApp = {
+      stage: { addChild: () => {} },
+      screen: { width: 800, height: 600 }
+    };
+    
+    game = new Game(mockApp, null);
+    
+    // Setup minimal player state for testing
+    game.players = [
       { melds: [] },
       { melds: [] },
       { melds: [] },
       { melds: [] }
     ];
-    this.myPosition = 0;
-  }
-
-  /**
-   * 檢查是否可以胡牌
-   * （從 Game.js 複製的邏輯）
-   */
-  canHu(hand, tile, meldCount = null) {
-    if (meldCount === null) {
-      meldCount = this.players[this.myPosition].melds.length;
-    }
-
-    const fullHand = [...hand, tile];
-    const requiredMelds = 5 - meldCount;
-    const requiredTiles = requiredMelds * 3 + 2;
-
-    if (fullHand.length !== requiredTiles) {
-      return false;
-    }
-
-    const tileCount = {};
-    fullHand.forEach(t => {
-      tileCount[t] = (tileCount[t] || 0) + 1;
-    });
-
-    for (const [tile, count] of Object.entries(tileCount)) {
-      if (count >= 2) {
-        const remainingTiles = { ...tileCount };
-        remainingTiles[tile] -= 2;
-
-        if (this.canFormMelds(remainingTiles, requiredMelds)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * 檢查剩餘的牌是否能組成指定數量的面子
-   * （從 Game.js 複製的邏輯）
-   */
-  canFormMelds(tileCount, meldsNeeded) {
-    const tiles = { ...tileCount };
-
-    Object.keys(tiles).forEach(key => {
-      if (tiles[key] === 0) delete tiles[key];
-    });
-
-    if (Object.keys(tiles).length === 0 && meldsNeeded === 0) {
-      return true;
-    }
-
-    if (Object.keys(tiles).length === 0 || meldsNeeded === 0) {
-      return false;
-    }
-
-    const firstTile = Object.keys(tiles).sort()[0];
-    const count = tiles[firstTile];
-
-    // 嘗試組成刻子
-    if (count >= 3) {
-      const newTiles = { ...tiles };
-      newTiles[firstTile] -= 3;
-      if (newTiles[firstTile] === 0) delete newTiles[firstTile];
-
-      if (this.canFormMelds(newTiles, meldsNeeded - 1)) {
-        return true;
-      }
-    }
-
-    // 嘗試組成順子
-    const match = firstTile.match(/^(wan|tong|tiao)-(\d)$/);
-    if (match) {
-      const suit = match[1];
-      const num = parseInt(match[2]);
-
-      if (num <= 7) {
-        const tile2 = `${suit}-${num + 1}`;
-        const tile3 = `${suit}-${num + 2}`;
-
-        if (tiles[tile2] >= 1 && tiles[tile3] >= 1) {
-          const newTiles = { ...tiles };
-          newTiles[firstTile] -= 1;
-          newTiles[tile2] -= 1;
-          newTiles[tile3] -= 1;
-
-          if (newTiles[firstTile] === 0) delete newTiles[firstTile];
-          if (newTiles[tile2] === 0) delete newTiles[tile2];
-          if (newTiles[tile3] === 0) delete newTiles[tile3];
-
-          if (this.canFormMelds(newTiles, meldsNeeded - 1)) {
-            return true;
-          }
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * 檢查是否聽牌
-   * （從 Game.js 複製的邏輯）
-   */
-  checkReadyHand(hand) {
-    const meldCount = this.players[this.myPosition].melds.length;
-    const allPossibleTiles = [];
-
-    ['wan', 'tong', 'tiao'].forEach(suit => {
-      for (let num = 1; num <= 9; num++) {
-        allPossibleTiles.push(`${suit}-${num}`);
-      }
-    });
-
-    ['dong', 'nan', 'xi', 'bei', 'zhong', 'fa', 'bai'].forEach(tile => {
-      allPossibleTiles.push(tile);
-    });
-
-    const readyTiles = [];
-    for (const tile of allPossibleTiles) {
-      if (this.canHu(hand, tile, meldCount)) {
-        readyTiles.push(tile);
-      }
-    }
-
-    return readyTiles;
-  }
-}
-
-describe('麻將胡牌判斷測試', () => {
-  let logic;
-
-  beforeEach(() => {
-    logic = new MahjongLogic();
+    game.myPosition = 0;
   });
 
   describe('canHu - 基本胡牌判斷', () => {
@@ -162,7 +61,7 @@ describe('麻將胡牌判斷測試', () => {
       ];
       const tile = 'dong'; // 要胡的牌，組成對子（16+1=17張）
 
-      expect(logic.canHu(hand, tile)).toBe(true);
+      expect(game.canHu(hand, tile)).toBe(true);
     });
 
     it('應該能判斷簡單的順子胡牌（全順子）', () => {
@@ -176,7 +75,7 @@ describe('麻將胡牌判斷測試', () => {
       ];
       const tile = 'dong'; // 要胡的牌，組成對子（16+1=17張）
 
-      expect(logic.canHu(hand, tile)).toBe(true);
+      expect(game.canHu(hand, tile)).toBe(true);
     });
 
     it('應該能判斷混合胡牌（順子+刻子）', () => {
@@ -190,7 +89,7 @@ describe('麻將胡牌判斷測試', () => {
       ];
       const tile = 'zhong'; // 要胡的牌（16+1=17張）
 
-      expect(logic.canHu(hand, tile)).toBe(true);
+      expect(game.canHu(hand, tile)).toBe(true);
     });
 
     it('應該拒絕不完整的牌型（缺牌）', () => {
@@ -203,7 +102,7 @@ describe('麻將胡牌判斷測試', () => {
       ];
       const tile = 'dong';
 
-      expect(logic.canHu(hand, tile)).toBe(false);
+      expect(game.canHu(hand, tile)).toBe(false);
     });
 
     it('應該拒絕牌數不正確的手牌', () => {
@@ -213,7 +112,7 @@ describe('麻將胡牌判斷測試', () => {
       ]; // 只有6張牌，不夠17張
       const tile = 'dong';
 
-      expect(logic.canHu(hand, tile)).toBe(false);
+      expect(game.canHu(hand, tile)).toBe(false);
     });
 
     it('應該拒絕沒有對子的牌型', () => {
@@ -226,13 +125,13 @@ describe('麻將胡牌判斷測試', () => {
       ];
       const tile = 'bei';
 
-      expect(logic.canHu(hand, tile)).toBe(false);
+      expect(game.canHu(hand, tile)).toBe(false);
     });
   });
 
   describe('canHu - 帶吃碰槓的胡牌判斷', () => {
     it('應該能判斷有1組碰牌的胡牌', () => {
-      logic.players[0].melds = [
+      game.players[0].melds = [
         { type: 'pong', tiles: ['wan-1', 'wan-1', 'wan-1'] }
       ];
 
@@ -254,11 +153,11 @@ describe('麻將胡牌判斷測試', () => {
       ];
       const correctTile = 'dong';
 
-      expect(logic.canHu(correctHand, correctTile, 1)).toBe(true);
+      expect(game.canHu(correctHand, correctTile, 1)).toBe(true);
     });
 
     it('應該能判斷有2組吃牌的胡牌', () => {
-      logic.players[0].melds = [
+      game.players[0].melds = [
         { type: 'chow', tiles: ['wan-1', 'wan-2', 'wan-3'] },
         { type: 'chow', tiles: ['tong-4', 'tong-5', 'tong-6'] }
       ];
@@ -272,13 +171,13 @@ describe('麻將胡牌判斷測試', () => {
       ];
       const tile = 'dong';
 
-      expect(logic.canHu(hand, tile, 2)).toBe(true);
+      expect(game.canHu(hand, tile, 2)).toBe(true);
     });
   });
 
   describe('checkReadyHand - 聽牌判斷', () => {
     it('應該能判斷兩面聽（7,8萬聽6萬或9萬）', () => {
-      logic.players[0].melds = [
+      game.players[0].melds = [
         { type: 'chow', tiles: ['tiao-3', 'tiao-4', 'tiao-5'] },
         { type: 'pong', tiles: ['zhong', 'zhong', 'zhong'] }
       ];
@@ -292,32 +191,15 @@ describe('麻將胡牌判斷測試', () => {
         'nan', 'nan', 'nan'        // 刻子
       ];
 
-      const readyTiles = logic.checkReadyHand(hand);
+      const readyTiles = game.checkReadyHand(hand);
 
       // 聽6萬或9萬可以組成順子
       expect(readyTiles).toContain('wan-6');
       expect(readyTiles).toContain('wan-9');
     });
 
-    it('應該能判斷單吊聽（只差一張做將）', () => {
-      const hand = [
-        'wan-1', 'wan-2', 'wan-3',
-        'wan-4', 'wan-5', 'wan-6',
-        'tong-7', 'tong-8', 'tong-9',
-        'tiao-1', 'tiao-2', 'tiao-3',
-        'dong', 'dong', 'dong'
-      ];
-
-      const readyTiles = logic.checkReadyHand(hand);
-
-      // 需要任意一張牌做對子，但由於已經有15張牌了，
-      // 需要16張+1張胡牌=17張，所以應該聽任何能做對子的牌
-      // 但實際上這個手牌已經太多了（15張），無法組成標準牌型
-      // 讓我修正這個測試
-    });
-
     it('應該能判斷多面聽', () => {
-      logic.players[0].melds = [
+      game.players[0].melds = [
         { type: 'pong', tiles: ['dong', 'dong', 'dong'] }
       ];
 
@@ -330,7 +212,7 @@ describe('麻將胡牌判斷測試', () => {
         'zhong'
       ];
 
-      const readyTiles = logic.checkReadyHand(hand);
+      const readyTiles = game.checkReadyHand(hand);
 
       // 聽中，可以組成對子
       expect(readyTiles).toContain('zhong');
@@ -345,11 +227,8 @@ describe('麻將胡牌判斷測試', () => {
         'fa', 'bai'
       ];
 
-      const readyTiles = logic.checkReadyHand(hand);
+      const readyTiles = game.checkReadyHand(hand);
 
-      // 這些牌雜亂無章，不太可能組成胡牌
-      // 但可能還是會有一些能胡的牌，所以我們不嚴格斷言為空
-      // 只是檢查它返回一個陣列
       expect(Array.isArray(readyTiles)).toBe(true);
     });
   });
@@ -357,7 +236,7 @@ describe('麻將胡牌判斷測試', () => {
   describe('實際案例測試', () => {
     it('使用者案例：7,8萬 + 2張8桶 + 345條應該聽牌', () => {
       // 假設使用者已經有其他吃碰槓的組合
-      logic.players[0].melds = [
+      game.players[0].melds = [
         { type: 'chow', tiles: ['tiao-3', 'tiao-4', 'tiao-5'] },
         { type: 'pong', tiles: ['fa', 'fa', 'fa'] }
       ];
@@ -370,7 +249,7 @@ describe('麻將胡牌判斷測試', () => {
         'dong', 'dong', 'dong'     // 刻子
       ];
 
-      const readyTiles = logic.checkReadyHand(hand);
+      const readyTiles = game.checkReadyHand(hand);
 
       // 聽6萬或9萬
       expect(readyTiles).toContain('wan-6');
@@ -379,7 +258,7 @@ describe('麻將胡牌判斷測試', () => {
     });
 
     it('應該能判斷清一色聽牌', () => {
-      logic.players[0].melds = [];
+      game.players[0].melds = [];
 
       const hand = [
         'wan-1', 'wan-2', 'wan-3',
@@ -390,14 +269,14 @@ describe('麻將胡牌判斷測試', () => {
         'wan-8'
       ];
 
-      const readyTiles = logic.checkReadyHand(hand);
+      const readyTiles = game.checkReadyHand(hand);
 
       // 聽萬-8組成對子
       expect(readyTiles).toContain('wan-8');
     });
 
     it('應該能判斷碰碰胡聽牌', () => {
-      logic.players[0].melds = [
+      game.players[0].melds = [
         { type: 'pong', tiles: ['wan-1', 'wan-1', 'wan-1'] }
       ];
 
@@ -409,7 +288,7 @@ describe('麻將胡牌判斷測試', () => {
         'dong'
       ];
 
-      const readyTiles = logic.checkReadyHand(hand);
+      const readyTiles = game.checkReadyHand(hand);
 
       // 聽東做對子
       expect(readyTiles).toContain('dong');
@@ -421,14 +300,14 @@ describe('麻將胡牌判斷測試', () => {
       const hand = [];
       const tile = 'wan-1';
 
-      expect(logic.canHu(hand, tile)).toBe(false);
+      expect(game.canHu(hand, tile)).toBe(false);
     });
 
     it('應該處理單張牌', () => {
       const hand = ['wan-1'];
       const tile = 'wan-1';
 
-      expect(logic.canHu(hand, tile)).toBe(false);
+      expect(game.canHu(hand, tile)).toBe(false);
     });
 
     it('應該處理字牌（不能組成順子）', () => {
@@ -442,7 +321,7 @@ describe('麻將胡牌判斷測試', () => {
       ];
       const tile = 'fa'; // 16+1=17張
 
-      expect(logic.canHu(hand, tile)).toBe(true);
+      expect(game.canHu(hand, tile)).toBe(true);
     });
 
     it('應該處理花色混合', () => {
@@ -456,7 +335,7 @@ describe('麻將胡牌判斷測試', () => {
       ];
       const tile = 'zhong';
 
-      expect(logic.canHu(hand, tile)).toBe(true);
+      expect(game.canHu(hand, tile)).toBe(true);
     });
   });
 });
