@@ -640,12 +640,13 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) (bool, string) 
 				Type:  "kong_exposed",
 				Tiles: []string{tile, tile, tile, tile},
 			})
-		}
 
-		// 從棄牌堆中移除最後一張
-		if len(r.Game.DiscardPile) > 0 {
-			r.Game.DiscardPile = r.Game.DiscardPile[:len(r.Game.DiscardPile)-1]
+			// 大明槓：從棄牌堆中移除最後一張（別人打出的牌）
+			if !isSelfDrawn && len(r.Game.DiscardPile) > 0 {
+				r.Game.DiscardPile = r.Game.DiscardPile[:len(r.Game.DiscardPile)-1]
+			}
 		}
+		// 加槓（isPromotedKong=true）：不需要從棄牌堆移除，因為是自己摸到的牌
 	}
 
 	// 槓牌後需要補牌

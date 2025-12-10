@@ -537,9 +537,10 @@ export class Player {
         const baseSprite = new Sprite(baseTexture);
         tileContainer.addChild(baseSprite);
 
-        // For concealed kong, two tiles are face down.
+        // For concealed kong, all 4 tiles are face down (green back)
         let texture;
-        if (meldType === 'kong_concealed' && (i === 0 || i === 3)) {
+        if (meldType === 'kong_concealed') {
+            // 暗槓：4張牌全部顯示為牌背（綠色）
             texture = tileAssets['back'];
         } else {
             texture = tileAssets[tileType];

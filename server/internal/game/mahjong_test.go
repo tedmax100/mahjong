@@ -540,3 +540,391 @@ func TestNineGatesTing(t *testing.T) {
 		t.Errorf("應該只聽 3 張牌，實際: %v", result.WinningTiles)
 	}
 }
+
+// TestHandleKong_ConcealedKong 測試暗槓（手牌有4張相同的牌）
+func TestHandleKong_ConcealedKong(t *testing.T) {
+	// Setup: 玩家手上有 4 張相同的牌
+	playerA := &Player{
+		ID:       "playerA",
+		Name:     "Player A",
+		Position: 0,
+		Hand:     []string{"wan-5", "wan-5", "wan-5", "wan-5", "tiao-1", "tiao-2", "tiao-3"},
+		Melds:    []model.Meld{},
+	}
+	playerB := &Player{ID: "playerB", Name: "Player B", Position: 1}
+	room := &Room{
+		ID:      "test-room",
+		Players: []*Player{playerA, playerB},
+		Game:    NewMahjongGame([]*Player{playerA, playerB}),
+	}
+	room.GameStarted = true
+	room.CurrentTurn = playerA.Position
+	initialHandSize := len(playerA.Hand)
+	deckSize := len(room.Game.Deck)
+
+	// 呼叫 HandleKong（暗槓 = isConcealed: true）
+	success, drawnTile := room.HandleKong(playerA.ID, "wan-5", true)
+
+	// 驗證
+	if !success {
+		t.Fatalf("暗槓應該成功")
+	}
+
+	// 檢查槓牌後有補牌
+	if drawnTile == "" {
+		t.Error("暗槓後應該補牌")
+	}
+
+	// 驗證 meld 類型是 kong_concealed
+	if len(playerA.Melds) != 1 {
+		t.Fatalf("應該有 1 組 meld，實際: %d", len(playerA.Melds))
+	}
+
+	meld := playerA.Melds[0]
+	if meld.Type != "kong_concealed" {
+		t.Errorf("Meld 類型應該是 'kong_concealed'，但是 '%s'", meld.Type)
+	}
+	if len(meld.Tiles) != 4 {
+		t.Errorf("暗槓 Meld 應該有 4 張牌，實際: %d", len(meld.Tiles))
+	}
+	for _, tile := range meld.Tiles {
+		if tile != "wan-5" {
+			t.Errorf("暗槓的牌應該都是 'wan-5'，但有 '%s'", tile)
+		}
+	}
+
+	// 手牌應該減少 4 張，再補 1 張 = 減少 3 張
+	if len(playerA.Hand) != initialHandSize-3 {
+		t.Errorf("手牌數應該是 %d，實際: %d", initialHandSize-3, len(playerA.Hand))
+	}
+
+	// 牌山應該減少 1 張（補牌用）
+	if len(room.Game.Deck) != deckSize-1 {
+		t.Errorf("牌山應該減少 1 張，從 %d 到 %d，實際: %d", deckSize, deckSize-1, len(room.Game.Deck))
+	}
+
+	// 輪到槓牌的玩家
+	if room.CurrentTurn != playerA.Position {
+		t.Errorf("暗槓後應該輪到玩家 A，但輪到 %d", room.CurrentTurn)
+	}
+}
+
+// TestHandleKong_ExposedKong 測試明槓（手牌有3張，別人打出1張）
+func TestHandleKong_ExposedKong(t *testing.T) {
+	// Setup: 玩家手上有 3 張相同的牌
+	playerA := &Player{
+		ID:       "playerA",
+		Name:     "Player A",
+		Position: 0,
+		Hand:     []string{"wan-5", "wan-5", "wan-5", "tiao-1", "tiao-2", "tiao-3"},
+		Melds:    []model.Meld{},
+	}
+	playerB := &Player{ID: "playerB", Name: "Player B", Position: 1}
+	room := &Room{
+		ID:      "test-room",
+		Players: []*Player{playerA, playerB},
+		Game:    NewMahjongGame([]*Player{playerA, playerB}),
+	}
+	room.GameStarted = true
+	room.CurrentTurn = playerB.Position // 輪到 B 打牌後 A 槓
+	initialHandSize := len(playerA.Hand)
+	deckSize := len(room.Game.Deck)
+
+	// 模擬 B 打出 wan-5
+	room.LastDiscardPlayer = playerB.Position
+	room.Game.DiscardPile = append(room.Game.DiscardPile, "wan-5")
+
+	// 呼叫 HandleKong（明槓 = isConcealed: false）
+	success, drawnTile := room.HandleKong(playerA.ID, "wan-5", false)
+
+	// 驗證
+	if !success {
+		t.Fatalf("明槓應該成功")
+	}
+
+	// 檢查槓牌後有補牌
+	if drawnTile == "" {
+		t.Error("明槓後應該補牌")
+	}
+
+	// 驗證 meld 類型是 kong_exposed
+	if len(playerA.Melds) != 1 {
+		t.Fatalf("應該有 1 組 meld，實際: %d", len(playerA.Melds))
+	}
+
+	meld := playerA.Melds[0]
+	if meld.Type != "kong_exposed" {
+		t.Errorf("Meld 類型應該是 'kong_exposed'，但是 '%s'", meld.Type)
+	}
+	if len(meld.Tiles) != 4 {
+		t.Errorf("明槓 Meld 應該有 4 張牌，實際: %d", len(meld.Tiles))
+	}
+
+	// 手牌應該減少 3 張，再補 1 張 = 減少 2 張
+	if len(playerA.Hand) != initialHandSize-2 {
+		t.Errorf("手牌數應該是 %d，實際: %d", initialHandSize-2, len(playerA.Hand))
+	}
+
+	// 牌山應該減少 1 張（補牌用）
+	if len(room.Game.Deck) != deckSize-1 {
+		t.Errorf("牌山應該減少 1 張，從 %d 到 %d，實際: %d", deckSize, deckSize-1, len(room.Game.Deck))
+	}
+
+	// 輪到槓牌的玩家
+	if room.CurrentTurn != playerA.Position {
+		t.Errorf("明槓後應該輪到玩家 A，但輪到 %d", room.CurrentTurn)
+	}
+
+	// 棄牌堆應該移除被槓的牌
+	for _, tile := range room.Game.DiscardPile {
+		if tile == "wan-5" {
+			t.Error("棄牌堆不應該還有被槓的 wan-5")
+		}
+	}
+}
+
+// TestHandleKong_ConcealedKong_NotEnoughTiles 測試暗槓失敗（不足4張）
+func TestHandleKong_ConcealedKong_NotEnoughTiles(t *testing.T) {
+	// Setup: 玩家手上只有 3 張
+	playerA := &Player{
+		ID:       "playerA",
+		Name:     "Player A",
+		Position: 0,
+		Hand:     []string{"wan-5", "wan-5", "wan-5", "tiao-1"},
+		Melds:    []model.Meld{},
+	}
+	room := &Room{
+		ID:      "test-room",
+		Players: []*Player{playerA},
+		Game:    NewMahjongGame([]*Player{playerA}),
+	}
+	room.GameStarted = true
+
+	// 嘗試暗槓
+	success, _ := room.HandleKong(playerA.ID, "wan-5", true)
+
+	// 應該失敗
+	if success {
+		t.Error("手牌只有 3 張，暗槓應該失敗")
+	}
+
+	// Melds 應該還是空的
+	if len(playerA.Melds) != 0 {
+		t.Error("暗槓失敗後 Melds 應該是空的")
+	}
+}
+
+// TestKongTypeDistinction 測試明槓和暗槓的類型區分
+func TestKongTypeDistinction(t *testing.T) {
+	tests := []struct {
+		name         string
+		isConcealed  bool
+		handCount    int  // 手牌中有幾張要槓的牌
+		hasDiscard   bool // 棄牌堆是否有這張牌
+		expectedType string
+		shouldPass   bool
+	}{
+		{
+			name:         "暗槓-手牌4張",
+			isConcealed:  true,
+			handCount:    4,
+			hasDiscard:   false,
+			expectedType: "kong_concealed",
+			shouldPass:   true,
+		},
+		{
+			name:         "明槓-手牌3張+棄牌1張",
+			isConcealed:  false,
+			handCount:    3,
+			hasDiscard:   true,
+			expectedType: "kong_exposed",
+			shouldPass:   true,
+		},
+		{
+			name:         "暗槓失敗-只有3張",
+			isConcealed:  true,
+			handCount:    3,
+			hasDiscard:   false,
+			expectedType: "",
+			shouldPass:   false,
+		},
+		{
+			name:         "明槓失敗-只有2張",
+			isConcealed:  false,
+			handCount:    2,
+			hasDiscard:   true,
+			expectedType: "",
+			shouldPass:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 建立手牌
+			hand := []string{"tiao-1", "tiao-2"} // 基礎手牌
+			for i := 0; i < tt.handCount; i++ {
+				hand = append(hand, "wan-8")
+			}
+
+			playerA := &Player{
+				ID:       "playerA",
+				Name:     "Player A",
+				Position: 0,
+				Hand:     hand,
+				Melds:    []model.Meld{},
+			}
+			playerB := &Player{ID: "playerB", Name: "Player B", Position: 1}
+			room := &Room{
+				ID:      "test-room",
+				Players: []*Player{playerA, playerB},
+				Game:    NewMahjongGame([]*Player{playerA, playerB}),
+			}
+			room.GameStarted = true
+
+			if tt.hasDiscard {
+				room.Game.DiscardPile = []string{"wan-8"}
+			}
+
+			success, _ := room.HandleKong(playerA.ID, "wan-8", tt.isConcealed)
+
+			if success != tt.shouldPass {
+				t.Errorf("預期成功=%v，實際=%v", tt.shouldPass, success)
+			}
+
+			if tt.shouldPass {
+				if len(playerA.Melds) != 1 {
+					t.Fatalf("應該有 1 組 meld，實際: %d", len(playerA.Melds))
+				}
+				if playerA.Melds[0].Type != tt.expectedType {
+					t.Errorf("預期 meld 類型是 '%s'，實際是 '%s'", tt.expectedType, playerA.Melds[0].Type)
+				}
+			}
+		})
+	}
+}
+
+// TestHandleKong_PromotedKongDoesNotRemoveFromDiscardPile 測試加槓不會從棄牌堆移除牌
+func TestHandleKong_PromotedKongDoesNotRemoveFromDiscardPile(t *testing.T) {
+	// Setup: 玩家已碰 wan-5，然後自己摸到第4張 wan-5
+	playerA := &Player{
+		ID:       "playerA",
+		Name:     "Player A",
+		Position: 0,
+		Hand:     []string{"tiao-1", "tiao-2", "wan-5"}, // 手上有一張 wan-5（自己摸到的）
+		Melds: []model.Meld{
+			{Type: "pong", Tiles: []string{"wan-5", "wan-5", "wan-5"}},
+		},
+	}
+	playerB := &Player{ID: "playerB", Name: "Player B", Position: 1}
+	room := &Room{
+		ID:      "test-room",
+		Players: []*Player{playerA, playerB},
+		Game:    NewMahjongGame([]*Player{playerA, playerB}),
+	}
+	room.GameStarted = true
+
+	// 棄牌堆有其他牌（但不是 wan-5）
+	room.Game.DiscardPile = []string{"tong-1", "tong-2", "tong-3"}
+	originalDiscardCount := len(room.Game.DiscardPile)
+
+	// 執行加槓
+	success, _ := room.HandleKong(playerA.ID, "wan-5", false)
+
+	if !success {
+		t.Fatalf("加槓應該成功")
+	}
+
+	// 驗證棄牌堆沒有被修改（因為是自己摸到的牌，不是別人打出的）
+	if len(room.Game.DiscardPile) != originalDiscardCount {
+		t.Errorf("加槓不應該修改棄牌堆，原本 %d 張，現在 %d 張", originalDiscardCount, len(room.Game.DiscardPile))
+	}
+
+	// 驗證 meld 類型是 kong_promoted
+	if playerA.Melds[0].Type != "kong_promoted" {
+		t.Errorf("Meld 類型應該是 'kong_promoted'，但是 '%s'", playerA.Melds[0].Type)
+	}
+}
+
+// TestHandleKong_ExposedKongRemovesFromDiscardPile 測試大明槓會從棄牌堆移除牌
+func TestHandleKong_ExposedKongRemovesFromDiscardPile(t *testing.T) {
+	// Setup: 玩家手上有3張 wan-5，別人打出第4張
+	playerA := &Player{
+		ID:       "playerA",
+		Name:     "Player A",
+		Position: 0,
+		Hand:     []string{"tiao-1", "wan-5", "wan-5", "wan-5"},
+		Melds:    []model.Meld{},
+	}
+	playerB := &Player{ID: "playerB", Name: "Player B", Position: 1}
+	room := &Room{
+		ID:      "test-room",
+		Players: []*Player{playerA, playerB},
+		Game:    NewMahjongGame([]*Player{playerA, playerB}),
+	}
+	room.GameStarted = true
+
+	// 棄牌堆最後一張是 wan-5（別人打出的）
+	room.Game.DiscardPile = []string{"tong-1", "tong-2", "wan-5"}
+	room.LastDiscardPlayer = playerB.Position
+
+	// 執行大明槓
+	success, _ := room.HandleKong(playerA.ID, "wan-5", false)
+
+	if !success {
+		t.Fatalf("大明槓應該成功")
+	}
+
+	// 驗證棄牌堆的 wan-5 被移除
+	if len(room.Game.DiscardPile) != 2 {
+		t.Errorf("大明槓應該從棄牌堆移除牌，預期 2 張，實際 %d 張", len(room.Game.DiscardPile))
+	}
+	for _, tile := range room.Game.DiscardPile {
+		if tile == "wan-5" {
+			t.Error("棄牌堆不應該還有 wan-5")
+		}
+	}
+
+	// 驗證 meld 類型是 kong_exposed
+	if playerA.Melds[0].Type != "kong_exposed" {
+		t.Errorf("Meld 類型應該是 'kong_exposed'，但是 '%s'", playerA.Melds[0].Type)
+	}
+}
+
+// TestHandleKong_ConcealedKongDoesNotTouchDiscardPile 測試暗槓不會影響棄牌堆
+func TestHandleKong_ConcealedKongDoesNotTouchDiscardPile(t *testing.T) {
+	// Setup: 玩家手上有4張 wan-5
+	playerA := &Player{
+		ID:       "playerA",
+		Name:     "Player A",
+		Position: 0,
+		Hand:     []string{"tiao-1", "wan-5", "wan-5", "wan-5", "wan-5"},
+		Melds:    []model.Meld{},
+	}
+	room := &Room{
+		ID:      "test-room",
+		Players: []*Player{playerA},
+		Game:    NewMahjongGame([]*Player{playerA}),
+	}
+	room.GameStarted = true
+
+	// 棄牌堆有其他牌
+	room.Game.DiscardPile = []string{"tong-1", "tong-2", "tong-3"}
+	originalDiscardCount := len(room.Game.DiscardPile)
+
+	// 執行暗槓
+	success, _ := room.HandleKong(playerA.ID, "wan-5", true)
+
+	if !success {
+		t.Fatalf("暗槓應該成功")
+	}
+
+	// 驗證棄牌堆沒有被修改
+	if len(room.Game.DiscardPile) != originalDiscardCount {
+		t.Errorf("暗槓不應該修改棄牌堆，原本 %d 張，現在 %d 張", originalDiscardCount, len(room.Game.DiscardPile))
+	}
+
+	// 驗證 meld 類型是 kong_concealed
+	if playerA.Melds[0].Type != "kong_concealed" {
+		t.Errorf("Meld 類型應該是 'kong_concealed'，但是 '%s'", playerA.Melds[0].Type)
+	}
+}
