@@ -27,6 +27,18 @@ vi.mock('./WebSocketClient.js', () => ({
   WebSocketClient: class {}
 }));
 
+vi.mock('./DiscardManager.js', () => ({
+  DiscardManager: class {
+    constructor() {
+      this.container = { addChild: () => {}, removeChildren: () => {} };
+      this.addDiscard = () => Promise.resolve();
+      this.removeLastDiscard = () => {};
+      this.clear = () => {};
+      this.resize = () => {};
+    }
+  }
+}));
+
 describe('麻將胡牌判斷測試 (Game.js)', () => {
   let game;
 

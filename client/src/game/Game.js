@@ -7,6 +7,7 @@ import { AudioManager } from './AudioManager.js';
 import { MahjongLogic } from './MahjongLogic.js';
 import { AssetLoader } from './AssetLoader.js';
 import { WinningHandDisplay } from './WinningHandDisplay.js';
+import { DiscardManager } from './DiscardManager.js';
 
 /**
  * 主遊戲類
@@ -24,8 +25,7 @@ export class Game {
     this.myPosition = 0; // 0=下, 1=右, 2=上, 3=左
     this.currentTurn = 0; // 當前輪到誰（0-3）
     this.tileAssets = {};
-    this.discardedTiles = []; // 儲存所有打出的牌的sprite
-    this.discardContainer = new Container(); // 中央棄牌區域容器
+    this.discardManager = new DiscardManager(this.app.screen.width, this.app.screen.height);
 
     // 牌山相關
     this.wallContainer = new Container(); // 牌山容器
@@ -137,7 +137,7 @@ ${'='.repeat(60)}`);
     this.container.addChild(this.table.container);
 
     // 新增棄牌區域容器
-    this.container.addChild(this.discardContainer);
+    this.container.addChild(this.discardManager.container);
 
     // 創建玩家區域
     this.createPlayers();
@@ -607,94 +607,8 @@ ${'='.repeat(60)}`);
     }
 
     // 創建棄牌容器（包含牌底和牌面）
-    const discardContainer = new Container();
-
-    // 載入並創建牌底 sprite
-    let baseTexture;
-    try {
-      baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
-    } catch (error) {
-      console.warn('無法載入棄牌牌底圖片', error);
-    }
-
-    if (baseTexture) {
-      const baseSprite = new Sprite(baseTexture);
-      baseSprite.anchor.set(0.5); // 設定錨點在中心
-      discardContainer.addChild(baseSprite);
-    }
-
-    // 創建牌面 sprite
-    const texture = this.tileAssets[tile] || this.tileAssets['back'];
-    const tileSprite = new Sprite(texture);
-    tileSprite.anchor.set(0.5); // 設定錨點在中心
-    tileSprite.y = 5; // 調整牌面位置，讓它貼齊牌底下緣
-
-    // 針對筒子微調
-    if (tile.startsWith('tong-')) {
-      tileSprite.y += 8; // 往下移8個像素
-    }
-
-    discardContainer.addChild(tileSprite);
-
-    // 設定棄牌大小（參考圖片樣式，縮小一點）
-    const scale = 0.45; // 縮小牌底和牌面至75% (0.6 * 0.75 = 0.45)
-    discardContainer.scale.set(scale);
-
-    // 計算棄牌位置（在中央區域，根據玩家位置排列）
-    const centerX = this.app.screen.width / 2;
-    const centerY = this.app.screen.height / 2;
-    // 使用實際的牌底尺寸來計算間距（牌底比牌面稍大）
-    // 棄牌包含牌底和牌面，實際佔用空間更大
-    const tileWidth = 53.4375 * scale;  // 縮小至56.25%（原95）
-    const tileHeight = 64.6875 * scale; // 縮小至56.25%（原115）
-    const spacing = 25; // 增加間距避免重疊
-
-    // 計算該玩家已經打出的牌數
-    const playerDiscards = this.discardedTiles.filter(d => d.playerPosition === playerPosition);
-    const discardIndex = playerDiscards.length;
-
-    // 根據玩家位置計算棄牌位置（按照紅框標註的區域）
-    let x, y;
-    // 上下方向每行10張，左右方向每列8張
-    const maxTilesPerRow = (playerPosition === 1 || playerPosition === 3) ? 8 : 10;
-    const row = Math.floor(discardIndex / maxTilesPerRow);
-    const col = discardIndex % maxTilesPerRow;
-
-    // 所有棄牌都保持正向（不旋轉）
-    switch (playerPosition) {
-      case 0: // 底部玩家 - 棄牌放在底部中央區域
-        x = centerX - (maxTilesPerRow * (tileWidth + spacing)) / 2 + col * (tileWidth + spacing) + tileWidth / 2;
-        y = centerY + 200 + row * (tileHeight + spacing);
-        break;
-
-      case 1: // 右側玩家 - 棄牌放在右側區域，垂直排列（每列8張）
-        x = centerX + 400 + row * (tileWidth + spacing);
-        y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing) + tileHeight / 2;
-        break;
-
-      case 2: // 頂部玩家 - 棄牌放在頂部中央區域，從右邊開始，第二排往下
-        x = centerX + (maxTilesPerRow * (tileWidth + spacing)) / 2 - col * (tileWidth + spacing) - tileWidth / 2;
-        y = centerY - 280 + row * (tileHeight + spacing); // 改為 + row，讓第二排往下移
-        break;
-
-      case 3: // 左側玩家 - 棄牌放在左側區域，垂直排列（每列8張）
-        x = centerX - 400 - row * (tileWidth + spacing);
-        y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing) + tileHeight / 2;
-        break;
-    }
-
-    discardContainer.x = x;
-    discardContainer.y = y;
-
-    // 記錄棄牌資訊
-    this.discardedTiles.push({
-      sprite: discardContainer,
-      playerPosition: playerPosition,
-      tile: tile
-    });
-
-    // 新增到棄牌區域
-    this.discardContainer.addChild(discardContainer);
+    // 使用 DiscardManager 處理視覺呈現
+    await this.discardManager.addDiscard(tile, playerPosition, this.tileAssets);
 
     // 從玩家手牌中移除該牌（視覺上）
     if (player) {
@@ -862,10 +776,7 @@ ${'='.repeat(60)}`);
       }, this.tileAssets);
 
       // 從棄牌堆中移除最後一張（被吃的牌）
-      if (this.discardedTiles.length > 0) {
-        const lastDiscard = this.discardedTiles.pop();
-        this.discardContainer.removeChild(lastDiscard.sprite);
-      }
+      this.discardManager.removeLastDiscard();
 
       console.log(`✅ 玩家 ${playerPosition} 吃牌完成`);
 
@@ -944,10 +855,7 @@ ${'='.repeat(60)}`);
       }, this.tileAssets);
 
       // 從棄牌堆中移除最後一張（被碰的牌）
-      if (this.discardedTiles.length > 0) {
-        const lastDiscard = this.discardedTiles.pop();
-        this.discardContainer.removeChild(lastDiscard.sprite);
-      }
+      this.discardManager.removeLastDiscard();
 
       console.log(`✅ 玩家 ${playerPosition} 碰牌完成`);
 
@@ -1062,9 +970,8 @@ ${'='.repeat(60)}`);
       await player.addMeld(meld, this.tileAssets);
 
       // 如果是明槓，從棄牌堆中移除最後一張（被槓的牌）
-      if (meld.Type === 'kong_exposed' && this.discardedTiles.length > 0) {
-        const lastDiscard = this.discardedTiles.pop();
-        this.discardContainer.removeChild(lastDiscard.sprite);
+      if (meld.Type === 'kong_exposed') {
+        this.discardManager.removeLastDiscard();
       }
 
       console.log(`✅ 玩家 ${playerPosition} 槓牌完成`);
@@ -1728,6 +1635,10 @@ ${winner} 胡牌 (${winType})
     if (this.table) {
       this.table.resize(width, height);
     }
+    
+    if (this.discardManager) {
+      this.discardManager.resize(width, height);
+    }
 
     this.players.forEach(player => {
       player.resize(width, height);
@@ -2036,8 +1947,7 @@ ${winner} 胡牌 (${winType})
    */
   resetForNewRound() {
     // 清空棄牌
-    this.discardContainer.removeChildren();
-    this.discardedTiles = [];
+    this.discardManager.clear();
 
     // 重置所有玩家
     this.players.forEach(p => p.reset());
