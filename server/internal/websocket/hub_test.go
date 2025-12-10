@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"mahjong/internal/game"
+	"mahjong/internal/model"
 	"testing"
 )
 
@@ -16,7 +17,7 @@ func TestDrawForRealPlayer(t *testing.T) {
 		Name:     "TestPlayer",
 		Position: 0,
 		Hand:     make([]string, 16), // 正常轮次（16张手牌）
-		Melds:    []game.Meld{},
+		Melds:    []model.Meld{},
 	}
 
 	// 填充手牌（16张）
@@ -29,7 +30,7 @@ func TestDrawForRealPlayer(t *testing.T) {
 		Name:     "TestBot",
 		Position: 1,
 		Hand:     []string{},
-		Melds:    []game.Meld{},
+		Melds:    []model.Meld{},
 	}
 
 	room := &game.Room{
@@ -47,8 +48,10 @@ func TestDrawForRealPlayer(t *testing.T) {
 	initialHandSize := len(realPlayer.Hand)
 	initialDeckSize := len(room.Game.Deck)
 
-	// 3. 执行 DrawForRealPlayer
-	hub.DrawForRealPlayer(room)
+	// 3. 执行 drawForRealPlayer_needsLock (with lock)
+	hub.mu.Lock()
+	hub.drawForRealPlayer_needsLock(room)
+	hub.mu.Unlock()
 
 	// 4. 验证结果
 	// 验证手牌数量增加了1
@@ -76,7 +79,7 @@ func TestDrawForRealPlayer_BotShouldNotDraw(t *testing.T) {
 		Name:     "TestBot",
 		Position: 0,
 		Hand:     make([]string, 16),
-		Melds:    []game.Meld{},
+		Melds:    []model.Meld{},
 	}
 
 	for i := 0; i < 16; i++ {
@@ -95,8 +98,10 @@ func TestDrawForRealPlayer_BotShouldNotDraw(t *testing.T) {
 	hub.rooms["test-room"] = room
 	initialHandSize := len(bot.Hand)
 
-	// 执行 DrawForRealPlayer
-	hub.DrawForRealPlayer(room)
+	// 执行 drawForRealPlayer_needsLock
+	hub.mu.Lock()
+	hub.drawForRealPlayer_needsLock(room)
+	hub.mu.Unlock()
 
 	// 验证机器人手牌数量没有变化
 	if len(bot.Hand) != initialHandSize {
@@ -113,7 +118,7 @@ func TestDrawForRealPlayer_WrongHandSize(t *testing.T) {
 		Name:     "TestPlayer",
 		Position: 0,
 		Hand:     []string{"wan-1", "wan-2", "wan-3"}, // 只有3张（异常状态）
-		Melds:    []game.Meld{},
+		Melds:    []model.Meld{},
 	}
 
 	room := &game.Room{
@@ -128,8 +133,10 @@ func TestDrawForRealPlayer_WrongHandSize(t *testing.T) {
 	hub.rooms["test-room"] = room
 	initialHandSize := len(realPlayer.Hand)
 
-	// 执行 DrawForRealPlayer
-	hub.DrawForRealPlayer(room)
+	// 执行 drawForRealPlayer_needsLock
+	hub.mu.Lock()
+	hub.drawForRealPlayer_needsLock(room)
+	hub.mu.Unlock()
 
 	// 验证手牌数量没有变化（因为不是16张）
 	if len(realPlayer.Hand) != initialHandSize {
@@ -146,7 +153,7 @@ func TestDrawForRealPlayer_GameNotStarted(t *testing.T) {
 		Name:     "TestPlayer",
 		Position: 0,
 		Hand:     make([]string, 16),
-		Melds:    []game.Meld{},
+		Melds:    []model.Meld{},
 	}
 
 	for i := 0; i < 16; i++ {
@@ -165,12 +172,14 @@ func TestDrawForRealPlayer_GameNotStarted(t *testing.T) {
 	hub.rooms["test-room"] = room
 	initialHandSize := len(realPlayer.Hand)
 
-	// 执行 DrawForRealPlayer
-	hub.DrawForRealPlayer(room)
+	// 执行 drawForRealPlayer_needsLock
+	hub.mu.Lock()
+	hub.drawForRealPlayer_needsLock(room)
+	hub.mu.Unlock()
 
 	// 验证手牌数量没有变化
 	if len(realPlayer.Hand) != initialHandSize {
-		t.Errorf("游戏未开始时不应该摸牌，手牌数应该保持 %d，但实际是 %d", initialHandSize, len(realPlayer.Hand))
+		t.Errorf("游戏未开始时不应该摸牌，手牌数應該保持 %d，但實際是 %d", initialHandSize, len(realPlayer.Hand))
 	}
 }
 
@@ -183,7 +192,7 @@ func TestCheckAndPlayBotTurn_CallsDrawForRealPlayer(t *testing.T) {
 		Name:     "TestPlayer",
 		Position: 0,
 		Hand:     make([]string, 16),
-		Melds:    []game.Meld{},
+		Melds:    []model.Meld{},
 	}
 
 	for i := 0; i < 16; i++ {
@@ -203,23 +212,11 @@ func TestCheckAndPlayBotTurn_CallsDrawForRealPlayer(t *testing.T) {
 	initialHandSize := len(realPlayer.Hand)
 
 	// 执行 CheckAndPlayBotTurn（应该检测到是真实玩家并调用 DrawForRealPlayer）
-	hub.CheckAndPlayBotTurn(room)
+	// 注意：withDelay = false 以避免 goroutine 和 sleep
+	hub.CheckAndPlayBotTurn(room, false)
 
 	// 验证真实玩家摸到了牌
 	if len(realPlayer.Hand) != initialHandSize+1 {
 		t.Errorf("CheckAndPlayBotTurn 应该为真实玩家摸牌，手牌数应该是 %d，但实际是 %d", initialHandSize+1, len(realPlayer.Hand))
 	}
-}
-
-// 辅助函数：检查两个字符串切片是否相同
-func isSameCombination(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
