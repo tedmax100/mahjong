@@ -6,6 +6,7 @@ import { ActionButtons } from './ActionButtons.js';
 import { AudioManager } from './AudioManager.js';
 import { MahjongLogic } from './MahjongLogic.js';
 import { AssetLoader } from './AssetLoader.js';
+import { WinningHandDisplay } from './WinningHandDisplay.js';
 
 /**
  * 主遊戲類
@@ -129,6 +130,7 @@ ${'='.repeat(60)}`);
 
     // 載入素材 (Using AssetLoader)
     this.tileAssets = await this.assetLoader.load();
+    this.winningHandDisplayHandler.tileAssets = this.tileAssets; // Update handler with loaded assets
 
     // 創建牌桌
     this.table = new Table(this.app.screen.width, this.app.screen.height);
@@ -175,6 +177,7 @@ ${'='.repeat(60)}`);
     this.winningHandContainer.visible = false;
     this.winningHandContainer.zIndex = 11000;
     this.container.addChild(this.winningHandContainer);
+    this.winningHandDisplayHandler = new WinningHandDisplay(this.winningHandContainer, this.app.screen, this.tileAssets);
 
     // 顯示等待文字
     this.showWaitingText();
@@ -1860,183 +1863,7 @@ ${winner} 胡牌 (${winType})
     }
   }
 
-    /**
-
-     * 顯示胡牌手牌
-
-     */
-
-    async displayWinningHand(hand, melds, winTile) {
-
-      const container = this.winningHandContainer;
-
-      container.removeChildren();
-
-  
-
-      const centerX = this.app.screen.width / 2;
-
-      const centerY = this.app.screen.height / 2;
-
-  
-
-      const bg = new Graphics();
-
-      bg.rect(0, 0, this.app.screen.width, this.app.screen.height);
-
-      bg.fill({ color: 0x000000, alpha: 0.7 });
-
-      container.addChild(bg);
-
-  
-
-      const allTilesContainer = new Container();
-
-      container.addChild(allTilesContainer);
-
-  
-
-      const tileScale = 0.8;
-
-      const tileWidth = 75 * tileScale;
-
-      const spacing = 8;
-
-      const meldSpacing = 20;
-
-  
-
-      let currentX = 0;
-
-  
-
-      // Display Melds
-
-      if (melds) {
-
-        for (const meld of melds) {
-
-          const meldContainer = new Container();
-
-          const tiles = meld.Tiles || meld.tiles;
-
-          for (let i = 0; i < tiles.length; i++) {
-
-            const texture = this.tileAssets[tiles[i]] || this.tileAssets['back'];
-
-            const tile = new Tile(tiles[i], texture);
-
-            await new Promise(resolve => setTimeout(resolve, 2)); // minimal delay for async creation
-
-            tile.setScale(tileScale);
-
-            tile.container.x = i * (tileWidth + spacing);
-
-            meldContainer.addChild(tile.container);
-
-          }
-
-          meldContainer.x = currentX;
-
-          allTilesContainer.addChild(meldContainer);
-
-          currentX += meldContainer.width + meldSpacing;
-
-        }
-
-      }
-
-  
-
-      // Display Hand, separating the winning tile
-
-      const handToShow = [...hand];
-
-      const winTileIndex = handToShow.lastIndexOf(winTile);
-
-      if (winTileIndex > -1) {
-
-        handToShow.splice(winTileIndex, 1);
-
-      }
-
-      handToShow.sort((a, b) => (MahjongLogic.tileValue(a) - MahjongLogic.tileValue(b)));
-
-  
-
-      for (const tileType of handToShow) {
-
-        const texture = this.tileAssets[tileType] || this.tileAssets['back'];
-
-        const tile = new Tile(tileType, texture);
-
-        await new Promise(resolve => setTimeout(resolve, 2));
-
-        tile.setScale(tileScale);
-
-        tile.container.x = currentX;
-
-        allTilesContainer.addChild(tile.container);
-
-        currentX += tileWidth + spacing;
-
-      }
-
-      
-
-      // Display the winning tile at the end, highlighted
-
-      if (winTile) {
-
-        currentX += meldSpacing;
-
-        const texture = this.tileAssets[winTile] || this.tileAssets['back'];
-
-        const winningTile = new Tile(winTile, texture);
-
-        await new Promise(resolve => setTimeout(resolve, 2));
-
-        winningTile.setScale(tileScale);
-
-        winningTile.container.x = currentX;
-
-  
-
-        const highlight = new Graphics();
-
-        highlight.roundRect(-5, -5, 75 + 10, 95 + 10, 8); // A bit larger than the tile
-
-        highlight.fill({color: 0xFFD700, alpha: 0.6});
-
-        winningTile.container.addChildAt(highlight, 0); // Add behind tile sprites
-
-  
-
-        allTilesContainer.addChild(winningTile.container);
-
-      }
-
-  
-
-      setTimeout(() => {
-
-          allTilesContainer.x = centerX - allTilesContainer.width / 2;
-
-          allTilesContainer.y = centerY - allTilesContainer.height / 2;
-
-      }, 50);
-
-  
-
-      container.visible = true;
-
-      setTimeout(() => {
-
-        container.visible = false;
-
-      }, 5000);
-
-    }
+    
 
     
 
@@ -2058,7 +1885,7 @@ ${winner} 胡牌 (${winType})
 
     // Display the winning hand
     if (WinningHand && Melds && WinTile) {
-        this.displayWinningHand(WinningHand, Melds, WinTile);
+        this.winningHandDisplayHandler.display(WinningHand, Melds, WinTile);
     }
 
     // 建構牌型描述
