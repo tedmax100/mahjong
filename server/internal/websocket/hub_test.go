@@ -42,6 +42,19 @@ func TestDrawForRealPlayer(t *testing.T) {
 		Clients:     make(map[string]interface{}),
 	}
 
+	// Force deck to have no flowers at the top to avoid flaky test
+	// Move any flowers to the end of the deck
+	nonFlowers := []string{}
+	flowers := []string{}
+	for _, t := range room.Game.Deck {
+		if len(t) > 6 && t[:6] == "flower" {
+			flowers = append(flowers, t)
+		} else {
+			nonFlowers = append(nonFlowers, t)
+		}
+	}
+	room.Game.Deck = append(nonFlowers, flowers...)
+
 	hub.rooms["test-room"] = room
 
 	// 记录初始状态
