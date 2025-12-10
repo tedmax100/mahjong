@@ -425,3 +425,118 @@ func TestCheckTing_UnsortedHand(t *testing.T) {
 		t.Errorf("Expected winning tile 'tong-5', but it was not found in %v", result.WinningTiles)
 	}
 }
+
+// TestConsecutiveFlowerReplacement 測試連續補花
+func TestConsecutiveFlowerReplacement(t *testing.T) {
+	player := &Player{
+		ID:      "p1",
+		Flowers: make([]string, 0),
+		Hand:    make([]string, 0),
+	}
+	game := NewMahjongGame([]*Player{player})
+
+	// 手動設置牌山：花牌 -> 花牌 -> 萬子 -> 填充牌 (避免流局檢查)
+	// 台灣麻將剩餘 8 張流局，所以總數至少要 3 + 8 + 1 = 12 張
+	game.Deck = []string{"flower-chun", "flower-xia", "wan-1"}
+	for i := 0; i < 20; i++ {
+		game.Deck = append(game.Deck, "tong-1")
+	}
+
+	// 執行補花摸牌
+	drawnTile := game.DrawTileWithFlowerReplacement(player)
+
+	// 驗證
+	if drawnTile != "wan-1" {
+		t.Errorf("應該摸到 wan-1，但摸到 %s", drawnTile)
+	}
+
+	if len(player.Flowers) != 2 {
+		t.Errorf("應該有 2 張花牌，實際 %d 張", len(player.Flowers))
+	}
+
+	if len(player.Flowers) >= 2 {
+		if player.Flowers[0] != "flower-chun" || player.Flowers[1] != "flower-xia" {
+			t.Errorf("花牌順序或內容錯誤: %v", player.Flowers)
+		}
+	}
+}
+
+// TestNineGatesTing 測試九蓮寶燈聽牌（9 面聽）
+// 1112345678999 聽 1-9
+func TestNineGatesTing(t *testing.T) {
+	// 注意：台灣麻將 16 張，九蓮寶燈通常指清一色且聽牌狀態下聽很多張
+	// 標準 13 張九蓮是 1112345678999
+	// 16 張要湊成胡牌型（5 組 + 1 對），九蓮寶燈可能定義不同，
+	// 這裡我們測試一個清一色且聽很多張的型態，驗證 CheckTing 的能力
+	
+	// 構造一個清一色聽多張的牌型 (16張)
+	// 例如：111 234 567 888 234 5 (聽 2, 5, 8?) -> 3刻+2順+單吊?
+	// 讓我們用更簡單的邏輯：測試 CheckTing 是否能找出所有聽牌
+	
+	// 構造：111 234 456 678 999 + 聽一張
+	// 111 (pong)
+	// 234 (chow)
+	// 456 (chow)
+	// 678 (chow)
+	// 999 (pong)
+	// 剩餘一張：假設是 5，則聽 2, 5, 8 (如果 456 是 45 聽 3,6? 不對)
+	
+	// 讓我們測試一個標準的多面聽：
+	// 手牌：wan-2, wan-3, wan-4, wan-5, wan-6
+	// 聽：wan-1, wan-4, wan-7
+	// 因為 234 + 56 (聽4,7) 或 23 + 456 (聽1,4) -> 合集 1,4,7
+	
+	player := &Player{ID: "p1"}
+	game := NewMahjongGame([]*Player{player})
+	
+	hand := []string{
+		"tong-1", "tong-1", "tong-1", // 刻
+		"tiao-1", "tiao-1", "tiao-1", // 刻
+		"wan-9", "wan-9",             // 眼
+		"wan-2", "wan-3", "wan-4", "wan-5", "wan-6", // 5 連張
+		// 總共 3+3+2+5 = 13 張，還差 3 張？ 
+		// 16 張麻將聽牌時手牌數應為 16 張 (4*3+1+3) ? 
+		// 不，聽牌時手牌數是 16 張，加一張成 17 張胡。
+		// 所以我們需要 16 張手牌。
+		"xi", "xi", "xi", // 刻
+	}
+	// 手牌：
+	// 刻：tong-1
+	// 刻：tiao-1
+	// 刻：xi
+	// 眼：wan-9
+	// 剩下：wan-2, wan-3, wan-4, wan-5, wan-6 (5張)
+	// 總共 3+3+3+2+5 = 16 張
+	// 聽牌分析：
+	// wan-234 (順) + wan-56 (搭) -> 聽 4, 7
+	// wan-23 (搭) + wan-456 (順) -> 聽 1, 4
+	// 所以應該聽 1, 4, 7
+	
+	result := game.CheckTing(hand, []model.Meld{})
+	
+	if !result.IsTing {
+		t.Fatalf("應該聽牌")
+	}
+	
+	expectedWins := []string{"wan-1", "wan-4", "wan-7"}
+	
+	// 驗證是否包含所有期望的聽牌
+	for _, exp := range expectedWins {
+		found := false
+		for _, act := range result.WinningTiles {
+			if act == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("應該聽 %s，但結果未包含。實際: %v", exp, result.WinningTiles)
+		}
+	}
+	
+	// 驗證沒有多餘的（在這個例子中應該只有 1,4,7）
+	// 注意：wan-1 (123, 456), wan-4 (234, 456 or 44 + 2356X or 234 456), wan-7 (234, 567)
+	if len(result.WinningTiles) != 3 {
+		t.Errorf("應該只聽 3 張牌，實際: %v", result.WinningTiles)
+	}
+}

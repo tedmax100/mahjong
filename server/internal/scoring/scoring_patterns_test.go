@@ -172,4 +172,32 @@ func TestScoringPatterns(t *testing.T) {
 			t.Error("應該識別為小四喜")
 		}
 	})
+
+	t.Run("平胡 (Ping Hu)", func(t *testing.T) {
+		// 平胡定義（常見規則）：
+		// 1. 無花
+		// 2. 無字牌刻子（有些規則允許字牌對子，有些不允許當眼）
+		// 3. 只有順子，沒有刻子
+		// 4. 非門清（即允許吃），但如果全部門清自摸就算門清自摸，不一定是平胡
+		// 5. 聽兩頭（非單吊、中洞、邊張）- 這個 CheckTing 較難檢測，這裡主要測計分
+		// 簡單起見，這裡測試最基本的：沒花、沒特殊番、基礎分=0（靠吃/非自摸）
+
+		hand := []string{
+			"wan-2", "wan-5", // 對眼
+		}
+		melds := []model.Meld{
+			{Type: "chow", Tiles: []string{"wan-1", "wan-2", "wan-3"}},
+			{Type: "chow", Tiles: []string{"wan-4", "wan-5", "wan-6"}},
+			{Type: "chow", Tiles: []string{"tong-1", "tong-2", "tong-3"}},
+			{Type: "chow", Tiles: []string{"tong-4", "tong-5", "tong-6"}},
+			{Type: "chow", Tiles: []string{"tiao-7", "tiao-8", "tiao-9"}},
+		}
+
+		// 假設有人打出 wan-2 胡牌 (非自摸)
+		result := CalculateScore(hand, melds, []string{}, "wan-2", false)
+
+		if !hasHandType(result, "平胡") {
+			t.Error("應該識別為平胡")
+		}
+	})
 }
