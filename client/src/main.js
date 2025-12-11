@@ -79,6 +79,31 @@ class MahjongApp {
     document.getElementById('add-bot-btn').addEventListener('click', () => {
       this.addBot();
     });
+
+    // 切換聲音
+    document.getElementById('toggle-sound-btn').addEventListener('click', () => {
+      this.toggleSound();
+    });
+  }
+
+  toggleSound() {
+    if (!this.game || !this.game.audioManager) {
+      console.warn('遊戲尚未初始化');
+      return;
+    }
+
+    const enabled = this.game.audioManager.toggle();
+    const btn = document.getElementById('toggle-sound-btn');
+
+    if (enabled) {
+      btn.textContent = '🔊 聲音開';
+      btn.style.background = '#667eea';
+      // 重新播放背景音樂
+      this.game.audioManager.playBGM('game');
+    } else {
+      btn.textContent = '🔇 聲音關';
+      btn.style.background = '#999';
+    }
   }
 
   quickStart() {

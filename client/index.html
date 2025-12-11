@@ -198,13 +198,54 @@
 
     .room-info {
       position: absolute;
-      top: 50px;
+      top: 20px;
       left: 20px;
+      z-index: 100;
+    }
+
+    .room-info-toggle {
+      width: 48px;
+      height: 48px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .room-info-toggle:hover {
+      background: #f0f0f0;
+      transform: scale(1.05);
+    }
+
+    .room-info-content {
+      position: absolute;
+      top: 0;
+      left: 0;
       background: white;
       padding: 15px 25px;
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(-10px);
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .room-info:hover .room-info-content {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+    }
+
+    .room-info:hover .room-info-toggle {
+      opacity: 0;
+      visibility: hidden;
     }
 
     .share-btn {
@@ -319,10 +360,14 @@
 
     <!-- 房間資訊 -->
     <div class="room-info hidden" id="room-info">
-      <div><strong>房間號：</strong><span id="current-room-id"></span></div>
-      <div><strong>玩家：</strong><span id="player-count">1/4</span></div>
-      <button class="share-btn" id="share-room-btn">分享房間</button>
-      <button class="share-btn" id="add-bot-btn" style="background: #48bb78;">🤖 新增Bot</button>
+      <div class="room-info-toggle">☰</div>
+      <div class="room-info-content">
+        <div><strong>房間號：</strong><span id="current-room-id"></span></div>
+        <div><strong>玩家：</strong><span id="player-count">1/4</span></div>
+        <button class="share-btn" id="share-room-btn">分享房間</button>
+        <button class="share-btn" id="add-bot-btn" style="background: #48bb78;">🤖 新增Bot</button>
+        <button class="share-btn" id="toggle-sound-btn" style="background: #667eea;">🔊 聲音開</button>
+      </div>
     </div>
   </div>
 

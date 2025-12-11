@@ -184,51 +184,63 @@ export class Player {
         const totalLayoutWidth = handWidth + spacingBetweenHandAndMelds + meldsWidth;
         const startX = (this.screenWidth / 2) - (totalLayoutWidth / 2);
 
-        // Position hand tile
+        // Position hand tile - 往下移 30px (從 -180 改為 -150)
         tile.setPosition(
           startX + index * (tileWidth + handSpacing),
-          this.screenHeight - 180
+          this.screenHeight - 150
         );
         tile.setScale(0.75);
 
         // Position the entire melds container to the right of the hand
         // This is done for every tile, which is redundant but ensures it's updated correctly
         this.meldsContainer.x = startX + handWidth + spacingBetweenHandAndMelds;
-        this.meldsContainer.y = this.screenHeight - 180;
+        this.meldsContainer.y = this.screenHeight - 150;
         break;
       }
 
-      case 'right':
-        // 右側 - 垂直排列
-        spacing = 12; // 增加間距避免重疊
+      case 'right': {
+        // 右側 - 垂直排列，超過9張換到第二排（往左）
+        spacing = 12;
+        const maxPerColumnRight = 9;
+        const colRight = Math.floor(index / maxPerColumnRight);
+        const rowRight = index % maxPerColumnRight;
+        const tilesInThisColRight = Math.min(totalTiles - colRight * maxPerColumnRight, maxPerColumnRight);
+
         tile.setPosition(
-          this.screenWidth - 70,  // 更靠近右邊（從 100 改為 70）
-          this.screenHeight / 2 - (totalTiles * (tileHeight + spacing)) / 2 + index * (tileHeight + spacing)
+          this.screenWidth - 70 - colRight * (tileWidth + 15),  // 第二排往左移
+          this.screenHeight / 2 - (tilesInThisColRight * (tileHeight + spacing)) / 2 + rowRight * (tileHeight + spacing)
         );
         tile.setRotation(Math.PI / 2);
-        tile.setScale(0.6); // 縮小牌底和牌面至75% (0.8 * 0.75 = 0.6)
+        tile.setScale(0.6);
         break;
+      }
 
       case 'top':
-        // 頂部 - 水平排列（背面）
+        // 頂部 - 水平排列（背面）- 往上移 (從 30 改為 10)
         spacing = 12; // 增加間距避免重疊
         tile.setPosition(
           this.screenWidth / 2 - (totalTiles * (tileWidth + spacing)) / 2 + index * (tileWidth + spacing),
-          30  // 更靠近頂部（從 50 改為 30）
+          10  // 更靠近頂部
         );
         tile.setScale(0.6); // 縮小牌底和牌面至75% (0.8 * 0.75 = 0.6)
         break;
 
-      case 'left':
-        // 左側 - 垂直排列
-        spacing = 12; // 增加間距避免重疊
+      case 'left': {
+        // 左側 - 垂直排列，超過9張換到第二排（往右）
+        spacing = 12;
+        const maxPerColumnLeft = 9;
+        const colLeft = Math.floor(index / maxPerColumnLeft);
+        const rowLeft = index % maxPerColumnLeft;
+        const tilesInThisColLeft = Math.min(totalTiles - colLeft * maxPerColumnLeft, maxPerColumnLeft);
+
         tile.setPosition(
-          30,  // 更靠近左邊（從 50 改為 30）
-          this.screenHeight / 2 - (totalTiles * (tileHeight + spacing)) / 2 + index * (tileHeight + spacing)
+          30 + colLeft * (tileWidth + 15),  // 第二排往右移
+          this.screenHeight / 2 - (tilesInThisColLeft * (tileHeight + spacing)) / 2 + rowLeft * (tileHeight + spacing)
         );
         tile.setRotation(-Math.PI / 2);
-        tile.setScale(0.6); // 縮小牌底和牌面至75% (0.8 * 0.75 = 0.6)
+        tile.setScale(0.6);
         break;
+      }
     }
   }
 
@@ -495,12 +507,14 @@ export class Player {
       console.error('❌ updateOpenLayout: tileAssets is empty or undefined');
       return;
     }
+    console.log(`📋 updateOpenLayout: position=${this.position}, melds=${this.melds.length}, flowers=${this.flowers.length}, tileAssets keys=${Object.keys(tileAssets).length}`);
 
         const tileWidth = 60;
         const tileHeight = 80;
         const groupSpacing = 25; // Increased from 15
         const gapFromHand = tileWidth * 0.8;
         let currentOffset = 0;
+        let currentRow = 0; // 用於追蹤當前在第幾排
 
         const { Sprite, Container, Assets } = await import('pixi.js');
         const baseTexture = await Assets.load('/assets/tiles/carddown/basefdown.png');
@@ -510,16 +524,21 @@ export class Player {
         const handSpacing = 5;
         const handWidth = handTileCount * handTileWidth + (handTileCount - 1) * handSpacing;
 
+        // 計算可用的垂直空間（左右側玩家）
+        // 明牌從 y=200 開始，可用空間 = 螢幕高度 - 起始位置
+        // 當 currentOffset + 牌組高度 > maxVerticalOffset 時換排
+        const maxVerticalOffset = this.screenHeight - 200;
+
         // 1. 渲染吃碰槓牌組
         for (const meld of this.melds) {
             const meldGroup = new Container();
             const meldType = meld.Type || meld.type;
             let meldTiles = meld.Tiles || meld.tiles;
-            
+
             if (meldType === 'chow') {
                 meldTiles = this.sortTiles([...meldTiles]);
             }
-            
+
             for (let i = 0; i < meldTiles.length; i++) {
                 const tileType = meldTiles[i];
                 const tileContainer = new Container();
@@ -528,13 +547,18 @@ export class Player {
 
                 let texture = (meldType === 'kong_concealed') ? tileAssets['back'] : tileAssets[tileType];
                 if (!texture) {
-                    console.warn(`⚠️ updateOpenLayout: Missing texture for "${tileType}", using back.`);
+                    console.warn(`⚠️ updateOpenLayout: Missing texture for "${tileType}" (meldType: ${meldType}), available keys:`, Object.keys(tileAssets).slice(0, 10));
                     texture = tileAssets['back'];
+                }
+                if (!texture) {
+                    console.error(`❌ updateOpenLayout: Even 'back' texture is missing! tileType: ${tileType}`);
+                    continue; // 跳過這張牌
                 }
 
                 const tileSprite = new Sprite(texture);
-                if (tileType.startsWith('tong-')) tileSprite.y = 5;
+                if (tileType && tileType.startsWith('tong-')) tileSprite.y = 5;
                 tileContainer.addChild(tileSprite);
+                // console.log(`🎴 Meld tile: ${tileType}, meldType: ${meldType}`);
 
                 const isKong = meldType && meldType.includes('kong');
                 if (isKong && i === 3) {
@@ -548,12 +572,20 @@ export class Player {
 
             const groupWidth = (meldTiles.length === 4 ? 3 : meldTiles.length) * (tileWidth + 35);
             const scale = this.position === 'bottom' ? 0.75 : 0.6;
-            
-            this.positionOpenGroup(meldGroup, scale, groupWidth, currentOffset, handWidth, gapFromHand);
+            const scaledGroupHeight = groupWidth * scale; // 旋轉後寬度變高度
+
+            // 檢查是否需要換排（左右側玩家）
+            if ((this.position === 'left' || this.position === 'right') &&
+                currentOffset + scaledGroupHeight > maxVerticalOffset && currentOffset > 0) {
+                currentRow++;
+                currentOffset = 0;
+            }
+
+            this.positionOpenGroup(meldGroup, scale, groupWidth, currentOffset, handWidth, gapFromHand, currentRow);
             currentOffset += groupWidth * scale + groupSpacing;
             this.meldsContainer.addChild(meldGroup);
         }
-        
+
         // 2. 渲染花牌
         if (this.flowers.length > 0) {
             const flowerGroup = new Container();
@@ -563,24 +595,42 @@ export class Player {
                 const baseSprite = new Sprite(baseTexture);
                 tileContainer.addChild(baseSprite);
 
-                const texture = tileAssets[tileType] || tileAssets['back'];
+                let texture = tileAssets[tileType] || tileAssets['back'];
+                if (!texture) {
+                    console.warn(`⚠️ updateOpenLayout: Missing flower texture for "${tileType}"`);
+                    continue;
+                }
                 const tileSprite = new Sprite(texture);
-                if (tileType.startsWith('tong-')) tileSprite.y = 5;
+                if (tileType && tileType.startsWith('tong-')) tileSprite.y = 5;
                 tileContainer.addChild(tileSprite);
                 tileContainer.x = i * (tileWidth + 35);
                 flowerGroup.addChild(tileContainer);
             }
-            
+
             const groupWidth = this.flowers.length * (tileWidth + 35);
             const scale = this.position === 'bottom' ? 0.75 : 0.6;
-            
-            this.positionOpenGroup(flowerGroup, scale, groupWidth, currentOffset, handWidth, gapFromHand);
+            const scaledGroupHeight = groupWidth * scale;
+
+            // 檢查是否需要換排（左右側玩家）
+            if ((this.position === 'left' || this.position === 'right') &&
+                currentOffset + scaledGroupHeight > maxVerticalOffset && currentOffset > 0) {
+                currentRow++;
+                currentOffset = 0;
+            }
+
+            this.positionOpenGroup(flowerGroup, scale, groupWidth, currentOffset, handWidth, gapFromHand, currentRow);
             this.meldsContainer.addChild(flowerGroup);
         }
   }
 
-  positionOpenGroup(group, scale, groupWidth, offset, handWidth, gapFromHand) {
+  positionOpenGroup(group, scale, groupWidth, offset, handWidth, gapFromHand, row = 0) {
     group.scale.set(scale);
+
+    // 牌組旋轉 90 度後，原本的高度變成寬度
+    // 一組牌（3張）總寬度 = 3 * (60+35) = 285，縮放後約 171
+    // 但旋轉後這個寬度變成高度，而原本的高度 80 變成寬度 = 80 * 0.6 = 48
+    // 排與排之間需要足夠的間距避免重疊，使用 90px
+    const rowSpacing = 90;
 
     switch (this.position) {
       case 'bottom': {
@@ -591,8 +641,11 @@ export class Player {
         break;
       }
       case 'right': {
-        group.x = this.screenWidth - 120;
-        group.y = 200 + offset;
+        // 右側玩家：第二排往右側開啟（往螢幕外側）
+        // 旋轉 90 度後，牌組從 group.x 向左延伸
+        // 第二排要往右移，所以 group.x 要增加
+        group.x = this.screenWidth - 120 + row * rowSpacing;
+        group.y = 100 + offset; // 往上移 50px（從 150 改為 100）
         group.rotation = Math.PI / 2;
         break;
       }
@@ -603,8 +656,11 @@ export class Player {
         break;
       }
       case 'left': {
-        group.x = 200;
-        group.y = 200 + offset;
+        // 左側玩家：第二排往左側開啟（往螢幕外側）
+        // 旋轉 90 度後，牌組從 group.x 向左延伸
+        // 第二排要往左移，所以 group.x 要減少
+        group.x = 200 - row * rowSpacing;
+        group.y = 100 + offset; // 往上移 50px（從 150 改為 100）
         group.rotation = Math.PI / 2;
         break;
       }

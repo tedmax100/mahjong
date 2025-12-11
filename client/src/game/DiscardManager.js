@@ -166,8 +166,9 @@ export class DiscardManager {
         let x, y;
         switch (playerPosition) {
             case 0:
+                // 底部玩家的棄牌區：往上移動以避免與手牌重疊
                 x = centerX - (maxTilesPerRow * (tileWidth + spacing)) / 2 + col * (tileWidth + spacing) + tileWidth / 2;
-                y = centerY + 200 + row * (tileHeight + spacing + rowSpacing);
+                y = centerY + 120 - row * (tileHeight + spacing + rowSpacing); // 從 +200 改為 +120，且第二排往上長
                 break;
             case 1:
                 // 右側玩家：每排 7 張，滿了往左換行（離中心更近）
@@ -175,8 +176,9 @@ export class DiscardManager {
                 y = centerY - (maxTilesPerRow * (tileHeight + spacing)) / 2 + col * (tileHeight + spacing + 10) + tileHeight / 2;
                 break;
             case 2:
+                // 頂部玩家的棄牌區：往下移動靠近中間，第二排往上長（更靠近頂部）
                 x = centerX + (maxTilesPerRow * (tileWidth + spacing)) / 2 - col * (tileWidth + spacing) - tileWidth / 2;
-                y = centerY - 280 - row * (tileHeight + spacing + rowSpacing);
+                y = centerY - 135 - row * (tileHeight + spacing + rowSpacing); // 從 -120 改為 -135，往上移15
                 break;
             case 3:
                 // 左側玩家：每排 7 張，滿了往右換行（離中心更近）

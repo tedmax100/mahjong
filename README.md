@@ -34,8 +34,8 @@
 ```bash
 docker compose up -d
 
-## 選用qwen 2.5 1.b
-docker exec -it qwen_server ollama run qwen2.5:1.5b
+## 選用gemma3 270m
+docker exec -it qwen_server ollama run gemma3:270m
 ```
 
 #### 2. 安裝依賴
