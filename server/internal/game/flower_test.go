@@ -42,7 +42,7 @@ func TestDrawTileWithFlowerReplacement(t *testing.T) {
 
 	// 添加玩家
 	for i := 1; i <= 4; i++ {
-		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 	}
 
 	room.StartGame()
@@ -155,7 +155,7 @@ func TestFlowerTilesInInitialDeal(t *testing.T) {
 
 	// 添加玩家
 	for i := 1; i <= 4; i++ {
-		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 	}
 
 	room.StartGame()
@@ -194,7 +194,7 @@ func TestFlowerTilesDoNotCountAsHandTiles(t *testing.T) {
 	room := NewRoom("test-room")
 
 	for i := 1; i <= 4; i++ {
-		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 	}
 
 	room.StartGame()
@@ -254,7 +254,7 @@ func TestFlowerTileScoring(t *testing.T) {
 	room := NewRoom("test-room")
 
 	for i := 1; i <= 4; i++ {
-		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 	}
 
 	room.StartGame()

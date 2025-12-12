@@ -16,7 +16,7 @@ func TestNextRound(t *testing.T) {
 
 	room := NewRoom("test-room")
 	for _, p := range players {
-		room.AddPlayer(p.ID, p.Name)
+		room.AddPlayer(p.ID, p.Name, false)
 	}
 	room.StartGame()
 
@@ -206,10 +206,10 @@ func TestHandleDiscard_TileCountWithKongs(t *testing.T) {
 			room := NewRoom("test-room")
 
 			// 添加玩家
-			room.AddPlayer("player1", "玩家1")
-			room.AddPlayer("player2", "玩家2")
-			room.AddPlayer("player3", "玩家3")
-			room.AddPlayer("player4", "玩家4")
+			room.AddPlayer("player1", "玩家1", false)
+			room.AddPlayer("player2", "玩家2", false)
+			room.AddPlayer("player3", "玩家3", false)
+			room.AddPlayer("player4", "玩家4", false)
 
 			room.StartGame()
 			// 不調用 DealTiles()，直接設置手牌

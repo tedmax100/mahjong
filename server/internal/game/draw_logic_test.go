@@ -11,7 +11,7 @@ func TestDrawLogicAfterMeld(t *testing.T) {
 
 	// 添加玩家
 	for i := 1; i <= 4; i++ {
-		err := room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		err := room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 		if err != nil {
 			t.Fatalf("添加玩家失敗: %v", err)
 		}
@@ -134,7 +134,7 @@ func TestPlayerHandCountAfterActions(t *testing.T) {
 
 	// 添加玩家
 	for i := 1; i <= 4; i++ {
-		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 	}
 
 	room.StartGame()
@@ -200,7 +200,7 @@ func TestHandCountNeverZero(t *testing.T) {
 	room := NewRoom("test-room")
 
 	for i := 1; i <= 4; i++ {
-		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 	}
 
 	room.StartGame()

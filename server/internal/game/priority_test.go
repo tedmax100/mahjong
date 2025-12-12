@@ -23,7 +23,7 @@ func TestActionPriority(t *testing.T) {
 	}
 
 	for _, p := range players {
-		err := room.AddPlayer(p.id, p.name)
+		err := room.AddPlayer(p.id, p.name, false)
 		if err != nil {
 			t.Fatalf("添加玩家失敗: %v", err)
 		}
@@ -151,7 +151,7 @@ func TestActionPriority(t *testing.T) {
 		}
 
 		if action.PlayerID != "player2" {
-			t.Errorf("期望玩家 2 先執行（先提交），實際是 %s", action.PlayerID)
+			t.Errorf("期望玩家 2 先執行（最早提交），實際是 %s", action.PlayerID)
 		}
 	})
 }
@@ -162,7 +162,7 @@ func TestPriorityOrder(t *testing.T) {
 
 	// 添加 4 個玩家
 	for i := 1; i <= 4; i++ {
-		err := room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		err := room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 		if err != nil {
 			t.Fatalf("添加玩家失敗: %v", err)
 		}
@@ -221,10 +221,10 @@ func TestClearPendingActions(t *testing.T) {
 	room := NewRoom("test-room")
 
 	// 添加玩家
-	room.AddPlayer("player1", "玩家1")
-	room.AddPlayer("player2", "玩家2")
-	room.AddPlayer("player3", "玩家3")
-	room.AddPlayer("player4", "玩家4")
+	room.AddPlayer("player1", "玩家1", false)
+	room.AddPlayer("player2", "玩家2", false)
+	room.AddPlayer("player3", "玩家3", false)
+	room.AddPlayer("player4", "玩家4", false)
 
 	room.StartGame()
 	room.DealTiles()
@@ -259,7 +259,7 @@ func TestClearPendingActions(t *testing.T) {
 // TestNoActionsToProcess 測試沒有待處理動作的情況
 func TestNoActionsToProcess(t *testing.T) {
 	room := NewRoom("test-room")
-	room.AddPlayer("player1", "玩家1")
+	room.AddPlayer("player1", "玩家1", false)
 
 	room.StartGame()
 	room.DealTiles()
@@ -278,7 +278,7 @@ func TestMultipleSamePriorityActions(t *testing.T) {
 
 	// 添加玩家
 	for i := 1; i <= 4; i++ {
-		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 	}
 
 	room.StartGame()

@@ -10,7 +10,7 @@ func TestHandleDiscardReturnsDrawStatus(t *testing.T) {
 
 	// 添加玩家
 	for i := 1; i <= 4; i++ {
-		err := room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		err := room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 		if err != nil {
 			t.Fatalf("添加玩家失敗: %v", err)
 		}
@@ -47,7 +47,7 @@ func TestHandleDiscardReturnsDrawStatus(t *testing.T) {
 		// 建立一個新房間來測試流局
 		drawRoom := NewRoom("test-draw")
 		for i := 1; i <= 4; i++ {
-			drawRoom.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+			drawRoom.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 		}
 		drawRoom.StartGame()
 
@@ -201,7 +201,7 @@ func TestDrawLogicWithRemainingTiles(t *testing.T) {
 
 	// 添加玩家
 	for i := 1; i <= 4; i++ {
-		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 	}
 
 	room.StartGame()
@@ -228,7 +228,7 @@ func TestDrawLogicWithRemainingTiles(t *testing.T) {
 		// 建立新房間
 		drawRoom := NewRoom("draw-boundary")
 		for i := 1; i <= 4; i++ {
-			drawRoom.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+			drawRoom.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 		}
 		drawRoom.StartGame()
 
@@ -260,7 +260,7 @@ func TestGameStateAfterDraw(t *testing.T) {
 
 	// 添加玩家
 	for i := 1; i <= 4; i++ {
-		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+		room.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 	}
 
 	room.StartGame()
@@ -299,7 +299,7 @@ func TestGameStateAfterDraw(t *testing.T) {
 		// 建立新房間
 		newRoom := NewRoom("test-discard-pile")
 		for i := 1; i <= 4; i++ {
-			newRoom.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)))
+			newRoom.AddPlayer("player"+string(rune('0'+i)), "玩家"+string(rune('0'+i)), false)
 		}
 		newRoom.StartGame()
 
