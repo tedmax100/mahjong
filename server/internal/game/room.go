@@ -252,6 +252,9 @@ func (r *Room) GetGameStartMessage(playerIndex int) []byte {
 	}
 	player := r.Players[playerIndex]
 
+	// 計算該玩家的門風
+	seatWind := r.Game.GetSeatWind(player.Position)
+
 	message := map[string]interface{}{
 		"type": "game_start",
 		"data": map[string]interface{}{
@@ -259,6 +262,9 @@ func (r *Room) GetGameStartMessage(playerIndex int) []byte {
 			"currentTurn":    r.CurrentTurn,
 			"myPosition":     player.Position,
 			"dealerPosition": r.Game.Dealer,
+			"roundWind":      r.Game.RoundWind,         // 場風
+			"seatWind":       seatWind,                 // 該玩家的門風
+			"allSeatWinds":   r.Game.GetAllSeatWinds(), // 所有玩家的門風
 		},
 	}
 

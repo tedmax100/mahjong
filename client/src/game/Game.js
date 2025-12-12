@@ -39,6 +39,11 @@ export class Game {
     this.dealerPosition = 0; // 莊家位置（0-3）
     this.dealerFirstDiscard = true; // 莊家是否還沒打過第一張牌
 
+    // 風位相關
+    this.roundWind = 'E'; // 場風: E=東, S=南, W=西, N=北
+    this.mySeatWind = 'E'; // 我的門風
+    this.allSeatWinds = ['E', 'S', 'W', 'N']; // 所有玩家的門風
+
     // 動作按鈕
     this.actionButtons = null;
     this.lastDiscardedTile = null; // 最後被打出的牌
@@ -405,7 +410,15 @@ ${'='.repeat(60)}`);
     this.dealerPosition = data.dealerPosition || 0;
     this.dealerFirstDiscard = true; // 重置莊家第一次打牌標記
 
+    // 設定風位資訊
+    this.roundWind = data.roundWind || 'E';
+    this.mySeatWind = data.seatWind || 'E';
+    this.allSeatWinds = data.allSeatWinds || this.calculateAllSeatWinds();
+
+    const windLabel = this.getWindLabel(this.roundWind);
+    const mySeatWindLabel = this.getWindLabel(this.mySeatWind);
     console.log(`我的位置: ${this.myPosition}, 莊家位置: ${this.dealerPosition}, 當前輪次: ${this.currentTurn}`);
+    console.log(`場風: ${windLabel}風局, 我的門風: ${mySeatWindLabel}家`);
 
     if (this.myPosition === this.dealerPosition) {
       console.log('🎴 你是莊家！起手 17 張，第一次打牌後不摸牌');
@@ -444,7 +457,13 @@ ${'='.repeat(60)}`);
     // 4個玩家 × 16張 + 莊家多1張 = 65張
     // 144張 - 65張 = 79張（不考慮花牌補牌）
     const dealtTiles = 65; // 簡化計算
-    this.updateRemainingTiles(144 - dealtTiles);
+    this.remainingTiles = 144 - dealtTiles;
+
+    // 創建場風/剩餘牌數顯示
+    this.createRemainingTilesText();
+
+    // 更新所有玩家的門風顯示
+    this.updatePlayerSeatWinds();
 
     // 更新所有玩家的輪次狀態
     this.updateTurnStatus();
@@ -1254,7 +1273,15 @@ ${winner} 胡牌 (${winType})
   }
 
   /**
-   * 創建剩餘牌數文字顯示
+   * 取得場風中文名稱
+   */
+  getWindLabel(wind) {
+    const windLabels = { E: '東', S: '南', W: '西', N: '北' };
+    return windLabels[wind] || '東';
+  }
+
+  /**
+   * 創建剩餘牌數文字顯示（含場風）
    */
   createRemainingTilesText() {
     // 移除舊的顯示
@@ -1265,15 +1292,16 @@ ${winner} 胡牌 (${winType})
     // 創建新的容器（獨立於 wallContainer，確保在最上層）
     this.wallTextContainer = new Container();
 
-    // 創建背景
+    // 創建背景（加寬以容納場風資訊）
     const bg = new Graphics();
-    bg.roundRect(-80, -20, 160, 40, 10);
+    bg.roundRect(-120, -20, 240, 40, 10);
     bg.fill({ color: 0x000000, alpha: 0.7 });
     bg.stroke({ width: 2, color: 0xFFD700 }); // 金色邊框
 
-    // 創建文字
+    // 創建文字（場風 | 海底）
+    const windLabel = this.getWindLabel(this.roundWind);
     this.wallText = new Text({
-      text: `海底: ${this.remainingTiles}張`,
+      text: `${windLabel}風局 | 海底: ${this.remainingTiles}張`,
       style: {
         fontSize: 22,
         fill: 0xFFFFFF,
@@ -1301,7 +1329,7 @@ ${winner} 胡牌 (${winType})
     // 加入到主容器的最上層
     this.container.addChild(this.wallTextContainer);
 
-    console.log(`✅ 剩餘牌數顯示已創建: ${this.remainingTiles}張`);
+    console.log(`✅ 場風/剩餘牌數顯示已創建: ${windLabel}風局, ${this.remainingTiles}張`);
   }
 
   /**
@@ -1310,11 +1338,49 @@ ${winner} 胡牌 (${winType})
   updateRemainingTiles(count) {
     this.remainingTiles = count;
     if (this.wallText) {
-      this.wallText.text = `海底: ${this.remainingTiles}張`;
+      const windLabel = this.getWindLabel(this.roundWind);
+      this.wallText.text = `${windLabel}風局 | 海底: ${this.remainingTiles}張`;
       console.log(`🎲 剩餘牌數更新: ${this.remainingTiles}張`);
     }
 
     // The server will handle the draw condition and send a message
+  }
+
+  /**
+   * 更新場風顯示
+   */
+  updateRoundWindDisplay() {
+    if (this.wallText) {
+      const windLabel = this.getWindLabel(this.roundWind);
+      this.wallText.text = `${windLabel}風局 | 海底: ${this.remainingTiles}張`;
+    }
+  }
+
+  /**
+   * 根據莊家位置計算所有玩家的門風（前端備用）
+   */
+  calculateAllSeatWinds() {
+    const winds = ['E', 'S', 'W', 'N'];
+    const seatWinds = [];
+    for (let seat = 0; seat < 4; seat++) {
+      const offset = (seat - this.dealerPosition + 4) % 4;
+      seatWinds.push(winds[offset]);
+    }
+    return seatWinds;
+  }
+
+  /**
+   * 更新所有玩家的門風顯示
+   */
+  updatePlayerSeatWinds() {
+    for (let serverPos = 0; serverPos < 4; serverPos++) {
+      const visualPos = this.serverToVisualPosition(serverPos);
+      const seatWind = this.allSeatWinds[serverPos];
+
+      if (this.players[visualPos]) {
+        this.players[visualPos].setSeatWind(seatWind);
+      }
+    }
   }
 
   handleTingResult(data) {

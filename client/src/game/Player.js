@@ -26,15 +26,17 @@ export class Player {
 
     this.infoText = null;
     this.tingStatusText = null; // 聽牌狀態文字
+    this.seatWind = 'E'; // 門風: E=東, S=南, W=西, N=北
+    this.seatWindText = null; // 門風顯示文字
 
     this.createInfoDisplay();
     this.container.addChild(this.meldsContainer);
   }
 
   createInfoDisplay() {
-    // 玩家資訊顯示
+    // 玩家資訊顯示（增加高度以容納門風）
     const bg = new Graphics();
-    bg.rect(0, 0, 120, 60);
+    bg.rect(0, 0, 120, 80);
     bg.fill(0x333333, 0.8);
     bg.stroke({ width: 2, color: 0x666666 });
 
@@ -50,7 +52,20 @@ export class Player {
     this.infoText.x = 5;
     this.infoText.y = 5;
 
+    // 門風顯示文字
+    this.seatWindText = new Text({
+      text: '',
+      style: {
+        fontSize: 16,
+        fill: 0xFFD700, // 金色
+        fontWeight: 'bold'
+      }
+    });
+    this.seatWindText.x = 5;
+    this.seatWindText.y = 55;
+
     bg.addChild(this.infoText);
+    bg.addChild(this.seatWindText);
 
     // 根據位置設定資訊框位置
     this.positionInfoDisplay(bg);
@@ -93,6 +108,19 @@ export class Player {
   updateNameDisplay() {
     if (this.infoText) {
       this.infoText.text = `${this.name}\n分數: ${this.score}`;
+    }
+  }
+
+  /**
+   * 設定並顯示門風
+   * @param {string} wind - 門風代碼: 'E'=東, 'S'=南, 'W'=西, 'N'=北
+   */
+  setSeatWind(wind) {
+    this.seatWind = wind;
+    const windNames = { E: '東家', S: '南家', W: '西家', N: '北家' };
+
+    if (this.seatWindText) {
+      this.seatWindText.text = windNames[wind] || '';
     }
   }
 
@@ -162,8 +190,8 @@ export class Player {
 
   positionTile(tile, index) {
     // 手牌包含牌底，實際佔用空間更大
-    const tileWidth = 42.1875;  // 縮小至56.25%（原75）
-    const tileHeight = 53.4375; // 縮小至56.25%（原95）
+    const tileWidth = 42.1875 * 0.8;  // 縮小至原來的80%
+    const tileHeight = 53.4375 * 0.8; // 縮小至原來的80%
 
     // 動態調整間距：根據牌的數量和螢幕寬度
     const totalTiles = this.tiles.length;
@@ -189,7 +217,7 @@ export class Player {
           startX + index * (tileWidth + handSpacing),
           this.screenHeight - 150
         );
-        tile.setScale(0.75);
+        tile.setScale(0.75 * 0.8);
 
         // Position the entire melds container to the right of the hand
         // This is done for every tile, which is redundant but ensures it's updated correctly
@@ -211,7 +239,7 @@ export class Player {
           this.screenHeight / 2 - (tilesInThisColRight * (tileHeight + spacing)) / 2 + rowRight * (tileHeight + spacing)
         );
         tile.setRotation(Math.PI / 2);
-        tile.setScale(0.6);
+        tile.setScale(0.6 * 0.8);
         break;
       }
 
@@ -222,7 +250,7 @@ export class Player {
           this.screenWidth / 2 - (totalTiles * (tileWidth + spacing)) / 2 + index * (tileWidth + spacing),
           10  // 更靠近頂部
         );
-        tile.setScale(0.6); // 縮小牌底和牌面至75% (0.8 * 0.75 = 0.6)
+        tile.setScale(0.6 * 0.8); // 縮小牌底和牌面至75% (0.8 * 0.75 = 0.6)，再縮小至90%
         break;
 
       case 'left': {
@@ -238,7 +266,7 @@ export class Player {
           this.screenHeight / 2 - (tilesInThisColLeft * (tileHeight + spacing)) / 2 + rowLeft * (tileHeight + spacing)
         );
         tile.setRotation(-Math.PI / 2);
-        tile.setScale(0.6);
+        tile.setScale(0.6 * 0.8);
         break;
       }
     }
@@ -571,7 +599,7 @@ export class Player {
             }
 
             const groupWidth = (meldTiles.length === 4 ? 3 : meldTiles.length) * (tileWidth + 35);
-            const scale = this.position === 'bottom' ? 0.75 : 0.6;
+            const scale = (this.position === 'bottom' ? 0.75 : 0.6) * 0.8;
             const scaledGroupHeight = groupWidth * scale; // 旋轉後寬度變高度
 
             // 檢查是否需要換排（左右側玩家）
@@ -608,7 +636,7 @@ export class Player {
             }
 
             const groupWidth = this.flowers.length * (tileWidth + 35);
-            const scale = this.position === 'bottom' ? 0.75 : 0.6;
+            const scale = (this.position === 'bottom' ? 0.75 : 0.6) * 0.8;
             const scaledGroupHeight = groupWidth * scale;
 
             // 檢查是否需要換排（左右側玩家）

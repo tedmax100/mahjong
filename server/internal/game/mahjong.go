@@ -13,8 +13,9 @@ type MahjongGame struct {
 	Deck         []string
 	CurrentTurn  int
 	DiscardPile  []string
-	Dealer       int  // 莊家位置
-	IsDraw       bool // 是否流局
+	Dealer       int    // 莊家位置
+	IsDraw       bool   // 是否流局
+	RoundWind    string // 場風: "E"=東風局, "S"=南風局, "W"=西風局, "N"=北風局
 }
 
 // NewMahjongGame 建立新遊戲
@@ -25,6 +26,7 @@ func NewMahjongGame(players []*Player) *MahjongGame {
 		DiscardPile:  make([]string, 0),
 		Dealer:       0,
 		IsDraw:       false,
+		RoundWind:    "E", // 預設東風局
 	}
 
 	game.initializeDeck()
@@ -460,4 +462,21 @@ func (g *MahjongGame) CheckTing(hand []string, melds []model.Meld) TingResult {
 		IsTing:       len(winningTiles) > 0,
 		WinningTiles: winningTiles,
 	}
+}
+
+// GetSeatWind 根據玩家座位和莊家位置計算該玩家的門風
+// 門風順序：莊家為東，順時針依序為南、西、北
+func (g *MahjongGame) GetSeatWind(playerPosition int) string {
+	winds := []string{"E", "S", "W", "N"}
+	offset := (playerPosition - g.Dealer + 4) % 4
+	return winds[offset]
+}
+
+// GetAllSeatWinds 取得所有玩家的門風
+func (g *MahjongGame) GetAllSeatWinds() []string {
+	winds := make([]string, 4)
+	for i := 0; i < 4; i++ {
+		winds[i] = g.GetSeatWind(i)
+	}
+	return winds
 }
