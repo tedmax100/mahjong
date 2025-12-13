@@ -29,16 +29,33 @@ export class Player {
     this.seatWind = 'E'; // 門風: E=東, S=南, W=西, N=北
     this.seatWindText = null; // 門風顯示文字
 
+    // 輪次指示器相關
+    this.turnIndicator = null; // 輪次指示器容器
+    this.turnIndicatorBg = null; // 高亮邊框
+    this.turnIndicatorIcon = null; // 出牌中圖示
+    this.isTurnActive = false; // 是否輪到該玩家
+    this.pulseAnimation = null; // 脈動動畫計時器
+
     this.createInfoDisplay();
     this.container.addChild(this.meldsContainer);
   }
 
   createInfoDisplay() {
+    // 輪次指示器容器（包含高亮邊框）
+    this.turnIndicator = new Container();
+
+    // 高亮邊框（輪到該玩家時顯示）
+    this.turnIndicatorBg = new Graphics();
+    this.turnIndicatorBg.roundRect(-4, -4, 128, 88, 8);
+    this.turnIndicatorBg.stroke({ width: 4, color: 0x00FF00 }); // 綠色高亮邊框
+    this.turnIndicatorBg.visible = false;
+    this.turnIndicator.addChild(this.turnIndicatorBg);
+
     // 玩家資訊顯示（增加高度以容納門風）
-    const bg = new Graphics();
-    bg.rect(0, 0, 120, 80);
-    bg.fill(0x333333, 0.8);
-    bg.stroke({ width: 2, color: 0x666666 });
+    this.infoBg = new Graphics();
+    this.infoBg.roundRect(0, 0, 120, 80, 4);
+    this.infoBg.fill({ color: 0x333333, alpha: 0.8 });
+    this.infoBg.stroke({ width: 2, color: 0x666666 });
 
     this.infoText = new Text({
       text: '等待玩家...',
@@ -64,13 +81,28 @@ export class Player {
     this.seatWindText.x = 5;
     this.seatWindText.y = 55;
 
-    bg.addChild(this.infoText);
-    bg.addChild(this.seatWindText);
+    // 出牌中圖示（▶）
+    this.turnIndicatorIcon = new Text({
+      text: '▶',
+      style: {
+        fontSize: 18,
+        fill: 0x00FF00, // 綠色
+        fontWeight: 'bold'
+      }
+    });
+    this.turnIndicatorIcon.x = 100;
+    this.turnIndicatorIcon.y = 30;
+    this.turnIndicatorIcon.visible = false;
+
+    this.infoBg.addChild(this.infoText);
+    this.infoBg.addChild(this.seatWindText);
+    this.infoBg.addChild(this.turnIndicatorIcon);
+    this.turnIndicator.addChild(this.infoBg);
 
     // 根據位置設定資訊框位置
-    this.positionInfoDisplay(bg);
+    this.positionInfoDisplay(this.turnIndicator);
 
-    this.container.addChild(bg);
+    this.container.addChild(this.turnIndicator);
   }
 
   positionInfoDisplay(bg) {
@@ -314,6 +346,70 @@ export class Player {
           tile.container.alpha = 0.7; // 半透明表示不可互動
         }
       });
+    }
+  }
+
+  /**
+   * 設定玩家是否為當前行動者
+   * @param {boolean} active - 是否輪到該玩家
+   * @param {boolean} isSelf - 是否為本機玩家（自己）
+   */
+  setTurnActive(active, isSelf = false) {
+    this.isTurnActive = active;
+
+    // 清除之前的脈動動畫
+    if (this.pulseAnimation) {
+      clearInterval(this.pulseAnimation);
+      this.pulseAnimation = null;
+    }
+
+    if (active) {
+      // 顯示高亮邊框
+      if (this.turnIndicatorBg) {
+        this.turnIndicatorBg.visible = true;
+        // 如果是自己，使用金色；其他玩家使用綠色
+        this.turnIndicatorBg.clear();
+        this.turnIndicatorBg.roundRect(-4, -4, 128, 88, 8);
+        this.turnIndicatorBg.stroke({ width: 4, color: isSelf ? 0xFFD700 : 0x00FF00 });
+      }
+
+      // 顯示出牌中圖示
+      if (this.turnIndicatorIcon) {
+        this.turnIndicatorIcon.visible = true;
+        this.turnIndicatorIcon.style.fill = isSelf ? 0xFFD700 : 0x00FF00;
+      }
+
+      // 如果是自己，啟動脈動動畫
+      if (isSelf) {
+        let alpha = 1.0;
+        let direction = -1;
+        this.pulseAnimation = setInterval(() => {
+          alpha += direction * 0.05;
+          if (alpha <= 0.5) {
+            alpha = 0.5;
+            direction = 1;
+          } else if (alpha >= 1.0) {
+            alpha = 1.0;
+            direction = -1;
+          }
+          if (this.turnIndicatorBg) {
+            this.turnIndicatorBg.alpha = alpha;
+          }
+        }, 50);
+      }
+
+      console.log(`🎯 玩家 ${this.name || this.id} 進入行動狀態 (isSelf: ${isSelf})`);
+    } else {
+      // 隱藏高亮邊框
+      if (this.turnIndicatorBg) {
+        this.turnIndicatorBg.visible = false;
+        this.turnIndicatorBg.alpha = 1.0; // 重置透明度
+      }
+
+      // 隱藏出牌中圖示
+      if (this.turnIndicatorIcon) {
+        this.turnIndicatorIcon.visible = false;
+      }
     }
   }
 
@@ -785,5 +881,8 @@ export class Player {
     this.winningTiles = [];
     this.lastDrawnTile = null;
     this.hideTingStatus();
+
+    // 清除輪次指示器
+    this.setTurnActive(false);
   }
 }

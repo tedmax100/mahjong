@@ -590,21 +590,89 @@ ${'='.repeat(60)}`);
     const visualTurn = this.serverToVisualPosition(this.currentTurn);
     console.log(`更新回合狀態: 伺服器回合 ${this.currentTurn} -> 視覺回合 ${visualTurn}`);
 
-    // 更新所有玩家的可互動狀態
+    // 更新所有玩家的可互動狀態和輪次指示器
     this.players.forEach((player, index) => {
       // index 是視覺位置，視覺位置 0 是自己
-      const isMyTurn = (index === visualTurn && index === 0);
+      const isCurrentTurn = (index === visualTurn);
+      const isSelf = (index === 0);
+      const isMyTurn = isCurrentTurn && isSelf;
+
+      // 更新輪次指示器
+      player.setTurnActive(isCurrentTurn, isSelf);
+
       // 如果玩家已聽牌，禁用互動（伺服器會自動打牌）
       const canInteract = isMyTurn && !player.isTing;
       player.setInteractive(canInteract);
 
-      // 如果輪到自己（視覺位置 0），檢查是否能聽牌或自摸
+      // 如果輪到自己（視覺位置 0），檢查是否能聽牌或自摸，並顯示提示
       if (isMyTurn) {
+        // 顯示「輪到你出牌」提示
+        this.showYourTurnHint();
+
         setTimeout(() => {
           this.checkSelfActions();
         }, 200);
       }
     });
+  }
+
+  /**
+   * 顯示「輪到你出牌」提示
+   */
+  showYourTurnHint() {
+    // 避免重複顯示（如果公告已經在顯示其他重要訊息）
+    if (this.announcementText && this.announcementText.visible) {
+      return;
+    }
+
+    // 創建或更新輪次提示
+    if (!this.yourTurnHint) {
+      this.yourTurnHint = new Text({
+        text: '輪到你出牌',
+        style: {
+          fontSize: 36,
+          fill: 0xFFD700, // 金色
+          fontWeight: 'bold',
+          stroke: { color: 0x000000, width: 4 },
+          dropShadow: {
+            color: 0x000000,
+            blur: 4,
+            distance: 2
+          }
+        }
+      });
+      this.yourTurnHint.anchor.set(0.5);
+      this.yourTurnHint.x = this.app.screen.width / 2;
+      this.yourTurnHint.y = this.app.screen.height / 2 - 100;
+      this.yourTurnHint.zIndex = 1500;
+      this.container.addChild(this.yourTurnHint);
+    }
+
+    // 顯示提示
+    this.yourTurnHint.visible = true;
+    this.yourTurnHint.alpha = 1.0;
+
+    // 淡出動畫
+    let fadeAlpha = 1.0;
+    const fadeInterval = setInterval(() => {
+      fadeAlpha -= 0.02;
+      if (this.yourTurnHint) {
+        this.yourTurnHint.alpha = fadeAlpha;
+      }
+      if (fadeAlpha <= 0) {
+        clearInterval(fadeInterval);
+        if (this.yourTurnHint) {
+          this.yourTurnHint.visible = false;
+        }
+      }
+    }, 50);
+
+    // 2秒後強制隱藏（以防萬一）
+    setTimeout(() => {
+      if (this.yourTurnHint) {
+        this.yourTurnHint.visible = false;
+      }
+    }, 2500);
   }
 
   async handleDiscard(playerId, tile) {
@@ -1319,8 +1387,8 @@ ${winner} 胡牌 (${winType})
     this.wallTextContainer.addChild(bg);
     this.wallTextContainer.addChild(this.wallText);
 
-    // 設定位置（置中，避免被遮擋）
-    this.wallTextContainer.x = this.app.screen.width / 2;
+    // 設定位置（左上角）
+    this.wallTextContainer.x = 140;
     this.wallTextContainer.y = 30;
 
     // 設定 zIndex 確保顯示在最上層
