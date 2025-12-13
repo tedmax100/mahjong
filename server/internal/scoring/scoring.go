@@ -5,6 +5,39 @@ import (
 	"mahjong/internal/tile"
 )
 
+// Wind 代表風牌方向
+type Wind string
+
+const (
+	WindEast  Wind = "E" // 東
+	WindSouth Wind = "S" // 南
+	WindWest  Wind = "W" // 西
+	WindNorth Wind = "N" // 北
+)
+
+// SpecialCondition 代表特殊胡牌情境
+type SpecialCondition string
+
+const (
+	ConditionLastTile       SpecialCondition = "LAST_TILE"        // 海底撈月
+	ConditionKongBloom      SpecialCondition = "KONG_BLOOM"       // 槓上開花
+	ConditionRobbingKong    SpecialCondition = "ROBBING_KONG"     // 搶槓
+	ConditionSelfDrawnAfter SpecialCondition = "SELF_DRAWN_AFTER" // 妙手回春（自摸最後一張）
+)
+
+// ScoreInput 計分輸入結構
+type ScoreInput struct {
+	RoundWind         Wind               // 場風
+	SeatWind          Wind               // 胡牌玩家的門風（自風）
+	IsDealer          bool               // 是否為莊家
+	IsSelfDrawn       bool               // 胡牌方式：自摸 / 榮和（吃胡）
+	Hand              []string           // 胡牌玩家手牌
+	Melds             []model.Meld       // 吃/碰/槓等結構化資料
+	Flowers           []string           // 花牌
+	WinningTile       string             // 胡的那張牌
+	SpecialConditions []SpecialCondition // 特殊情境標記
+}
+
 // HandType 代表胡牌的牌型
 type HandType struct {
 	Name   string // 牌型名稱
@@ -12,99 +45,257 @@ type HandType struct {
 	IsFaan bool   // 是否為番（特殊計分）
 }
 
-// WinResult 代表胡牌結果
-type WinResult struct {
-	HandTypes   []HandType   // 所有符合的牌型
-	TotalTai    int          // 總台數
-	BaseScore   int          // 基礎分數
-	IsSelfDrawn bool         // 是否自摸
-	WinningHand []string     // 胡牌時的手牌
-	Melds       []model.Meld // 胡牌時的吃碰槓
-	WinTile     string       // 胡的最後一張牌
+// ScoreBreakdown 計分明細
+type ScoreBreakdown struct {
+	Key      string // 內部用代號，例如 "MEN_QING_ZIMO", "ROUND_WIND_KOUTSU"
+	Label    string // 給 UI 顯示的文字，例如「門清自摸」「場風刻」
+	Value    int    // 該項加成的數值（台數）
+	Category string // 分類，例如 "yaku", "bonus", "wind", "kong"
 }
 
-// CalculateScore 計算台數和得分
-func CalculateScore(hand []string, melds []model.Meld, flowers []string, lastTile string, isSelfDrawn bool) *WinResult {
-	result := &WinResult{
-		HandTypes:   make([]HandType, 0),
-		IsSelfDrawn: isSelfDrawn,
-		WinningHand: hand,
-		Melds:       melds,
-		WinTile:     lastTile,
+// WinResult 代表胡牌結果
+type WinResult struct {
+	HandTypes   []HandType       // 所有符合的牌型（向後兼容）
+	Breakdown   []ScoreBreakdown // 詳細計分明細
+	TotalTai    int              // 總台數
+	BaseScore   int              // 基礎分數
+	IsSelfDrawn bool             // 是否自摸
+	WinningHand []string         // 胡牌時的手牌
+	Melds       []model.Meld     // 胡牌時的吃碰槓
+	WinTile     string           // 胡的最後一張牌
+	RoundWind   Wind             // 場風
+	SeatWind    Wind             // 門風
+	IsDealer    bool             // 是否為莊家
+}
+
+// addScore 添加計分項目
+func (r *WinResult) addScore(key, label string, value int, category string) {
+	// 添加到 HandTypes（向後兼容）
+	r.HandTypes = append(r.HandTypes, HandType{
+		Name: label,
+		Tai:  value,
+	})
+
+	// 添加到 Breakdown（新格式）
+	r.Breakdown = append(r.Breakdown, ScoreBreakdown{
+		Key:      key,
+		Label:    label,
+		Value:    value,
+		Category: category,
+	})
+}
+
+// windToTile 將 Wind 轉換為牌面字串
+func windToTile(w Wind) string {
+	switch w {
+	case WindEast:
+		return "dong"
+	case WindSouth:
+		return "nan"
+	case WindWest:
+		return "xi"
+	case WindNorth:
+		return "bei"
+	default:
+		return ""
+	}
+}
+
+// countTileInHand 計算指定牌在手牌中的數量
+func countTileInHand(hand []string, t string) int {
+	count := 0
+	for _, h := range hand {
+		if h == t {
+			count++
+		}
+	}
+	return count
+}
+
+// hasTripletOrKong 檢查是否有指定牌的刻子或槓子（包含手牌和已亮牌組）
+func hasTripletOrKong(hand []string, melds []model.Meld, t string) bool {
+	// 檢查已亮牌組（碰、槓）
+	for _, meld := range melds {
+		if len(meld.Tiles) > 0 && meld.Tiles[0] == t {
+			if meld.Type == "pong" || meld.Type == "kong_concealed" ||
+				meld.Type == "kong_exposed" || meld.Type == "kong_promoted" {
+				return true
+			}
+		}
 	}
 
-	// 基礎台數
+	// 檢查手牌中的暗刻（3 張或以上相同）
+	if countTileInHand(hand, t) >= 3 {
+		return true
+	}
+
+	return false
+}
+
+// checkWindTriplets 檢查場風刻和門風刻
+func checkWindTriplets(hand []string, melds []model.Meld, roundWind, seatWind Wind, result *WinResult) int {
+	totalTai := 0
+
+	roundWindTile := windToTile(roundWind)
+	seatWindTile := windToTile(seatWind)
+
+	// 檢查場風刻
+	if roundWindTile != "" && hasTripletOrKong(hand, melds, roundWindTile) {
+		result.addScore("ROUND_WIND_TRIPLET", "場風刻", 1, "wind")
+		totalTai += 1
+	}
+
+	// 檢查門風刻
+	if seatWindTile != "" && hasTripletOrKong(hand, melds, seatWindTile) {
+		result.addScore("SEAT_WIND_TRIPLET", "門風刻", 1, "wind")
+		totalTai += 1
+	}
+
+	return totalTai
+}
+
+// checkKongScoring 檢查槓牌台數
+func checkKongScoring(melds []model.Meld, result *WinResult) int {
+	totalTai := 0
+
+	for _, meld := range melds {
+		switch meld.Type {
+		case "kong_concealed":
+			// 暗槓：2 台
+			result.addScore("KONG_CONCEALED", "暗槓", 2, "kong")
+			totalTai += 2
+		case "kong_exposed":
+			// 明槓：1 台
+			result.addScore("KONG_EXPOSED", "明槓", 1, "kong")
+			totalTai += 1
+		case "kong_promoted":
+			// 加槓（補槓）：1 台
+			result.addScore("KONG_PROMOTED", "加槓", 1, "kong")
+			totalTai += 1
+		}
+	}
+
+	return totalTai
+}
+
+// checkSpecialConditions 檢查特殊胡牌情境
+func checkSpecialConditions(conditions []SpecialCondition, result *WinResult) int {
+	totalTai := 0
+
+	for _, condition := range conditions {
+		switch condition {
+		case ConditionLastTile:
+			// 海底撈月：1 台
+			result.addScore("LAST_TILE", "海底撈月", 1, "special")
+			totalTai += 1
+		case ConditionKongBloom:
+			// 槓上開花：1 台
+			result.addScore("KONG_BLOOM", "槓上開花", 1, "special")
+			totalTai += 1
+		case ConditionRobbingKong:
+			// 搶槓：1 台
+			result.addScore("ROBBING_KONG", "搶槓", 1, "special")
+			totalTai += 1
+		case ConditionSelfDrawnAfter:
+			// 妙手回春：1 台（與海底撈月類似，但通常用於自摸最後一張）
+			result.addScore("SELF_DRAWN_AFTER", "妙手回春", 1, "special")
+			totalTai += 1
+		}
+	}
+
+	return totalTai
+}
+
+// CalculateScoreWithInput 使用 ScoreInput 計算台數和得分（新版本）
+func CalculateScoreWithInput(input *ScoreInput) *WinResult {
+	result := &WinResult{
+		HandTypes:   make([]HandType, 0),
+		Breakdown:   make([]ScoreBreakdown, 0),
+		IsSelfDrawn: input.IsSelfDrawn,
+		WinningHand: input.Hand,
+		Melds:       input.Melds,
+		WinTile:     input.WinningTile,
+		RoundWind:   input.RoundWind,
+		SeatWind:    input.SeatWind,
+		IsDealer:    input.IsDealer,
+	}
+
 	baseTai := 0
 
 	// 1. 檢查自摸（1 台）
-	if isSelfDrawn {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "自摸",
-			Tai:  1,
-		})
+	if input.IsSelfDrawn {
+		result.addScore("SELF_DRAWN", "自摸", 1, "basic")
 		baseTai += 1
 	}
 
-	// 2. 檢查門清（門前清，未碰、槓、吃）
-	// 暗槓不算破壞門清
+	// 2. 檢查門清（門前清，未碰、槓、吃，暗槓除外）
 	isMenQing := true
-	for _, meld := range melds {
+	for _, meld := range input.Melds {
 		if meld.Type != "kong_concealed" {
 			isMenQing = false
 			break
 		}
 	}
-	
-	// 如果是吃胡（非自摸），門清要看是否有吃碰槓（暗槓除外），如果有則沒有門清
-	// 但台灣麻將門清自摸是3台（門清1+自摸1+不求人1? 規則不一，這裡假設門清就是沒吃碰明槓）
-	// 簡單判斷：len(melds) == 0 或者只有暗槓
-	
+
 	if isMenQing {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "門清",
-			Tai:  1,
-		})
+		result.addScore("MEN_QING", "門清", 1, "basic")
 		baseTai += 1
 	}
 
 	// 3. 檢查花牌（每朵 1 台）
-	flowerTai := len(flowers)
+	flowerTai := len(input.Flowers)
 	if flowerTai > 0 {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "花牌",
-			Tai:  flowerTai,
-		})
+		result.addScore("FLOWERS", "花牌", flowerTai, "flower")
 		baseTai += flowerTai
 	}
 
-	// 4. 檢查全求人（全部靠別人打的牌胡牌，0 台）
-	// TODO: 實作全求人判斷
+	// 4. 檢查場風刻 / 門風刻
+	windTai := checkWindTriplets(input.Hand, input.Melds, input.RoundWind, input.SeatWind, result)
+	baseTai += windTai
 
-	// 5. 檢查平胡（基礎胡牌，1 台）
+	// 5. 檢查槓牌台數
+	kongTai := checkKongScoring(input.Melds, result)
+	baseTai += kongTai
+
+	// 6. 檢查特殊情境
+	specialTai := checkSpecialConditions(input.SpecialConditions, result)
+	baseTai += specialTai
+
+	// 7. 檢查平胡（基礎胡牌，1 台）- 只在沒有任何台數時才給
 	if baseTai == 0 {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "平胡",
-			Tai:  1,
-		})
+		result.addScore("PING_HU", "平胡", 1, "basic")
 		baseTai = 1
 	}
 
-	// 6. 檢查特殊牌型
-	specialTai := checkSpecialHandTypes(hand, melds, result)
-	baseTai += specialTai
-
-	// 7. 檢查番牌型（大三元、大四喜等）
-	// TODO: 實作番牌型判斷
+	// 8. 檢查特殊牌型
+	patternTai := checkSpecialHandTypes(input.Hand, input.Melds, result)
+	baseTai += patternTai
 
 	result.TotalTai = baseTai
 
 	// 計算基礎分數（底分 * 2^台數）
-	// 台灣 16 張麻將常見規則：底分 10 元，每台翻倍
 	baseAmount := 10
 	// #nosec G115 -- baseTai 來自遊戲邏輯，範圍有限 (0-20)，不會溢出
-	result.BaseScore = baseAmount << uint(baseTai) // 相當於 10 * (2 ^ baseTai)
+	result.BaseScore = baseAmount << uint(baseTai)
 
 	return result
+}
+
+// CalculateScore 計算台數和得分（向後兼容版本）
+func CalculateScore(hand []string, melds []model.Meld, flowers []string, lastTile string, isSelfDrawn bool) *WinResult {
+	// 使用新版本計算，預設東風東家
+	input := &ScoreInput{
+		RoundWind:         WindEast,
+		SeatWind:          WindEast,
+		IsDealer:          false,
+		IsSelfDrawn:       isSelfDrawn,
+		Hand:              hand,
+		Melds:             melds,
+		Flowers:           flowers,
+		WinningTile:       lastTile,
+		SpecialConditions: nil,
+	}
+	return CalculateScoreWithInput(input)
 }
 
 // checkSpecialHandTypes 檢查特殊牌型
@@ -119,76 +310,52 @@ func checkSpecialHandTypes(hand []string, melds []model.Meld, result *WinResult)
 		allTiles = append(allTiles, meld.Tiles...)
 	}
 
-	// 1. 檢查碰碰胡（全部都是刻子，3 台）
+	// 1. 檢查碰碰胡（全部都是刻子，4 台）
 	if isPongPongHu(hand, melds) {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "碰碰胡",
-			Tai:  3,
-		})
-		totalTai += 3
+		result.addScore("PONG_PONG_HU", "碰碰胡", 4, "pattern")
+		totalTai += 4
 	}
 
-	// 2. 檢查混一色（只有一種花色+字牌，3 台）
+	// 2. 檢查混一色（只有一種花色+字牌，4 台）
 	if isMixedOneSuit(allTiles) {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "混一色",
-			Tai:  3,
-		})
-		totalTai += 3
+		result.addScore("MIXED_ONE_SUIT", "混一色", 4, "pattern")
+		totalTai += 4
 	}
 
-	// 3. 檢查清一色（只有一種花色，5 台）
+	// 3. 檢查清一色（只有一種花色，8 台）
 	if isOneSuit(allTiles) {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "清一色",
-			Tai:  5,
-		})
-		totalTai += 5
+		result.addScore("ONE_SUIT", "清一色", 8, "pattern")
+		totalTai += 8
 	}
 
 	// 4. 檢查字一色（全部是字牌，8 台）
 	if isAllHonors(allTiles) {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "字一色",
-			Tai:  8,
-		})
+		result.addScore("ALL_HONORS", "字一色", 8, "pattern")
 		totalTai += 8
 	}
 
-	// 5. 檢查小三元（中發白有 2 組+1 對，2 台）
+	// 5. 檢查小三元（中發白有 2 組+1 對，4 台）
 	if isSmallDragons(allTiles) {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "小三元",
-			Tai:  2,
-		})
-		totalTai += 2
+		result.addScore("SMALL_DRAGONS", "小三元", 4, "pattern")
+		totalTai += 4
 	}
 
 	// 6. 檢查大三元（中發白全有，8 台）
 	if isBigDragons(allTiles) {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "大三元",
-			Tai:  8,
-		})
+		result.addScore("BIG_DRAGONS", "大三元", 8, "pattern")
 		totalTai += 8
 	}
 
-	// 7. 檢查小四喜（東南西北有 3 組+1 對，2 台）
+	// 7. 檢查小四喜（東南西北有 3 組+1 對，8 台）
 	if isSmallWinds(allTiles) {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "小四喜",
-			Tai:  2,
-		})
-		totalTai += 2
+		result.addScore("SMALL_WINDS", "小四喜", 8, "pattern")
+		totalTai += 8
 	}
 
-	// 8. 檢查大四喜（東南西北全有，8 台）
+	// 8. 檢查大四喜（東南西北全有，16 台）
 	if isBigWinds(allTiles) {
-		result.HandTypes = append(result.HandTypes, HandType{
-			Name: "大四喜",
-			Tai:  8,
-		})
-		totalTai += 8
+		result.addScore("BIG_WINDS", "大四喜", 16, "pattern")
+		totalTai += 16
 	}
 
 	return totalTai
@@ -315,7 +482,7 @@ func isAllHonors(tiles []string) bool {
 			return false
 		}
 	}
-	return true
+	return len(tiles) > 0
 }
 
 // isSmallDragons 檢查是否為小三元

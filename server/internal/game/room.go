@@ -686,6 +686,11 @@ func (r *Room) HandleKong(userID, tile string, isConcealed bool) (bool, string) 
 
 // HandleHu 處理胡牌
 func (r *Room) HandleHu(userID string, winTile string, isSelfDrawn bool) *scoring.WinResult {
+	return r.HandleHuWithConditions(userID, winTile, isSelfDrawn, nil)
+}
+
+// HandleHuWithConditions 處理胡牌（支援特殊情境）
+func (r *Room) HandleHuWithConditions(userID string, winTile string, isSelfDrawn bool, specialConditions []scoring.SpecialCondition) *scoring.WinResult {
 	// 找到玩家
 	var player *Player
 	for _, p := range r.Players {
@@ -726,11 +731,26 @@ func (r *Room) HandleHu(userID string, winTile string, isSelfDrawn bool) *scorin
 	// 在算分前，確保玩家的手牌是最終的胡牌狀態
 	player.Hand = validationHand
 
-	// 使用胡牌的牌作為 lastTile
-	lastTile := winTile
+	// 取得場風和門風
+	roundWind := scoring.Wind(r.Game.RoundWind)
+	seatWind := scoring.Wind(r.Game.GetSeatWind(player.Position))
+	isDealer := player.Position == r.Game.Dealer
 
-	// 使用 scoring package 計算分數
-	winResult := scoring.CalculateScore(player.Hand, player.Melds, player.Flowers, lastTile, isSelfDrawn)
+	// 建立計分輸入
+	scoreInput := &scoring.ScoreInput{
+		RoundWind:         roundWind,
+		SeatWind:          seatWind,
+		IsDealer:          isDealer,
+		IsSelfDrawn:       isSelfDrawn,
+		Hand:              player.Hand,
+		Melds:             player.Melds,
+		Flowers:           player.Flowers,
+		WinningTile:       winTile,
+		SpecialConditions: specialConditions,
+	}
+
+	// 使用新版 scoring 計算分數
+	winResult := scoring.CalculateScoreWithInput(scoreInput)
 
 	// 更新玩家分數
 	if isSelfDrawn {
