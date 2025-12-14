@@ -40,40 +40,7 @@ export class Table {
     // 非同步載入中央裝飾圖片
     this.loadCenterImage();
 
-    // 繪製四個玩家區域標記
-    this.drawPlayerMarkers(centerX, centerY, centerWidth, centerHeight);
-  }
-
-  drawPlayerMarkers(x, y, width, height) {
-    const positions = [
-      { x: this.width / 2, y: y + height + 20, text: '你' },        // 下
-      { x: x + width + 20, y: this.height / 2, text: '右家' },      // 右
-      { x: this.width / 2, y: y - 20, text: '對家' },               // 上
-      { x: x - 20, y: this.height / 2, text: '左家' }               // 左
-    ];
-
-    positions.forEach((pos, index) => {
-      const marker = new Graphics();
-      marker.circle(0, 0, 30);
-      marker.fill(0x4a7c59);
-      marker.stroke({ width: 2, color: 0x8B7355 });
-
-      const text = new Text({
-        text: pos.text,
-        style: {
-          fontSize: 16,
-          fill: 0xffffff,
-          fontWeight: 'bold'
-        }
-      });
-      text.anchor.set(0.5);
-
-      marker.addChild(text);
-      marker.x = pos.x;
-      marker.y = pos.y;
-
-      this.container.addChild(marker);
-    });
+    // 玩家區域標籤已移除（由 Player 資訊條取代）
   }
 
   async loadCenterImage() {

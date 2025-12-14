@@ -136,11 +136,7 @@ class MahjongApp {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('room-screen').classList.remove('hidden');
 
-    // 顯示使用者資訊
-    const userInfo = document.getElementById('user-info');
-    document.getElementById('user-avatar').src = this.user.picture;
-    document.getElementById('user-name').textContent = this.user.name;
-    userInfo.classList.remove('hidden');
+    // 使用者資訊已移至遊戲內的玩家資訊條顯示
 
     // 檢查 URL 是否有房間參數，自動加入房間
     const urlParams = new URLSearchParams(window.location.search);

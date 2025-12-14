@@ -44,60 +44,168 @@ export class Player {
     // 輪次指示器容器（包含高亮邊框）
     this.turnIndicator = new Container();
 
-    // 高亮邊框（輪到該玩家時顯示）
+    // 風位顏色對照表
+    const windColors = {
+      E: 0xE53935, // 東 - 紅色
+      S: 0x43A047, // 南 - 綠色
+      W: 0x1E88E5, // 西 - 藍色
+      N: 0x8E24AA  // 北 - 紫色
+    };
+
+    // 根據位置決定資訊條的尺寸和方向
+    const isHorizontal = (this.position === 'bottom' || this.position === 'top');
+    const barWidth = isHorizontal ? 200 : 50;
+    const barHeight = isHorizontal ? 36 : 180;
+
+    // 高亮邊框（輪到該玩家時顯示）- 發光效果
     this.turnIndicatorBg = new Graphics();
-    this.turnIndicatorBg.roundRect(-4, -4, 128, 88, 8);
-    this.turnIndicatorBg.stroke({ width: 4, color: 0x00FF00 }); // 綠色高亮邊框
+    this.turnIndicatorBg.roundRect(-4, -4, barWidth + 8, barHeight + 8, 8);
+    this.turnIndicatorBg.stroke({ width: 3, color: 0xFFD700 }); // 金色高亮邊框
     this.turnIndicatorBg.visible = false;
     this.turnIndicator.addChild(this.turnIndicatorBg);
 
-    // 玩家資訊顯示（增加高度以容納門風）
+    // 玩家資訊背景（半透明深色底）
     this.infoBg = new Graphics();
-    this.infoBg.roundRect(0, 0, 120, 80, 4);
-    this.infoBg.fill({ color: 0x333333, alpha: 0.8 });
-    this.infoBg.stroke({ width: 2, color: 0x666666 });
-
-    this.infoText = new Text({
-      text: '等待玩家...',
-      style: {
-        fontSize: 14,
-        fill: 0xffffff,
-        wordWrap: true,
-        wordWrapWidth: 110
-      }
-    });
-    this.infoText.x = 5;
-    this.infoText.y = 5;
-
-    // 門風顯示文字
-    this.seatWindText = new Text({
-      text: '',
-      style: {
-        fontSize: 16,
-        fill: 0xFFD700, // 金色
-        fontWeight: 'bold'
-      }
-    });
-    this.seatWindText.x = 5;
-    this.seatWindText.y = 55;
-
-    // 出牌中圖示（▶）
-    this.turnIndicatorIcon = new Text({
-      text: '▶',
-      style: {
-        fontSize: 18,
-        fill: 0x00FF00, // 綠色
-        fontWeight: 'bold'
-      }
-    });
-    this.turnIndicatorIcon.x = 100;
-    this.turnIndicatorIcon.y = 30;
-    this.turnIndicatorIcon.visible = false;
-
-    this.infoBg.addChild(this.infoText);
-    this.infoBg.addChild(this.seatWindText);
-    this.infoBg.addChild(this.turnIndicatorIcon);
+    this.infoBg.roundRect(0, 0, barWidth, barHeight, 6);
+    this.infoBg.fill({ color: 0x000000, alpha: 0.6 });
     this.turnIndicator.addChild(this.infoBg);
+
+    if (isHorizontal) {
+      // 水平布局（上下玩家）：[風位圓標] 玩家名 · 分數
+
+      // 風位圓形徽章
+      this.windBadge = new Graphics();
+      this.windBadge.circle(18, 18, 14);
+      this.windBadge.fill({ color: windColors[this.seatWind] || 0xE53935 });
+      this.turnIndicator.addChild(this.windBadge);
+
+      // 風位文字（在圓形徽章內）
+      this.seatWindText = new Text({
+        text: this.getWindChar(this.seatWind),
+        style: {
+          fontSize: 16,
+          fill: 0xFFFFFF,
+          fontWeight: 'bold'
+        }
+      });
+      this.seatWindText.anchor.set(0.5);
+      this.seatWindText.x = 18;
+      this.seatWindText.y = 18;
+      this.turnIndicator.addChild(this.seatWindText);
+
+      // 玩家名稱
+      this.nameText = new Text({
+        text: this.name || '等待中...',
+        style: {
+          fontSize: 14,
+          fill: 0xFFFFFF,
+          fontWeight: 'normal'
+        }
+      });
+      this.nameText.x = 40;
+      this.nameText.y = 6;
+      this.turnIndicator.addChild(this.nameText);
+
+      // 分數
+      this.scoreText = new Text({
+        text: `${this.score}`,
+        style: {
+          fontSize: 13,
+          fill: 0xFFD700, // 金黃色
+          fontWeight: 'bold'
+        }
+      });
+      this.scoreText.x = 40;
+      this.scoreText.y = 20;
+      this.turnIndicator.addChild(this.scoreText);
+
+      // 出牌中標籤
+      this.turnLabel = new Text({
+        text: '出牌中',
+        style: {
+          fontSize: 11,
+          fill: 0x00FF00,
+          fontWeight: 'bold'
+        }
+      });
+      this.turnLabel.x = barWidth - 45;
+      this.turnLabel.y = 12;
+      this.turnLabel.visible = false;
+      this.turnIndicator.addChild(this.turnLabel);
+
+    } else {
+      // 垂直布局（左右玩家）：風位圓標在上，名稱和分數在下
+
+      // 風位圓形徽章
+      this.windBadge = new Graphics();
+      this.windBadge.circle(barWidth / 2, 20, 16);
+      this.windBadge.fill({ color: windColors[this.seatWind] || 0xE53935 });
+      this.turnIndicator.addChild(this.windBadge);
+
+      // 風位文字（在圓形徽章內）
+      this.seatWindText = new Text({
+        text: this.getWindChar(this.seatWind),
+        style: {
+          fontSize: 18,
+          fill: 0xFFFFFF,
+          fontWeight: 'bold'
+        }
+      });
+      this.seatWindText.anchor.set(0.5);
+      this.seatWindText.x = barWidth / 2;
+      this.seatWindText.y = 20;
+      this.turnIndicator.addChild(this.seatWindText);
+
+      // 玩家名稱（垂直排列）
+      const displayName = this.truncateName(this.name || '等待中', 4);
+      this.nameText = new Text({
+        text: displayName.split('').join('\n'),
+        style: {
+          fontSize: 13,
+          fill: 0xFFFFFF,
+          fontWeight: 'normal',
+          align: 'center',
+          lineHeight: 16
+        }
+      });
+      this.nameText.anchor.set(0.5, 0);
+      this.nameText.x = barWidth / 2;
+      this.nameText.y = 45;
+      this.turnIndicator.addChild(this.nameText);
+
+      // 分數
+      this.scoreText = new Text({
+        text: `${this.score}`,
+        style: {
+          fontSize: 12,
+          fill: 0xFFD700,
+          fontWeight: 'bold'
+        }
+      });
+      this.scoreText.anchor.set(0.5);
+      this.scoreText.x = barWidth / 2;
+      this.scoreText.y = barHeight - 20;
+      this.turnIndicator.addChild(this.scoreText);
+
+      // 出牌中標籤（垂直顯示）
+      this.turnLabel = new Text({
+        text: '▶',
+        style: {
+          fontSize: 14,
+          fill: 0x00FF00,
+          fontWeight: 'bold'
+        }
+      });
+      this.turnLabel.anchor.set(0.5);
+      this.turnLabel.x = barWidth / 2;
+      this.turnLabel.y = barHeight - 5;
+      this.turnLabel.visible = false;
+      this.turnIndicator.addChild(this.turnLabel);
+    }
+
+    // 保留舊的 infoText 引用以相容現有程式碼
+    this.infoText = this.nameText;
+    this.turnIndicatorIcon = this.turnLabel;
 
     // 根據位置設定資訊框位置
     this.positionInfoDisplay(this.turnIndicator);
@@ -105,23 +213,45 @@ export class Player {
     this.container.addChild(this.turnIndicator);
   }
 
+  /**
+   * 取得風位的中文字
+   */
+  getWindChar(wind) {
+    const windChars = { E: '東', S: '南', W: '西', N: '北' };
+    return windChars[wind] || '東';
+  }
+
+  /**
+   * 截斷名稱到指定長度
+   */
+  truncateName(name, maxLength) {
+    if (!name) return '';
+    if (name.length <= maxLength) return name;
+    return name.substring(0, maxLength);
+  }
+
   positionInfoDisplay(bg) {
+    // 資訊條貼在手牌外側
     switch (this.position) {
       case 'bottom':
-        bg.x = this.screenWidth / 2 - 60;
-        bg.y = this.screenHeight - 250; // Move up
+        // 下方玩家：資訊條在手牌下方（靠近螢幕底部）
+        bg.x = this.screenWidth / 2 - 100; // 置中（寬度 200px）
+        bg.y = this.screenHeight - 45;     // 靠近底部
         break;
       case 'right':
-        bg.x = this.screenWidth - 140;
-        bg.y = this.screenHeight / 2 - 30;
+        // 右側玩家：資訊條在手牌右側（靠近螢幕右邊）
+        bg.x = this.screenWidth - 60;      // 靠近右邊（寬度 50px）
+        bg.y = this.screenHeight / 2 - 90; // 垂直置中（高度 180px）
         break;
       case 'top':
-        bg.x = this.screenWidth / 2 - 60;
-        bg.y = 10;
+        // 上方玩家：資訊條貼齊頂端
+        bg.x = this.screenWidth / 2 - 100; // 置中（寬度 200px）
+        bg.y = 5;                          // 貼齊頂端
         break;
       case 'left':
-        bg.x = 10;
-        bg.y = this.screenHeight / 2 - 30;
+        // 左側玩家：資訊條在手牌左側（靠近螢幕左邊）
+        bg.x = 10;                         // 靠近左邊
+        bg.y = this.screenHeight / 2 - 90; // 垂直置中（高度 180px）
         break;
     }
   }
@@ -138,8 +268,22 @@ export class Player {
    * 更新玩家名稱顯示
    */
   updateNameDisplay() {
-    if (this.infoText) {
-      this.infoText.text = `${this.name}\n分數: ${this.score}`;
+    const isHorizontal = (this.position === 'bottom' || this.position === 'top');
+
+    if (this.nameText) {
+      if (isHorizontal) {
+        // 水平布局：直接顯示名稱
+        const displayName = this.name.length > 10 ? this.name.substring(0, 10) + '...' : this.name;
+        this.nameText.text = displayName;
+      } else {
+        // 垂直布局：名稱豎排
+        const displayName = this.truncateName(this.name, 4);
+        this.nameText.text = displayName.split('').join('\n');
+      }
+    }
+
+    if (this.scoreText) {
+      this.scoreText.text = `${this.score}`;
     }
   }
 
@@ -149,10 +293,32 @@ export class Player {
    */
   setSeatWind(wind) {
     this.seatWind = wind;
-    const windNames = { E: '東家', S: '南家', W: '西家', N: '北家' };
 
+    // 風位顏色對照表
+    const windColors = {
+      E: 0xE53935, // 東 - 紅色
+      S: 0x43A047, // 南 - 綠色
+      W: 0x1E88E5, // 西 - 藍色
+      N: 0x8E24AA  // 北 - 紫色
+    };
+
+    // 更新風位文字
     if (this.seatWindText) {
-      this.seatWindText.text = windNames[wind] || '';
+      this.seatWindText.text = this.getWindChar(wind);
+    }
+
+    // 更新風位徽章顏色
+    if (this.windBadge) {
+      this.windBadge.clear();
+      const isHorizontal = (this.position === 'bottom' || this.position === 'top');
+      const barWidth = isHorizontal ? 200 : 50;
+
+      if (isHorizontal) {
+        this.windBadge.circle(18, 18, 14);
+      } else {
+        this.windBadge.circle(barWidth / 2, 20, 16);
+      }
+      this.windBadge.fill({ color: windColors[wind] || 0xE53935 });
     }
   }
 
@@ -357,6 +523,11 @@ export class Player {
   setTurnActive(active, isSelf = false) {
     this.isTurnActive = active;
 
+    // 根據位置決定資訊條尺寸
+    const isHorizontal = (this.position === 'bottom' || this.position === 'top');
+    const barWidth = isHorizontal ? 200 : 50;
+    const barHeight = isHorizontal ? 36 : 180;
+
     // 清除之前的脈動動畫
     if (this.pulseAnimation) {
       clearInterval(this.pulseAnimation);
@@ -364,19 +535,20 @@ export class Player {
     }
 
     if (active) {
-      // 顯示高亮邊框
+      // 顯示高亮邊框（發光效果）
       if (this.turnIndicatorBg) {
         this.turnIndicatorBg.visible = true;
         // 如果是自己，使用金色；其他玩家使用綠色
+        const highlightColor = isSelf ? 0xFFD700 : 0x00FF00;
         this.turnIndicatorBg.clear();
-        this.turnIndicatorBg.roundRect(-4, -4, 128, 88, 8);
-        this.turnIndicatorBg.stroke({ width: 4, color: isSelf ? 0xFFD700 : 0x00FF00 });
+        this.turnIndicatorBg.roundRect(-4, -4, barWidth + 8, barHeight + 8, 8);
+        this.turnIndicatorBg.stroke({ width: 3, color: highlightColor });
       }
 
-      // 顯示出牌中圖示
-      if (this.turnIndicatorIcon) {
-        this.turnIndicatorIcon.visible = true;
-        this.turnIndicatorIcon.style.fill = isSelf ? 0xFFD700 : 0x00FF00;
+      // 顯示出牌中標籤
+      if (this.turnLabel) {
+        this.turnLabel.visible = true;
+        this.turnLabel.style.fill = isSelf ? 0xFFD700 : 0x00FF00;
       }
 
       // 如果是自己，啟動脈動動畫
@@ -406,9 +578,9 @@ export class Player {
         this.turnIndicatorBg.alpha = 1.0; // 重置透明度
       }
 
-      // 隱藏出牌中圖示
-      if (this.turnIndicatorIcon) {
-        this.turnIndicatorIcon.visible = false;
+      // 隱藏出牌中標籤
+      if (this.turnLabel) {
+        this.turnLabel.visible = false;
       }
     }
   }
