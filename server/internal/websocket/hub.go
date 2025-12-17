@@ -198,6 +198,25 @@ func (h *Hub) broadcastPlayerLeftNoLock(room *game.Room, playerID, playerName st
 	log.Printf("廣播玩家離開通知: %s", playerName)
 }
 
+// BroadcastDiceRoll 廣播擲骰結果
+func (h *Hub) BroadcastDiceRoll(room *game.Room, diceResult *game.DiceRollResult) {
+	message := map[string]interface{}{
+		"type": "dice_roll",
+		"data": map[string]interface{}{
+			"diceResults":     diceResult.DiceResults,
+			"totalSum":        diceResult.TotalSum,
+			"dealerPlayerId":  diceResult.DealerPlayerID,
+			"dealerSeatIndex": diceResult.DealerSeatIndex,
+		},
+	}
+
+	msgBytes, _ := json.Marshal(message)
+	log.Printf("廣播擲骰結果: %v, 總和: %d, 莊家位置: %d",
+		diceResult.DiceResults, diceResult.TotalSum, diceResult.DealerSeatIndex)
+
+	h.broadcast(room, msgBytes)
+}
+
 // startGame 開始遊戲
 func (h *Hub) startGame(room *game.Room) {
 	// 清空 log 檔案，開始新局
@@ -205,7 +224,17 @@ func (h *Hub) startGame(room *game.Room) {
 		log.Printf("清空 log 檔案失敗: %v", err)
 	}
 
-	log.Printf("房間 %s 開始遊戲", room.ID)
+	log.Printf("房間 %s 開始遊戲流程", room.ID)
+
+	// 擲骰決定莊家
+	diceResult := game.RollDiceForDealer(room.Players)
+	room.DiceRollResult = diceResult
+
+	// 廣播擲骰事件（在 game_start 之前）
+	h.BroadcastDiceRoll(room, diceResult)
+
+	// 等待前端播放擲骰動畫（約 5 秒）
+	time.Sleep(5 * time.Second)
 
 	room.GameStarted = true
 	room.StartGame()

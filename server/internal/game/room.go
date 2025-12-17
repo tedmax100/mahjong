@@ -49,6 +49,7 @@ type Room struct {
 	IsWaitingForActions bool            // 是否正在等待玩家動作回應
 	noResponseTimer     *time.Timer
 	timerMu             sync.Mutex
+	DiceRollResult      *DiceRollResult // 擲骰結果（用於斷線重連）
 }
 
 // Player 代表一個玩家
@@ -207,8 +208,16 @@ func (r *Room) RemovePlayer(userID string) {
 func (r *Room) StartGame() {
 	r.Game = NewMahjongGame(r.Players)
 	r.GameStarted = true
-	r.CurrentTurn = 0 // 莊家（位置 0）先出牌
-	log.Printf("房間 %s 遊戲開始，莊家先出牌", r.ID)
+
+	// 使用擲骰結果決定莊家位置（如果有的話）
+	if r.DiceRollResult != nil {
+		r.Game.Dealer = r.DiceRollResult.DealerSeatIndex
+		r.CurrentTurn = r.DiceRollResult.DealerSeatIndex
+		log.Printf("房間 %s 遊戲開始，依擲骰結果莊家為位置 %d", r.ID, r.DiceRollResult.DealerSeatIndex)
+	} else {
+		r.CurrentTurn = 0 // 預設莊家（位置 0）先出牌
+		log.Printf("房間 %s 遊戲開始，預設莊家先出牌", r.ID)
+	}
 }
 
 // DealTiles 發牌
@@ -255,17 +264,24 @@ func (r *Room) GetGameStartMessage(playerIndex int) []byte {
 	// 計算該玩家的門風
 	seatWind := r.Game.GetSeatWind(player.Position)
 
+	messageData := map[string]interface{}{
+		"roomId":         r.ID,
+		"currentTurn":    r.CurrentTurn,
+		"myPosition":     player.Position,
+		"dealerPosition": r.Game.Dealer,
+		"roundWind":      r.Game.RoundWind,         // 場風
+		"seatWind":       seatWind,                 // 該玩家的門風
+		"allSeatWinds":   r.Game.GetAllSeatWinds(), // 所有玩家的門風
+	}
+
+	// 包含擲骰結果（用於斷線重連顯示）
+	if r.DiceRollResult != nil {
+		messageData["diceRollResult"] = r.DiceRollResult
+	}
+
 	message := map[string]interface{}{
 		"type": "game_start",
-		"data": map[string]interface{}{
-			"roomId":         r.ID,
-			"currentTurn":    r.CurrentTurn,
-			"myPosition":     player.Position,
-			"dealerPosition": r.Game.Dealer,
-			"roundWind":      r.Game.RoundWind,         // 場風
-			"seatWind":       seatWind,                 // 該玩家的門風
-			"allSeatWinds":   r.Game.GetAllSeatWinds(), // 所有玩家的門風
-		},
+		"data": messageData,
 	}
 
 	data, _ := json.Marshal(message)

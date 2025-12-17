@@ -63,9 +63,16 @@ export class ChowSelectionUI {
     const bgHeight = combinations.length * (tileHeight + comboSpacing) + 20;
 
     const bg = new Graphics();
+    // 外層陰影效果
+    bg.roundRect(-bgWidth / 2 - 4, -bgHeight / 2 - 4, bgWidth + 8, bgHeight + 8, 14);
+    bg.fill({ color: 0x000000, alpha: 0.5 });
+    // 主背景 - 深綠色麻將桌風格
     bg.roundRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 10);
-    bg.fill({ color: 0x000000, alpha: 0.8 });
-    bg.stroke({ width: 2, color: 0xFFD700 }); // 金色邊框
+    bg.fill({ color: 0x1a4a3a, alpha: 0.95 });
+    // 內層漸層效果
+    bg.roundRect(-bgWidth / 2 + 3, -bgHeight / 2 + 3, bgWidth - 6, bgHeight - 6, 8);
+    bg.fill({ color: 0x2a5a4a, alpha: 0.3 });
+    bg.stroke({ width: 3, color: 0xFFD700 }); // 金色邊框
     this.chowSelectionContainer.addChild(bg);
 
     // 為每個組合創建牌的視覺呈現

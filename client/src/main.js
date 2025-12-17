@@ -255,6 +255,12 @@ class MahjongApp {
       case 'room_update':
         this.updateRoomInfo(message.data);
         break;
+      case 'dice_roll':
+        // 擲骰決定莊家動畫
+        if (this.game) {
+          this.game.handleDiceRoll(message.data);
+        }
+        break;
       case 'game_start':
         this.game.startGame(message.data);
         break;

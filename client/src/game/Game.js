@@ -9,6 +9,7 @@ import { AssetLoader } from './AssetLoader.js';
 import { WinningHandDisplay } from './WinningHandDisplay.js';
 import { DiscardManager } from './DiscardManager.js';
 import { ChowSelectionUI } from './ChowSelectionUI.js';
+import { DiceRollUI } from './DiceRollUI.js';
 
 /**
  * 主遊戲類
@@ -60,9 +61,12 @@ export class Game {
 
     // 音效管理器
     this.audioManager = new AudioManager();
-    
+
     // 素材載入器
     this.assetLoader = new AssetLoader(this.app.renderer);
+
+    // 擲骰 UI
+    this.diceRollUI = null;
   }
 
   /**
@@ -192,7 +196,16 @@ ${'='.repeat(60)}`);
     this.winningHandContainer.zIndex = 11000;
     this.container.addChild(this.winningHandContainer);
     // Initialize with loaded tile assets
-    this.winningHandDisplayHandler = new WinningHandDisplay(this.winningHandContainer, this.app.screen, this.tileAssets); 
+    this.winningHandDisplayHandler = new WinningHandDisplay(this.winningHandContainer, this.app.screen, this.tileAssets);
+
+    // 初始化擲骰 UI
+    this.diceRollUI = new DiceRollUI(
+      this.app.screen.width,
+      this.app.screen.height,
+      this.audioManager
+    );
+    await this.diceRollUI.load();
+    this.container.addChild(this.diceRollUI.container);
 
     // 顯示等待文字
     this.showWaitingText();
@@ -382,6 +395,39 @@ ${'='.repeat(60)}`);
     return false;
   }
 
+  /**
+   * 處理擲骰事件
+   * @param {Object} data - 擲骰結果資料
+   */
+  async handleDiceRoll(data) {
+    const { diceResults, totalSum, dealerPlayerId, dealerSeatIndex } = data;
+
+    console.log('收到擲骰結果:', diceResults, '總和:', totalSum, '莊家位置:', dealerSeatIndex);
+
+    // 找出莊家名稱
+    let dealerName = '玩家';
+    for (const player of this.players) {
+      if (player.userId === dealerPlayerId) {
+        dealerName = player.name || '玩家';
+        break;
+      }
+    }
+
+    // 移除等待文字
+    if (this.waitingText) {
+      this.container.removeChild(this.waitingText);
+      this.waitingText = null;
+    }
+
+    // 播放擲骰動畫
+    await this.diceRollUI.play(diceResults, totalSum, dealerName, dealerSeatIndex);
+
+    // 隱藏擲骰 UI
+    this.diceRollUI.hide();
+
+    console.log('擲骰動畫完成，等待 game_start');
+  }
+
   startGame(data) {
     console.log('遊戲開始!', data);
 
@@ -392,9 +438,8 @@ ${'='.repeat(60)}`);
     }
     this.resetForNewRound();
 
-    // 播放遊戲背景音樂和骰子音效
+    // 播放遊戲背景音樂
     this.audioManager.playBGM('game');
-    this.audioManager.playEffect('dice');
 
     // 移除等待文字
     if (this.waitingText) {
