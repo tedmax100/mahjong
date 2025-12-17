@@ -332,6 +332,21 @@ ${'='.repeat(60)}`);
   }
 
   /**
+   * 設定玩家說話狀態（語音通話用）
+   * @param {string} peerId - 玩家 ID
+   * @param {boolean} isTalking - 是否正在說話
+   */
+  setPlayerTalking(peerId, isTalking) {
+    // 尋找對應玩家並更新說話狀態
+    for (const player of this.players) {
+      if (player && player.userId === peerId) {
+        player.setTalking(isTalking);
+        break;
+      }
+    }
+  }
+
+  /**
    * 初始化牌池（144 張牌）
    */
   initializeTilePool() {

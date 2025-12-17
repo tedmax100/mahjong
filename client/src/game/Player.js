@@ -36,6 +36,11 @@ export class Player {
     this.isTurnActive = false; // 是否輪到該玩家
     this.pulseAnimation = null; // 脈動動畫計時器
 
+    // 語音通話相關
+    this.isTalking = false; // 是否正在說話
+    this.talkingIndicator = null; // 說話指示器圖形
+    this.talkingPulseTimer = null; // 說話動畫計時器
+
     this.createInfoDisplay();
     this.container.addChild(this.meldsContainer);
   }
@@ -207,10 +212,102 @@ export class Player {
     this.infoText = this.nameText;
     this.turnIndicatorIcon = this.turnLabel;
 
+    // 建立說話指示器
+    this.createTalkingIndicator(isHorizontal, barWidth, barHeight);
+
     // 根據位置設定資訊框位置
     this.positionInfoDisplay(this.turnIndicator);
 
     this.container.addChild(this.turnIndicator);
+  }
+
+  /**
+   * 建立說話中指示器（語音通話用）
+   */
+  createTalkingIndicator(isHorizontal, barWidth, barHeight) {
+    this.talkingIndicator = new Graphics();
+    this.talkingIndicator.visible = false;
+
+    // 根據布局決定位置
+    if (isHorizontal) {
+      // 水平布局：在資訊條右側
+      this.talkingIndicator.x = barWidth - 18;
+      this.talkingIndicator.y = 18;
+    } else {
+      // 垂直布局：在風位徽章旁邊
+      this.talkingIndicator.x = barWidth - 12;
+      this.talkingIndicator.y = 20;
+    }
+
+    // 繪製初始狀態
+    this.drawTalkingIcon(false);
+
+    this.turnIndicator.addChild(this.talkingIndicator);
+  }
+
+  /**
+   * 繪製說話圖示
+   * @param {boolean} isActive - 是否正在說話
+   */
+  drawTalkingIcon(isActive) {
+    if (!this.talkingIndicator) return;
+
+    this.talkingIndicator.clear();
+
+    const color = isActive ? 0x48BB78 : 0x718096; // 綠色 or 灰色
+    const alpha = isActive ? 1.0 : 0.5;
+
+    // 繪製小麥克風圓圈
+    this.talkingIndicator.circle(0, 0, 6);
+    this.talkingIndicator.fill({ color, alpha });
+
+    if (isActive) {
+      // 繪製音波效果
+      this.talkingIndicator.circle(0, 0, 9);
+      this.talkingIndicator.stroke({ width: 1.5, color, alpha: 0.7 });
+      this.talkingIndicator.circle(0, 0, 12);
+      this.talkingIndicator.stroke({ width: 1.5, color, alpha: 0.4 });
+    }
+  }
+
+  /**
+   * 設定說話狀態（語音通話用）
+   * @param {boolean} isTalking - 是否正在說話
+   */
+  setTalking(isTalking) {
+    if (this.isTalking === isTalking) return;
+
+    this.isTalking = isTalking;
+
+    if (!this.talkingIndicator) return;
+
+    this.talkingIndicator.visible = isTalking;
+    this.drawTalkingIcon(isTalking);
+
+    // 清除之前的動畫
+    if (this.talkingPulseTimer) {
+      clearInterval(this.talkingPulseTimer);
+      this.talkingPulseTimer = null;
+    }
+
+    // 如果正在說話，啟動脈動動畫
+    if (isTalking) {
+      let scale = 1.0;
+      let growing = true;
+
+      this.talkingPulseTimer = setInterval(() => {
+        if (growing) {
+          scale += 0.05;
+          if (scale >= 1.15) growing = false;
+        } else {
+          scale -= 0.05;
+          if (scale <= 1.0) growing = true;
+        }
+        this.talkingIndicator.scale.set(scale);
+      }, 50);
+    } else {
+      this.talkingIndicator.scale.set(1.0);
+    }
   }
 
   /**

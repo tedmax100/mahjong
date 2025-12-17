@@ -1,6 +1,8 @@
 import { Application } from 'pixi.js';
 import { Game } from './game/Game.js';
 import { WebSocketClient } from './network/WebSocketClient.js';
+import { VoiceChat } from './voice/VoiceChat.js';
+import { VoiceChatUI } from './voice/VoiceChatUI.js';
 
 class MahjongApp {
   constructor() {
@@ -9,6 +11,10 @@ class MahjongApp {
     this.ws = null;
     this.user = null;
     this.roomId = null;
+
+    // Voice chat
+    this.voiceChat = null;
+    this.voiceChatUI = null;
 
     this.init();
   }
@@ -197,6 +203,28 @@ class MahjongApp {
     if (this.game) {
       this.game.setWebSocket(this.ws);
     }
+
+    // 初始化語音通話
+    this.initVoiceChat();
+  }
+
+  /**
+   * 初始化語音通話功能
+   */
+  initVoiceChat() {
+    this.voiceChat = new VoiceChat();
+    this.voiceChat.setWebSocket(this.ws, this.user.id);
+
+    this.voiceChatUI = new VoiceChatUI(this.voiceChat);
+
+    // 設定說話指示器回調 - 當玩家說話時更新遊戲中的指示器
+    this.voiceChatUI.onPlayerTalkingChange = (peerId, isTalking) => {
+      if (this.game) {
+        this.game.setPlayerTalking(peerId, isTalking);
+      }
+    };
+
+    console.log('[VoiceChat] 語音通話功能已初始化');
   }
 
   async initGame() {
@@ -298,6 +326,13 @@ class MahjongApp {
           this.leaveRoom();
         }
         break;
+      case 'webrtc_signal':
+        // 處理 WebRTC 信令訊息
+        if (this.voiceChat && message.data) {
+          const { fromId, signalType, payload } = message.data;
+          this.voiceChat.handleSignal(fromId, signalType, payload);
+        }
+        break;
       default:
         console.warn('未知訊息類型:', message.type);
     }
@@ -331,6 +366,15 @@ class MahjongApp {
     // 即使遊戲還沒開始，也更新玩家列表
     if (this.game) {
       this.game.updatePlayers(data.players);
+    }
+
+    // 更新語音通話玩家列表（過濾掉 Bot 玩家，只保留真人玩家）
+    if (this.voiceChat && this.voiceChatUI && data.players) {
+      const otherPlayers = data.players
+        .filter(p => p && p.id !== this.user.id && !p.id.startsWith('bot_'))
+        .map(p => ({ id: p.id, name: p.name }));
+      this.voiceChat.setRoomPlayers(otherPlayers);
+      this.voiceChatUI.updatePlayerList(otherPlayers);
     }
   }
 
@@ -369,6 +413,16 @@ class MahjongApp {
   }
 
   leaveRoom() {
+    // 關閉語音通話
+    if (this.voiceChat) {
+      this.voiceChat.disconnect();
+      this.voiceChat = null;
+    }
+    if (this.voiceChatUI) {
+      this.voiceChatUI.destroy();
+      this.voiceChatUI = null;
+    }
+
     // 關閉 WebSocket 連線
     if (this.ws) {
       this.ws.close();

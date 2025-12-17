@@ -198,6 +198,37 @@ func (h *Hub) broadcastPlayerLeftNoLock(room *game.Room, playerID, playerName st
 	log.Printf("廣播玩家離開通知: %s", playerName)
 }
 
+// SendToPlayer 發送訊息給指定玩家（用於 WebRTC 信令轉發）
+func (h *Hub) SendToPlayer(room *game.Room, targetId string, message map[string]interface{}) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	clientInterface, ok := room.Clients[targetId]
+	if !ok {
+		log.Printf("SendToPlayer: 找不到目標玩家 %s", targetId)
+		return
+	}
+
+	client, ok := clientInterface.(*Client)
+	if !ok {
+		log.Printf("SendToPlayer: 類型轉換失敗 %s", targetId)
+		return
+	}
+
+	msgBytes, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("SendToPlayer: JSON 序列化失敗: %v", err)
+		return
+	}
+
+	select {
+	case client.Send <- msgBytes:
+		// 訊息發送成功
+	default:
+		log.Printf("SendToPlayer: 玩家 %s 的發送緩衝區已滿，訊息丟棄", targetId)
+	}
+}
+
 // BroadcastDiceRoll 廣播擲骰結果
 func (h *Hub) BroadcastDiceRoll(room *game.Room, diceResult *game.DiceRollResult) {
 	message := map[string]interface{}{

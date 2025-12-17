@@ -126,9 +126,47 @@ func (c *Client) handleMessage(data []byte) {
 		// 處理遊戲動作
 		c.handleGameAction(msg.Action, msg.Data)
 
+	case "webrtc_signal":
+		// 處理 WebRTC 信令轉發
+		c.handleWebRTCSignal(msg.Data)
+
 	default:
 		log.Printf("未知訊息類型: %s", msg.Type)
 	}
+}
+
+// handleWebRTCSignal 處理 WebRTC 信令轉發
+func (c *Client) handleWebRTCSignal(data map[string]interface{}) {
+	if c.Room == nil {
+		log.Printf("WebRTC 信令失敗：玩家 %s 不在房間中", c.UserName)
+		return
+	}
+
+	targetId, ok := data["targetId"].(string)
+	if !ok || targetId == "" {
+		log.Printf("WebRTC 信令缺少 targetId")
+		return
+	}
+
+	signalType, ok := data["signalType"].(string)
+	if !ok || signalType == "" {
+		log.Printf("WebRTC 信令缺少 signalType")
+		return
+	}
+
+	payload := data["payload"]
+
+	log.Printf("WebRTC 信令轉發: %s -> %s (type: %s)", c.UserID, targetId, signalType)
+
+	// 轉發信令給目標玩家
+	c.Hub.SendToPlayer(c.Room, targetId, map[string]interface{}{
+		"type": "webrtc_signal",
+		"data": map[string]interface{}{
+			"fromId":     c.UserID,
+			"signalType": signalType,
+			"payload":    payload,
+		},
+	})
 }
 
 // handleGameAction 處理遊戲動作
