@@ -1,7 +1,7 @@
 # 麻將專案 README
 
 [![Security Scan](https://github.com/tedmax100/mahjong/actions/workflows/security.yml/badge.svg)](https://github.com/tedmax100/mahjong/actions/workflows/security.yml)
-![Go Coverage](https://img.shields.io/badge/Go_Coverage-52.1%25-orange)
+![Go Coverage](https://img.shields.io/badge/Go_Coverage-51.4%25-orange)
 ![Frontend Coverage](https://img.shields.io/badge/Frontend_Coverage-18.9%25-red)
 
 這是一個16張台灣麻將的網頁遊戲專案。
