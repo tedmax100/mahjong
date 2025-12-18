@@ -104,3 +104,46 @@ make build
 ```bash
 make help
 ```
+
+
+```
+ server/                                                                                                                                                                  
+  ├── cmd/                                                                                                                                                                 
+  │   ├── main.go              # 麻將遊戲伺服器 (Port 8080)                                                                                                                
+  │   └── lobby/                                                                                                                                                           
+  │       └── main.go          # Lobby & Auth Proxy (Port 3001)                                                                                                            
+  ├── internal/auth/                                                                                                                                                       
+  │   ├── keys.go              # RSA 金鑰管理 & JWT 簽發                                                                                                                   
+  │   ├── oauth.go             # Google OAuth 處理器                                                                                                                       
+  │   ├── jwks_handler.go      # JWKS 端點                                                                                                                                 
+  │   ├── origin.go            # Origin 白名單驗證                                                                                                                         
+  │   └── middleware.go        # JWT 驗證中介軟體（遊戲伺服器用）                                                                                                          
+  └── .env.example             # 環境變數範本                                                                                                                              
+                                                                                                                                                                           
+  Makefile Commands                                                                                                                                                        
+                                                                                                                                                                           
+  make start-backend     # 啟動遊戲伺服器 (Port 8080)                                                                                                                      
+  make start-lobby       # 啟動 Lobby & Auth Proxy (Port 3001)                                                                                                             
+  make dev-with-auth     # 啟動全部（遊戲 + 前端 + Lobby）                                                                                                                 
+  make build             # 構建兩個執行檔 (mahjong-server, mahjong-lobby)                                                                                                  
+                                                                                                                                                                           
+  Environment Variables                                                                                                                                                    
+                                                                                                                                                                           
+  # Lobby 伺服器必要設定                                                                                                                                                   
+  GOOGLE_CLIENT_ID=xxx                                                                                                                                                     
+  GOOGLE_CLIENT_SECRET=xxx                                                                                                                                                 
+  AUTH_PROXY_URL=http://localhost:3001  # 或生產環境網址                                                                                                                   
+  SESSION_SECRET=xxx                                                                                                                                                       
+                                                                                                                                                                           
+  # 遊戲伺服器（可選，啟用 JWT 驗證）                                                                                                                                      
+  AUTH_PROXY_URL=http://localhost:3001                                                                                                                                     
+                                                                                                                                                                           
+  啟動方式                                                                                                                                                                 
+                                                                                                                                                                           
+  # 1. 複製並設定環境變數                                                                                                                                                  
+  cp server/.env.example server/.env                                                                                                                                       
+  # 編輯 .env 填入 Google OAuth 憑證                                                                                                                                       
+                                                                                                                                                                           
+  # 2. 啟動全部服務                                                                                                                                                        
+  make dev-with-auth              
+  ```
