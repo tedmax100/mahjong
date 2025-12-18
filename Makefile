@@ -1,4 +1,4 @@
-.PHONY: help install-cloudflared start stop tunnel dev dev-tunnel clean
+.PHONY: help install-cloudflared start stop tunnel dev dev-tunnel clean start-lobby dev-with-auth
 
 # 顏色定義
 GREEN  := \033[0;32m
@@ -150,8 +150,10 @@ test-ui: ## 運行測試 UI
 build: ## 構建項目
 	@echo "$(YELLOW)構建前端...$(NC)"
 	@cd client && npm run build
-	@echo "$(YELLOW)構建後端...$(NC)"
+	@echo "$(YELLOW)構建遊戲伺服器...$(NC)"
 	@cd server && go build -o ../mahjong-server cmd/main.go
+	@echo "$(YELLOW)構建 Lobby 伺服器...$(NC)"
+	@cd server && go build -o ../mahjong-lobby cmd/lobby/main.go
 	@echo "$(GREEN)✓ 構建完成$(NC)"
 
 # 安裝依賴
@@ -161,3 +163,12 @@ install: ## 安裝所有依賴
 	@echo "$(YELLOW)安裝後端依賴...$(NC)"
 	@cd server && go mod download
 	@echo "$(GREEN)✓ 依賴安裝完成$(NC)"
+
+# Lobby & Auth Proxy 相關命令
+start-lobby: ## 啟動 Lobby & Auth Proxy 伺服器 (Port 3001)
+	@echo "$(GREEN)🏠 啟動 Lobby & Auth Proxy (Port 3001)...$(NC)"
+	@cd server && go run cmd/lobby/main.go
+
+dev-with-auth: ## 啟動本地開發環境（含 Lobby & Auth）
+	@echo "$(YELLOW)啟動本地開發環境（含認證）...$(NC)"
+	@$(MAKE) -j3 start-backend start-frontend start-lobby

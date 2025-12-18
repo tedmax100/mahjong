@@ -3,6 +3,7 @@ import { Game } from './game/Game.js';
 import { WebSocketClient } from './network/WebSocketClient.js';
 import { VoiceChat } from './voice/VoiceChat.js';
 import { VoiceChatUI } from './voice/VoiceChatUI.js';
+import { GoogleAuth } from './auth/GoogleAuth.js';
 
 class MahjongApp {
   constructor() {
@@ -16,15 +17,53 @@ class MahjongApp {
     this.voiceChat = null;
     this.voiceChatUI = null;
 
+    // Auth
+    this.auth = null;
+    this.authFetch = null;
+
     this.init();
   }
 
   init() {
+    // 初始化認證系統
+    this.initAuth();
+
     // 顯示啟動畫面動畫
     this.showSplashScreen();
 
     // 綁定UI事件
     this.bindEvents();
+  }
+
+  /**
+   * 初始化認證系統
+   */
+  initAuth() {
+    this.auth = new GoogleAuth();
+
+    // 設定登入回調
+    this.auth.onSignIn = (user) => {
+      console.log('使用者已登入:', user.name);
+      this.user = user;
+      // 如果已在登入畫面，可自動跳轉到房間選擇
+      // this.showRoomScreen();
+    };
+
+    // 設定登出回調
+    this.auth.onSignOut = () => {
+      console.log('使用者已登出');
+      this.user = null;
+      // 如果在遊戲中，離開房間
+      if (this.roomId) {
+        this.leaveRoom();
+      }
+    };
+
+    // 初始化（檢查 URL token 和 localStorage）
+    this.auth.init();
+
+    // 建立帶認證的 fetch（自動處理 401）
+    this.authFetch = this.auth.createAuthFetch();
   }
 
   showSplashScreen() {
@@ -157,17 +196,22 @@ class MahjongApp {
 
   async createRoom() {
     try {
-      const response = await fetch('/api/rooms/create', {
+      // 使用 authFetch 自動附加 token 並處理 401
+      const response = await this.authFetch('/api/rooms/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.user.token}`
         },
         body: JSON.stringify({
           userId: this.user.id,
           userName: this.user.name
         })
       });
+
+      // 如果是 401，authFetch 已經處理登出，這裡直接返回
+      if (response.status === 401) {
+        return;
+      }
 
       const data = await response.json();
       if (data.success) {

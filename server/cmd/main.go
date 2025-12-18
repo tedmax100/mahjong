@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"mahjong/internal/api"
+	"mahjong/internal/auth"
 	"mahjong/internal/logger"
 	"mahjong/internal/websocket"
 
@@ -15,6 +16,12 @@ func main() {
 		log.Fatal("Logger 初始化失敗:", err)
 	}
 	defer logger.Close()
+
+	// 初始化 JWKS 認證（如果 AUTH_PROXY_URL 有設定）
+	if err := auth.InitJWKS(); err != nil {
+		log.Printf("⚠️ JWKS 初始化失敗: %v（認證功能停用）", err)
+	}
+	defer auth.ShutdownJWKS()
 
 	// 建立 Gin 路由
 	r := gin.Default()
@@ -37,12 +44,20 @@ func main() {
 	hub := websocket.NewHub()
 	go hub.Run()
 
-	// API 路由
+	// API 路由（使用可選 JWT 驗證）
 	apiGroup := r.Group("/api")
+	apiGroup.Use(auth.OptionalJWTMiddleware())
 	{
 		apiGroup.POST("/rooms/create", api.CreateRoom(hub))
 		apiGroup.GET("/rooms/:roomId", api.GetRoom(hub))
 	}
+
+	// 受保護的 API 路由（需要 JWT）
+	// protectedGroup := r.Group("/api/protected")
+	// protectedGroup.Use(auth.JWTMiddleware())
+	// {
+	//     // 未來需要強制驗證的端點放這裡
+	// }
 
 	// WebSocket 路由
 	r.GET("/ws", func(c *gin.Context) {
