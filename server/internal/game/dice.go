@@ -4,8 +4,6 @@ import (
 	"crypto/rand"
 	"log"
 	"math/big"
-	mathrand "math/rand"
-	"time"
 )
 
 // DiceRollResult holds the result of rolling dice for dealer selection
@@ -25,13 +23,10 @@ func RollDiceForDealer(players []*Player) *DiceRollResult {
 	for i := 0; i < 3; i++ {
 		n, err := rand.Int(rand.Reader, big.NewInt(6))
 		if err != nil {
-			// Fallback to less secure random if crypto/rand fails
-			log.Printf("crypto/rand 失敗，使用 math/rand: %v", err)
-			mathrand.Seed(time.Now().UnixNano())
-			result.DiceResults[i] = mathrand.Intn(6) + 1
-		} else {
-			result.DiceResults[i] = int(n.Int64()) + 1 // 1-6
+			// crypto/rand should never fail on a properly configured system
+			log.Panicf("crypto/rand 失敗: %v", err)
 		}
+		result.DiceResults[i] = int(n.Int64()) + 1 // 1-6
 	}
 
 	// Calculate sum
