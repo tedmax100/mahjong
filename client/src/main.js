@@ -268,7 +268,94 @@ class MahjongApp {
       }
     };
 
+    // 設定語音連線狀態變更回調 - 控制玩家名牌上的語音按鈕顯示
+    this.voiceChatUI.onVoiceConnectionChange = (isConnected) => {
+      if (this.game) {
+        // 更新其他玩家的靜音按鈕顯示狀態
+        this.game.setVoiceButtonsVisible(isConnected);
+        // 更新底部玩家的連線狀態顯示
+        this.game.setBottomPlayerVoiceState(isConnected ? 'connected' : 'disconnected');
+      }
+    };
+
+    // 設定靜音狀態同步回調 - 當 VoiceChatUI 面板中的靜音狀態改變時同步到遊戲
+    this.voiceChatUI.onMuteStateChange = (peerId, isMuted, isSelf) => {
+      if (this.game) {
+        this.game.setPlayerVoiceMuted(peerId, isMuted);
+      }
+    };
+
+    // 設定遊戲中玩家語音按鈕的回調（靜音/取消靜音）
+    if (this.game) {
+      this.game.setupVoiceButtonCallbacks((userId, isSelf) => {
+        this.handleGameVoiceButtonClick(userId, isSelf);
+      });
+
+      // 設定底部玩家語音連線按鈕的回調
+      this.game.setupVoiceConnectCallback((connect) => {
+        this.handleVoiceConnectClick(connect);
+      });
+    }
+
     console.log('[VoiceChat] 語音通話功能已初始化');
+  }
+
+  /**
+   * 處理語音連線/斷線按鈕點擊（底部玩家）
+   * @param {boolean} connect - true 為連線，false 為斷線
+   */
+  async handleVoiceConnectClick(connect) {
+    if (!this.voiceChat || !this.voiceChatUI || !this.game) return;
+
+    if (connect) {
+      // 顯示連線中狀態
+      this.game.setBottomPlayerVoiceState('connecting');
+
+      try {
+        // 連線
+        await this.voiceChatUI.connect();
+
+        // 連線成功後會透過 onVoiceConnectionChange 回調更新其他玩家的按鈕
+      } catch (error) {
+        console.error('[VoiceChat] 連線失敗:', error);
+        // 恢復為未連線狀態
+        this.game.setBottomPlayerVoiceState('disconnected');
+      }
+    } else {
+      // 斷線
+      this.voiceChatUI.disconnect();
+    }
+  }
+
+  /**
+   * 處理遊戲中玩家語音按鈕點擊
+   * @param {string} userId - 玩家 ID
+   * @param {boolean} isSelf - 是否是自己的麥克風按鈕
+   */
+  handleGameVoiceButtonClick(userId, isSelf) {
+    if (!this.voiceChat || !this.voiceChatUI) return;
+
+    if (isSelf) {
+      // 切換自己的麥克風
+      const isMuted = this.voiceChat.toggleMute();
+      this.voiceChatUI.updateMuteUI(isMuted);
+
+      // 同步到遊戲中的按鈕
+      if (this.game) {
+        this.game.setPlayerVoiceMuted(this.user.id, isMuted);
+      }
+    } else {
+      // 切換對方的靜音狀態
+      const isMuted = this.voiceChat.togglePeerMute(userId);
+
+      // 同步到 VoiceChatUI
+      this.voiceChatUI.updatePeerMuteUI(userId, isMuted);
+
+      // 同步到遊戲中的按鈕
+      if (this.game) {
+        this.game.setPlayerVoiceMuted(userId, isMuted);
+      }
+    }
   }
 
   async initGame() {

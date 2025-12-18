@@ -347,6 +347,70 @@ ${'='.repeat(60)}`);
   }
 
   /**
+   * 設定所有玩家的語音按鈕顯示狀態
+   * @param {boolean} visible - 是否顯示
+   */
+  setVoiceButtonsVisible(visible) {
+    for (const player of this.players) {
+      if (player) {
+        player.setVoiceButtonVisible(visible);
+      }
+    }
+    console.log(`[Game] 語音按鈕顯示狀態: ${visible}`);
+  }
+
+  /**
+   * 設定玩家的語音靜音狀態
+   * @param {string} userId - 玩家 ID
+   * @param {boolean} isMuted - 是否靜音
+   */
+  setPlayerVoiceMuted(userId, isMuted) {
+    for (const player of this.players) {
+      if (player && player.userId === userId) {
+        player.setVoiceMuted(isMuted);
+        break;
+      }
+    }
+  }
+
+  /**
+   * 設定語音按鈕的回調函數
+   * @param {Function} callback - 回調函數 (userId, isSelf) => void
+   */
+  setupVoiceButtonCallbacks(callback) {
+    for (const player of this.players) {
+      if (player) {
+        player.onVoiceButtonClick = callback;
+      }
+    }
+    console.log('[Game] 語音按鈕回調已設定');
+  }
+
+  /**
+   * 設定語音連線按鈕的回調函數（僅限底部玩家）
+   * @param {Function} callback - 回調函數 (connect: boolean) => void
+   */
+  setupVoiceConnectCallback(callback) {
+    // 只設定底部玩家（自己）的連線回調
+    const bottomPlayer = this.players.find(p => p && p.position === 'bottom');
+    if (bottomPlayer) {
+      bottomPlayer.onVoiceConnectClick = callback;
+    }
+    console.log('[Game] 語音連線按鈕回調已設定');
+  }
+
+  /**
+   * 設定底部玩家的語音連線狀態
+   * @param {'disconnected' | 'connecting' | 'connected'} state - 連線狀態
+   */
+  setBottomPlayerVoiceState(state) {
+    const bottomPlayer = this.players.find(p => p && p.position === 'bottom');
+    if (bottomPlayer) {
+      bottomPlayer.setVoiceConnectionState(state);
+    }
+  }
+
+  /**
    * 初始化牌池（144 張牌）
    */
   initializeTilePool() {

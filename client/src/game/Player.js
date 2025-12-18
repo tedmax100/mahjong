@@ -41,6 +41,16 @@ export class Player {
     this.talkingIndicator = null; // 說話指示器圖形
     this.talkingPulseTimer = null; // 說話動畫計時器
 
+    // 語音控制按鈕相關
+    this.voiceButton = null; // 麥克風按鈕（自己）或靜音按鈕（其他玩家）
+    this.voiceButtonBg = null;
+    this.voiceButtonIcon = null;
+    this.isVoiceMuted = false; // 是否已靜音（自己）或已將對方靜音
+    this.isVoiceConnected = false; // 語音是否已連線
+    this.isVoiceConnecting = false; // 語音是否正在連線中
+    this.onVoiceButtonClick = null; // 按鈕點擊回調（靜音/取消靜音）
+    this.onVoiceConnectClick = null; // 連線/斷線點擊回調（僅限底部玩家）
+
     this.createInfoDisplay();
     this.container.addChild(this.meldsContainer);
   }
@@ -215,6 +225,9 @@ export class Player {
     // 建立說話指示器
     this.createTalkingIndicator(isHorizontal, barWidth, barHeight);
 
+    // 建立語音控制按鈕
+    this.createVoiceButton(isHorizontal, barWidth, barHeight);
+
     // 根據位置設定資訊框位置
     this.positionInfoDisplay(this.turnIndicator);
 
@@ -307,6 +320,258 @@ export class Player {
       }, 50);
     } else {
       this.talkingIndicator.scale.set(1.0);
+    }
+  }
+
+  /**
+   * 建立語音控制按鈕
+   * - 底部玩家（自己）：連線/麥克風開關（始終顯示）
+   * - 其他玩家：靜音按鈕（語音連線後才顯示）
+   */
+  createVoiceButton(isHorizontal, barWidth, barHeight) {
+    this.voiceButton = new Container();
+    this.voiceButton.eventMode = 'static';
+    this.voiceButton.cursor = 'pointer';
+
+    // 按鈕背景
+    this.voiceButtonBg = new Graphics();
+
+    // 按鈕圖示文字
+    // 底部玩家預設顯示連線圖示，其他玩家顯示喇叭圖示
+    this.voiceButtonIcon = new Text({
+      text: this.position === 'bottom' ? '📞' : '🔊',
+      style: {
+        fontSize: isHorizontal ? 16 : 14,
+        fill: 0xFFFFFF
+      }
+    });
+    this.voiceButtonIcon.anchor.set(0.5);
+
+    // 根據布局設定按鈕大小和位置
+    const buttonSize = isHorizontal ? 28 : 24;
+
+    // 繪製按鈕背景（底部玩家預設為「未連線」狀態）
+    if (this.position === 'bottom') {
+      this.drawVoiceButtonBgWithState(buttonSize, 'disconnected');
+    } else {
+      this.drawVoiceButtonBg(buttonSize, false);
+    }
+
+    this.voiceButton.addChild(this.voiceButtonBg);
+    this.voiceButton.addChild(this.voiceButtonIcon);
+
+    // 設定按鈕位置
+    if (isHorizontal) {
+      if (this.position === 'bottom') {
+        // 底部玩家：麥克風按鈕在名牌右側
+        this.voiceButton.x = barWidth + 8;
+        this.voiceButton.y = barHeight / 2;
+      } else {
+        // 頂部玩家：靜音按鈕在名牌右側
+        this.voiceButton.x = barWidth + 8;
+        this.voiceButton.y = barHeight / 2;
+      }
+    } else {
+      // 垂直布局（左右玩家）：按鈕在名牌下方
+      this.voiceButton.x = barWidth / 2;
+      this.voiceButton.y = barHeight + 8;
+    }
+
+    // 長按計時器（用於斷線功能）
+    let longPressTimer = null;
+    let isLongPress = false;
+
+    // 按下事件
+    this.voiceButton.on('pointerdown', () => {
+      isLongPress = false;
+
+      if (this.position === 'bottom' && this.isVoiceConnected) {
+        // 底部玩家且已連線：啟動長按計時器（1秒後斷線）
+        longPressTimer = setTimeout(() => {
+          isLongPress = true;
+          // 長按 → 斷線
+          if (this.onVoiceConnectClick) {
+            this.onVoiceConnectClick(false); // disconnect
+          }
+        }, 1000);
+      }
+    });
+
+    // 放開事件
+    this.voiceButton.on('pointerup', () => {
+      // 清除長按計時器
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      // 如果是長按，不執行短按行為
+      if (isLongPress) {
+        isLongPress = false;
+        return;
+      }
+
+      if (this.position === 'bottom') {
+        // 底部玩家：根據連線狀態決定行為
+        if (!this.isVoiceConnected && !this.isVoiceConnecting) {
+          // 未連線 → 開始連線
+          if (this.onVoiceConnectClick) {
+            this.onVoiceConnectClick(true); // connect
+          }
+        } else if (this.isVoiceConnected) {
+          // 已連線 → 切換靜音
+          if (this.onVoiceButtonClick) {
+            this.onVoiceButtonClick(this.userId, true);
+          }
+        }
+      } else {
+        // 其他玩家：切換對方靜音
+        if (this.onVoiceButtonClick) {
+          this.onVoiceButtonClick(this.userId, false);
+        }
+      }
+    });
+
+    // 離開事件（取消長按）
+    this.voiceButton.on('pointerout', () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      isLongPress = false;
+    });
+
+    // 底部玩家始終顯示按鈕，其他玩家預設隱藏（語音連線後才顯示）
+    this.voiceButton.visible = (this.position === 'bottom');
+
+    this.turnIndicator.addChild(this.voiceButton);
+  }
+
+  /**
+   * 繪製語音按鈕背景
+   */
+  drawVoiceButtonBg(size, isMuted) {
+    if (!this.voiceButtonBg) return;
+
+    this.voiceButtonBg.clear();
+
+    const bgColor = isMuted ? 0xE53E3E : 0x48BB78; // 紅色表示靜音，綠色表示正常
+    const alpha = 0.9;
+
+    this.voiceButtonBg.circle(0, 0, size / 2);
+    this.voiceButtonBg.fill({ color: bgColor, alpha });
+    this.voiceButtonBg.stroke({ width: 2, color: 0xFFFFFF, alpha: 0.5 });
+  }
+
+  /**
+   * 繪製語音按鈕背景（含連線狀態）
+   * @param {number} size - 按鈕大小
+   * @param {'disconnected' | 'connecting' | 'connected' | 'muted'} state - 狀態
+   */
+  drawVoiceButtonBgWithState(size, state) {
+    if (!this.voiceButtonBg) return;
+
+    this.voiceButtonBg.clear();
+
+    let bgColor;
+    let alpha = 0.9;
+
+    switch (state) {
+      case 'disconnected':
+        bgColor = 0x667EEA; // 藍紫色 - 未連線
+        break;
+      case 'connecting':
+        bgColor = 0xED8936; // 橙色 - 連線中
+        break;
+      case 'connected':
+        bgColor = 0x48BB78; // 綠色 - 已連線
+        break;
+      case 'muted':
+        bgColor = 0xE53E3E; // 紅色 - 已靜音
+        break;
+      default:
+        bgColor = 0x667EEA;
+    }
+
+    this.voiceButtonBg.circle(0, 0, size / 2);
+    this.voiceButtonBg.fill({ color: bgColor, alpha });
+    this.voiceButtonBg.stroke({ width: 2, color: 0xFFFFFF, alpha: 0.5 });
+  }
+
+  /**
+   * 設定語音按鈕狀態
+   * @param {boolean} isMuted - 是否靜音
+   */
+  setVoiceMuted(isMuted) {
+    this.isVoiceMuted = isMuted;
+
+    if (!this.voiceButtonIcon || !this.voiceButtonBg) return;
+
+    const isHorizontal = (this.position === 'bottom' || this.position === 'top');
+    const buttonSize = isHorizontal ? 28 : 24;
+
+    // 更新圖示和背景
+    if (this.position === 'bottom') {
+      // 自己的麥克風
+      if (this.isVoiceConnected) {
+        this.voiceButtonIcon.text = isMuted ? '🔇' : '🎤';
+        this.drawVoiceButtonBgWithState(buttonSize, isMuted ? 'muted' : 'connected');
+      }
+      // 未連線時不更新（保持連線圖示）
+    } else {
+      // 其他玩家的靜音狀態
+      this.voiceButtonIcon.text = isMuted ? '🔇' : '🔊';
+      this.drawVoiceButtonBg(buttonSize, isMuted);
+    }
+  }
+
+  /**
+   * 設定語音連線狀態（僅限底部玩家）
+   * @param {'disconnected' | 'connecting' | 'connected'} state - 連線狀態
+   */
+  setVoiceConnectionState(state) {
+    if (this.position !== 'bottom') return;
+
+    const isHorizontal = true; // 底部玩家是水平布局
+    const buttonSize = 28;
+
+    this.isVoiceConnecting = (state === 'connecting');
+    this.isVoiceConnected = (state === 'connected');
+
+    if (!this.voiceButtonIcon || !this.voiceButtonBg) return;
+
+    switch (state) {
+      case 'disconnected':
+        this.voiceButtonIcon.text = '📞';
+        this.drawVoiceButtonBgWithState(buttonSize, 'disconnected');
+        break;
+      case 'connecting':
+        this.voiceButtonIcon.text = '⏳';
+        this.drawVoiceButtonBgWithState(buttonSize, 'connecting');
+        break;
+      case 'connected':
+        this.voiceButtonIcon.text = this.isVoiceMuted ? '🔇' : '🎤';
+        this.drawVoiceButtonBgWithState(buttonSize, this.isVoiceMuted ? 'muted' : 'connected');
+        break;
+    }
+  }
+
+  /**
+   * 顯示/隱藏語音按鈕
+   * @param {boolean} visible - 是否顯示
+   */
+  setVoiceButtonVisible(visible) {
+    if (this.voiceButton) {
+      // 底部玩家的按鈕始終顯示（狀態由 setVoiceConnectionState 控制）
+      if (this.position === 'bottom') {
+        this.voiceButton.visible = true;
+        // 更新連線狀態
+        this.setVoiceConnectionState(visible ? 'connected' : 'disconnected');
+      } else {
+        // 其他玩家：語音連線後才顯示靜音按鈕
+        this.voiceButton.visible = visible;
+        this.isVoiceConnected = visible;
+      }
     }
   }
 

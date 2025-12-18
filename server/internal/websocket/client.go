@@ -130,6 +130,13 @@ func (c *Client) handleMessage(data []byte) {
 		// 處理 WebRTC 信令轉發
 		c.handleWebRTCSignal(msg.Data)
 
+	// [TEMP] IP 偵測功能 - 之後要移除時，刪除這個 case
+	case "client_ip":
+		if ip, ok := msg.Data["ip"].(string); ok {
+			log.Printf("[TEMP] 玩家 %s 的 IP: %s", c.UserName, ip)
+		}
+	// [TEMP] END
+
 	default:
 		log.Printf("未知訊息類型: %s", msg.Type)
 	}

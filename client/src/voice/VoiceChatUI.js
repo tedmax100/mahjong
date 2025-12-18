@@ -18,6 +18,12 @@ export class VoiceChatUI {
     // Callback for talking indicator in game
     this.onPlayerTalkingChange = null; // (peerId, isTalking) => void
 
+    // Callback for voice connection state change (show/hide game voice buttons)
+    this.onVoiceConnectionChange = null; // (isConnected) => void
+
+    // Callback for mute state change (sync with game voice buttons)
+    this.onMuteStateChange = null; // (peerId, isMuted, isSelf) => void
+
     this.createUI();
     this.bindEvents();
   }
@@ -360,6 +366,9 @@ export class VoiceChatUI {
     this.statusText = this.container.querySelector('.voice-status');
     this.errorDiv = this.container.querySelector('.voice-error');
     this.permissionHint = this.container.querySelector('.voice-permission-hint');
+
+    // 預設隱藏浮動面板（改用玩家名牌上的按鈕控制）
+    this.container.style.display = 'none';
   }
 
   /**
@@ -414,6 +423,11 @@ export class VoiceChatUI {
   handleMuteClick() {
     const isMuted = this.voiceChat.toggleMute();
     this.updateMuteUI(isMuted);
+
+    // Notify game to sync voice button state
+    if (this.onMuteStateChange) {
+      this.onMuteStateChange(this.voiceChat.myUserId, isMuted, true);
+    }
   }
 
   /**
@@ -428,6 +442,19 @@ export class VoiceChatUI {
     // Update toggle button
     this.toggleBtn.classList.toggle('muted', isMuted);
     this.toggleIcon.textContent = isMuted ? '🔇' : '🎙️';
+  }
+
+  /**
+   * Update peer mute button UI (sync from game voice buttons)
+   * @param {string} peerId - Peer ID
+   * @param {boolean} isMuted - Mute state
+   */
+  updatePeerMuteUI(peerId, isMuted) {
+    const controls = this.playerControls.get(peerId);
+    if (controls && controls.muteBtn) {
+      controls.muteBtn.classList.toggle('muted', isMuted);
+      controls.muteBtn.textContent = isMuted ? '🔇' : '🔊';
+    }
   }
 
   /**
@@ -466,6 +493,11 @@ export class VoiceChatUI {
 
       // Resume audio (handle autoplay policy)
       await this.voiceChat.resumeAudio();
+
+      // Notify game to show voice buttons
+      if (this.onVoiceConnectionChange) {
+        this.onVoiceConnectionChange(true);
+      }
     } else {
       this.connectText.textContent = '連線';
     }
@@ -494,6 +526,11 @@ export class VoiceChatUI {
     // Reset all player indicators
     for (const [peerId, controls] of this.playerControls) {
       controls.indicator.classList.remove('talking', 'connected', 'disconnected', 'connecting');
+    }
+
+    // Notify game to hide voice buttons
+    if (this.onVoiceConnectionChange) {
+      this.onVoiceConnectionChange(false);
     }
   }
 
@@ -527,6 +564,11 @@ export class VoiceChatUI {
         muteBtn.classList.toggle('muted', isMuted);
         muteBtn.textContent = isMuted ? '🔇' : '🔊';
         muteBtn.title = isMuted ? `解除靜音 ${player.name}` : `靜音 ${player.name}`;
+
+        // Notify game to sync voice button state
+        if (this.onMuteStateChange) {
+          this.onMuteStateChange(player.id, isMuted, false);
+        }
       });
 
       this.playerList.appendChild(item);

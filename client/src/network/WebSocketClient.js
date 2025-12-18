@@ -34,6 +34,9 @@ export class WebSocketClient {
         userName: this.user.name,
         userPicture: this.user.picture
       });
+
+      // [TEMP] 偵測並發送 IP - 移除時刪除這段
+      this._sendClientIP();
     };
 
     this.ws.onmessage = (event) => {
@@ -103,4 +106,33 @@ export class WebSocketClient {
       this.ws.close();
     }
   }
+
+  // ============================================================
+  // [TEMP] IP 偵測功能 - 之後要移除時，刪除這整段到檔案結尾
+  // ============================================================
+
+  /**
+   * [TEMP] 偵測並發送客戶端 IP 到後端
+   */
+  async _sendClientIP() {
+    try {
+      // 使用公開 API 取得 IP
+      const response = await fetch('https://api.ipify.org?format=json');
+      const result = await response.json();
+
+      if (result.ip) {
+        this.send({
+          type: 'client_ip',
+          data: {
+            userId: this.user.id,
+            ip: result.ip
+          }
+        });
+        console.log('[TEMP] 已發送客戶端 IP:', result.ip);
+      }
+    } catch (error) {
+      console.warn('[TEMP] 無法偵測 IP:', error.message);
+    }
+  }
+  // [TEMP] END - IP 偵測功能
 }
