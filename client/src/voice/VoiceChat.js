@@ -39,13 +39,38 @@ export class VoiceChat {
     // Talking state tracking
     this.talkingStates = new Map(); // peerId -> boolean
 
-    // STUN server configuration (Google public servers)
+    // STUN/TURN server configuration
+    // TURN servers are required when direct P2P connection fails (NAT traversal)
     this.rtcConfig = {
       iceServers: [
+        // STUN servers (for discovering public IP)
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' }
-      ]
+        // Free TURN servers from Open Relay Project (metered.ca)
+        // These are for testing - consider using paid service for production
+        {
+          urls: 'turn:a.relay.metered.ca:80',
+          username: 'e8dd65b92f6107b6b4156952',
+          credential: 'uWdWNmkhvyqTEuFV'
+        },
+        {
+          urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+          username: 'e8dd65b92f6107b6b4156952',
+          credential: 'uWdWNmkhvyqTEuFV'
+        },
+        {
+          urls: 'turn:a.relay.metered.ca:443',
+          username: 'e8dd65b92f6107b6b4156952',
+          credential: 'uWdWNmkhvyqTEuFV'
+        },
+        {
+          urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+          username: 'e8dd65b92f6107b6b4156952',
+          credential: 'uWdWNmkhvyqTEuFV'
+        }
+      ],
+      // Force TURN relay for testing (uncomment to debug)
+      // iceTransportPolicy: 'relay'
     };
 
     // Audio constraints (audio only, no video)
@@ -282,6 +307,29 @@ export class VoiceChat {
     // Handle ICE connection state changes
     pc.oniceconnectionstatechange = () => {
       console.log(`[VoiceChat] ICE state with ${peerId}: ${pc.iceConnectionState}`);
+
+      // Log more details when connection fails
+      if (pc.iceConnectionState === 'failed') {
+        console.error(`[VoiceChat] ICE connection FAILED with ${peerId} - likely NAT traversal issue`);
+        console.log('[VoiceChat] Try checking: 1) TURN server availability 2) Firewall settings');
+      } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        // Get connection stats to see if using relay
+        pc.getStats().then(stats => {
+          stats.forEach(report => {
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+              console.log(`[VoiceChat] Connection type with ${peerId}:`, {
+                local: report.localCandidateId,
+                remote: report.remoteCandidateId
+              });
+            }
+            if (report.type === 'local-candidate' || report.type === 'remote-candidate') {
+              if (report.candidateType === 'relay') {
+                console.log(`[VoiceChat] Using TURN relay for ${peerId}`);
+              }
+            }
+          });
+        });
+      }
     };
 
     // Handle connection state changes

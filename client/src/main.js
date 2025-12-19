@@ -364,9 +364,11 @@ class MahjongApp {
 
       const container = document.getElementById('game-container');
 
-      // 使用視窗大小（響應式設計）
-      const CANVAS_WIDTH = window.innerWidth;
-      const CANVAS_HEIGHT = window.innerHeight;
+      // 固定最小尺寸，如果螢幕更大則使用螢幕尺寸
+      const MIN_WIDTH = 1280;
+      const MIN_HEIGHT = 720;
+      const CANVAS_WIDTH = Math.max(window.innerWidth, MIN_WIDTH);
+      const CANVAS_HEIGHT = Math.max(window.innerHeight, MIN_HEIGHT);
 
       console.log(`📐 畫布尺寸: ${CANVAS_WIDTH}x${CANVAS_HEIGHT}`);
 
@@ -391,10 +393,10 @@ class MahjongApp {
       await this.game.init();
       console.log('✅ 遊戲初始化完成');
 
-      // 新增視窗大小調整（響應式）
+      // 新增視窗大小調整（響應式，但有最小尺寸限制）
       window.addEventListener('resize', () => {
-        const newWidth = window.innerWidth;
-        const newHeight = window.innerHeight;
+        const newWidth = Math.max(window.innerWidth, MIN_WIDTH);
+        const newHeight = Math.max(window.innerHeight, MIN_HEIGHT);
         console.log(`🔄 視窗調整: ${newWidth}x${newHeight}`);
         this.app.renderer.resize(newWidth, newHeight);
         if (this.game) {
