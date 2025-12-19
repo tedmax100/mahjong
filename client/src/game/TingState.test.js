@@ -6,21 +6,44 @@ import { Player } from './Player.js';
 vi.mock('pixi.js', () => ({
   Application: class {},
   Container: class {
-    constructor() { this.children = []; this.addChild = () => {}; this.removeChildren = () => {}; this.destroy = () => {}; }
+    constructor() {
+      this.children = [];
+      this.addChild = () => {};
+      this.removeChild = () => {};
+      this.removeChildren = () => {};
+      this.destroy = () => {};
+      this.on = () => this;
+      this.off = () => this;
+      this.eventMode = 'none';
+      this.cursor = 'default';
+      this.visible = true;
+      this.x = 0;
+      this.y = 0;
+      this.alpha = 1;
+      this.scale = { x: 1, y: 1, set: () => {} };
+      this.pivot = { x: 0, y: 0, set: () => {} };
+    }
   },
   Graphics: class {
-    constructor() { 
-      this.clear = () => {}; 
-      this.beginFill = () => {}; 
-      this.drawRect = () => {}; 
-      this.rect = () => {}; 
-      this.endFill = () => {}; 
-      this.fill = () => {}; 
-      this.roundRect = () => {}; 
-      this.stroke = () => {};
+    constructor() {
+      this.clear = () => this;
+      this.beginFill = () => this;
+      this.drawRect = () => this;
+      this.rect = () => this;
+      this.endFill = () => this;
+      this.fill = () => this;
+      this.roundRect = () => this;
+      this.stroke = () => this;
+      this.circle = () => this;
+      this.moveTo = () => this;
+      this.lineTo = () => this;
       this.addChild = () => {};
       this.removeChildren = () => {};
       this.destroy = () => {};
+      this.eventMode = 'none';
+      this.cursor = 'default';
+      this.on = () => this;
+      this.visible = true;
     }
   },
   Sprite: class {
