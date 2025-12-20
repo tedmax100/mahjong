@@ -320,6 +320,11 @@ class MahjongApp {
         console.error('[VoiceChat] 連線失敗:', error);
         // 恢復為未連線狀態
         this.game.setBottomPlayerVoiceState('disconnected');
+
+        // 在遊戲界面中顯示錯誤訊息
+        if (this.game.showAnnouncement) {
+          this.game.showAnnouncement('語音連線失敗，請檢查麥克風權限', 3000);
+        }
       }
     } else {
       // 斷線

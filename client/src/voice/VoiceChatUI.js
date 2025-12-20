@@ -500,6 +500,9 @@ export class VoiceChatUI {
       }
     } else {
       this.connectText.textContent = '連線';
+      this.connectBtn.disabled = false;
+      // 拋出錯誤以便呼叫者能夠處理（例如恢復遊戲中的按鈕狀態）
+      throw new Error('Voice chat initialization failed');
     }
 
     this.connectBtn.disabled = false;

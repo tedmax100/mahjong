@@ -124,9 +124,30 @@ export class VoiceChat {
     try {
       console.log('[VoiceChat] Requesting microphone permission...');
 
-      this.localStream = await navigator.mediaDevices.getUserMedia(
-        this.audioConstraints
-      );
+      // 檢測是否為 iOS/iPad
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      // iOS 使用更簡單的音頻約束以提高兼容性
+      const constraints = isIOS ? {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true
+        },
+        video: false
+      } : this.audioConstraints;
+
+      console.log(`[VoiceChat] Using ${isIOS ? 'iOS' : 'standard'} audio constraints`);
+
+      // 添加超時機制，防止 getUserMedia 永遠等待
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout')), 15000);
+      });
+
+      this.localStream = await Promise.race([
+        navigator.mediaDevices.getUserMedia(constraints),
+        timeoutPromise
+      ]);
 
       console.log('[VoiceChat] Microphone access granted');
 
@@ -149,13 +170,19 @@ export class VoiceChat {
 
       if (error.name === 'NotAllowedError') {
         errorType = 'permission_denied';
-        errorMessage = '麥克風權限被拒絕';
+        errorMessage = '麥克風權限被拒絕。請在瀏覽器設定中允許麥克風權限。';
       } else if (error.name === 'NotFoundError') {
         errorType = 'no_device';
         errorMessage = '找不到麥克風設備';
       } else if (error.name === 'NotReadableError') {
         errorType = 'device_in_use';
         errorMessage = '麥克風正在被其他應用程式使用';
+      } else if (error.message === 'Timeout') {
+        errorType = 'timeout';
+        errorMessage = '麥克風權限請求超時。請確認已授予權限後重試。';
+      } else if (error.name === 'OverconstrainedError') {
+        errorType = 'overconstrained';
+        errorMessage = '麥克風不支援所需的音頻格式';
       }
 
       if (this.onError) {
