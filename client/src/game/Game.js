@@ -845,7 +845,9 @@ ${'='.repeat(60)}`);
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      player.removeTile(tile);
+      // 對於其他玩家（非自己），手牌都是 'back' 類型，需要移除 'back' 而非實際牌名
+      const tileToRemove = (visualPosition === 0) ? tile : 'back';
+      player.removeTile(tileToRemove);
 
       // 📋 記錄打牌後的手牌狀態
       setTimeout(() => {
