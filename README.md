@@ -1,149 +1,135 @@
-# 麻將專案 README
+# 台灣十六張麻將專案 README
 
 [![Security Scan](https://github.com/tedmax100/mahjong/actions/workflows/security.yml/badge.svg)](https://github.com/tedmax100/mahjong/actions/workflows/security.yml)
-![Go Coverage](https://img.shields.io/badge/Go_Coverage-34.8%25-red)
-![Frontend Coverage](https://img.shields.io/badge/Frontend_Coverage-14.3%25-red)
 
-這是一個16張台灣麻將的網頁遊戲專案。
+這是一個功能完整的台灣十六張麻將網頁遊戲專案，具備前後端分離、即時連線對戰、以及可選的 AI 提示功能。
 
-## ✨ 功能亮點
+## ✨ 架構亮點
 
-*   **前後端分離**: 採用 Go 語言後端與現代 JavaScript 前端分離的架構。
-*   **即時通訊**: 使用 WebSocket 技術實現玩家之間的即時互動。
-*   **一鍵啟動**: 透過 `Makefile` 整合了完整的開發、測試、建置與部署流程。
-*   **遠端測試**: 內建 Cloudflare Tunnel 整合，方便將本機服務暴露於公網進行測試。
+*   **微前端 (Micro-Frontends)**: 將使用者介面拆分為`大廳 (Lobby)`與`遊戲 (Game)`兩個獨立的前端應用，提高開發效率與可維護性。
+*   **服務導向後端 (Service-Oriented Backend)**: 後端拆分為`Lobby 認證服務`與`遊戲邏輯服務`，讓系統各部分職責分明。
+*   **即時遊戲體驗**: 使用 WebSocket 實現玩家間的即時出牌、吃、碰、槓、胡牌等操作。
+*   **AI 輔助**: 整合 [Ollama](https://ollama.com/)，在本機運行大型語言模型 (LLM)，為玩家提供出牌建議。
+*   **一鍵式開發環境**: 透過 `Makefile` 整合了所有服務的啟動、安裝、測試與建置流程，簡化了開發設定。
+*   **容器化部署**: 提供 `Dockerfile`，可將遊戲服務打包成獨立的 Docker 映像檔，方便部署。
 
 ## 🛠️ 技術棧 (Tech Stack)
 
 *   **後端 (Backend)**: Go
-*   **前端 (Frontend)**: JavaScript (使用 [Vite](https://vitejs.dev/) 作為建置工具)
-*   **即時通訊 (Real-time Communication)**: WebSocket
+*   **前端 (Frontend)**:
+    *   **遊戲端**: JavaScript + [PixiJS](https://pixijs.com/) (用於 2D 渲染)
+    *   **大廳端**: 純 JavaScript
+    *   **建置工具**: [Vite](https://vitejs.dev/)
+*   **即時通訊 (Real-time)**: WebSocket
+*   **AI 模型服務**: Ollama + Docker
+*   **認證 (Authentication)**: Google OAuth 2.0 + JWT
+
+## 📂 專案結構
+
+```
+/
+├── server/          # Go 後端原始碼
+│   ├── cmd/main.go      # 遊戲邏輯主服務 (WebSocket)
+│   └── cmd/lobby/main.go  # Lobby 與認證代理服務
+├── lobby-client/    # 大廳介面前端專案
+├── game-client/     # 遊戲介面前端專案
+├── game-bundle/     # 遊戲獨立部署包 (整合後端與 game-client)
+├── docker-compose.yaml # AI 服務 (Ollama) 的設定
+└── Makefile         # 自動化指令腳本
+```
 
 ## 🚀 如何開始 (Getting Started)
+
+推薦使用分離式前端的模式進行開發，此模式會完整啟動所有服務。
 
 #### 1. 環境準備
 
 請確保您已安裝以下軟體：
-
 *   `make`
-*   `Go` (建議版本 1.20+)
-*   `Node.js` (建議版本 18+) 及 `npm`
-*   (選用) `cloudflared` - 若要使用 `make start` 功能，會自動為您安裝。
+*   `go` (建議版本 1.20+)
+*   `node` & `npm` (建議版本 18+)
+*   `docker` & `docker-compose` (若要啟用 AI 功能)
 
-執行 LLM
+#### 2. 設定環境變數
+
+Lobby 伺服器需要 Google OAuth 的憑證。
 ```bash
-docker compose up -d
+cp server/.env.example server/.env
+```
+然後編輯 `server/.env` 檔案，填入您的 `GOOGLE_CLIENT_ID` 和 `GOOGLE_CLIENT_SECRET`。
 
-## 選用gemma3 270m
-docker exec -it qwen_server ollama run gemma3:270m
+#### 3. 安裝所有依賴
+
+此指令會安裝後端、大廳前端、遊戲前端的所有依賴項目。
+```bash
+make install-all
 ```
 
-#### 2. 安裝依賴
+#### 4. 啟動開發環境
 
-進入專案根目錄，執行以下指令來安裝前後端的所有依賴項目：
-
-```bash
-make install
-```
-
-#### 3. 運行開發環境
-
-您可以根據需求選擇不同的啟動方式：
-
-*   **純本機開發** (推薦日常開發使用)
-    此模式會在本機啟動後端伺服器 (`:8080`) 與前端開發伺服器 (`:5173`)。
-
+*   **啟動所有服務（推薦）**
+    此指令會同時啟動後端兩個服務、前端兩個開發伺服器。
     ```bash
-    make dev
+    make dev-all
+    ```
+    啟動後，各服務的位址為：
+    *   **大廳前端**: `http://localhost:5174` (由此進入遊戲)
+    *   **遊戲前端**: `http://localhost:5175`
+    *   **Lobby 後端**: `http://localhost:3001`
+    *   **遊戲後端**: `http://localhost:8080`
+
+*   **啟動 AI 建議功能 (可選)**
+    ```bash
+    docker compose up -d
+    ```
+    第一次啟動後，需要手動下載模型：
+    ```bash
+    docker exec -it qwen_server ollama pull gemma:2b
     ```
 
-*   **本機開發並建立公網通道**
-    此模式除了啟動本機服務外，還會使用 Cloudflare Tunnel 建立一個臨時的公開網址，讓其他人可以存取您的本機前端服務。
-
-    ```bash
-    make start
-    ```
-
-#### 4. 停止所有服務
-
-若要停止所有由 `make` 啟動的服務 (包含後端、前端與 tunnel)，請執行：
+#### 5. 停止所有服務
 
 ```bash
 make stop
 ```
 
-## 🧪 如何測試 (Running Tests)
+## 📦 如何建置與部署
 
-使用以下指令來運行前端的單元測試：
+本專案支援將`遊戲服務`與`遊戲前端`打包成一個獨立的應用程式進行部署。
 
+#### 1. 建立部署包
+
+此指令會建置 `game-client`，並將其與編譯後的 `mahjong-server` 執行檔一起放入 `game-bundle/dist` 目錄。
 ```bash
-make test
+make build-game-bundle
 ```
 
-您也可以使用 Vitest 的 UI 模式來進行互動式測試：
+#### 2. 使用 Docker 進行部署 (推薦)
 
+專案已預設 `game-bundle/Dockerfile`，可直接用來建置與運行遊戲服務。
 ```bash
+# 步驟 1: 建置 Docker 映像
+make docker-build-game
+
+# 步驟 2: 運行 Docker 容器
+make docker-run-game
+```
+服務將會運行在 `http://localhost:8080`。
+
+## 🧪 如何測試
+
+目前專案提供針對 `game-client` 的單元測試。
+```bash
+# 運行所有測試
+make test
+
+# 啟動互動式測試介面
 make test-ui
 ```
 
-## 📦 如何建置 (Building for Production)
-
-執行以下指令來建置用於生產環境的前後端應用程式：
-
-```bash
-make build
-```
-
-*   後端應用程式會被編譯成執行檔 `mahjong-server` 並放置於專案根目錄。
-*   前端的靜態檔案會被建置到 `client/dist` 目錄下。
-
 ## 📜 可用指令
 
-本專案 `Makefile` 中包含了許多便利的指令，您可以執行 `make help` 來查看所有可用的指令及其說明。
-
+`Makefile` 提供了豐富的指令來簡化開發流程，您可以執行 `make help` 來查看所有可用的指令與其說明。
 ```bash
 make help
 ```
-
-
-```
- server/                                                                                                                                                                  
-  ├── cmd/                                                                                                                                                                 
-  │   ├── main.go              # 麻將遊戲伺服器 (Port 8080)                                                                                                                
-  │   └── lobby/                                                                                                                                                           
-  │       └── main.go          # Lobby & Auth Proxy (Port 3001)                                                                                                            
-  ├── internal/auth/                                                                                                                                                       
-  │   ├── keys.go              # RSA 金鑰管理 & JWT 簽發                                                                                                                   
-  │   ├── oauth.go             # Google OAuth 處理器                                                                                                                       
-  │   ├── jwks_handler.go      # JWKS 端點                                                                                                                                 
-  │   ├── origin.go            # Origin 白名單驗證                                                                                                                         
-  │   └── middleware.go        # JWT 驗證中介軟體（遊戲伺服器用）                                                                                                          
-  └── .env.example             # 環境變數範本                                                                                                                              
-                                                                                                                                                                           
-  Makefile Commands                                                                                                                                                        
-                                                                                                                                                                           
-  make start-backend     # 啟動遊戲伺服器 (Port 8080)                                                                                                                      
-  make start-lobby       # 啟動 Lobby & Auth Proxy (Port 3001)                                                                                                             
-  make dev-with-auth     # 啟動全部（遊戲 + 前端 + Lobby）                                                                                                                 
-  make build             # 構建兩個執行檔 (mahjong-server, mahjong-lobby)                                                                                                  
-                                                                                                                                                                           
-  Environment Variables                                                                                                                                                    
-                                                                                                                                                                           
-  # Lobby 伺服器必要設定                                                                                                                                                   
-  GOOGLE_CLIENT_ID=xxx                                                                                                                                                     
-  GOOGLE_CLIENT_SECRET=xxx                                                                                                                                                 
-  AUTH_PROXY_URL=http://localhost:3001  # 或生產環境網址                                                                                                                   
-  SESSION_SECRET=xxx                                                                                                                                                       
-                                                                                                                                                                           
-  # 遊戲伺服器（可選，啟用 JWT 驗證）                                                                                                                                      
-  AUTH_PROXY_URL=http://localhost:3001                                                                                                                                     
-                                                                                                                                                                           
-  啟動方式                                                                                                                                                                 
-                                                                                                                                                                           
-  # 1. 複製並設定環境變數                                                                                                                                                  
-  cp server/.env.example server/.env                                                                                                                                       
-  # 編輯 .env 填入 Google OAuth 憑證                                                                                                                                       
-                                                                                                                                                                           
-  # 2. 啟動全部服務                                                                                                                                                        
-  make dev-with-auth              
-  ```
