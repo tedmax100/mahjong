@@ -59,13 +59,21 @@ type ClientMessage struct {
 func (c *LobbyClient) readPump() {
 	defer func() {
 		c.hub.Unregister(c)
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			log.Printf("[LobbyClient] readPump: 關閉連接錯誤: %v", err)
+		}
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		log.Printf("[LobbyClient] readPump: 設定讀取超時錯誤: %v", err)
+		return
+	}
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+			log.Printf("[LobbyClient] readPump: 設定 Pong 讀取超時錯誤: %v", err)
+			return err
+		}
 		return nil
 	})
 
@@ -87,15 +95,22 @@ func (c *LobbyClient) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			log.Printf("[LobbyClient] writePump: 關閉連接錯誤: %v", err)
+		}
 	}()
 
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				log.Printf("[LobbyClient] writePump: 設定寫入超時錯誤: %v", err)
+				return
+			}
 			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+					log.Printf("[LobbyClient] writePump: 發送關閉訊息錯誤: %v", err)
+				}
 				return
 			}
 
@@ -103,13 +118,22 @@ func (c *LobbyClient) writePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
+			if err := w.Write(message); err != nil {
+				log.Printf("[LobbyClient] writePump: 寫入訊息錯誤: %v", err)
+				return
+			}
 
 			// 批量發送隊列中的訊息
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.send)
+				if err := w.Write([]byte{'\n'}); err != nil {
+					log.Printf("[LobbyClient] writePump: 寫入換行符錯誤: %v", err)
+					return
+				}
+				if err := w.Write(<-c.send); err != nil {
+					log.Printf("[LobbyClient] writePump: 寫入隊列訊息錯誤: %v", err)
+					return
+				}
 			}
 
 			if err := w.Close(); err != nil {
@@ -117,8 +141,12 @@ func (c *LobbyClient) writePump() {
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				log.Printf("[LobbyClient] writePump: 設定 ping 寫入超時錯誤: %v", err)
+				return
+			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Printf("[LobbyClient] writePump: 發送 ping 訊息錯誤: %v", err)
 				return
 			}
 		}
