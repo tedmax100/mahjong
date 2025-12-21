@@ -52,7 +52,7 @@ func main() {
 		lobbyServiceURL = "http://localhost:3001"
 	}
 	if lobbyInternalSecret == "" {
-		log.Fatal("LOBBY_INTERNAL_SECRET environment variable not set. Please set it to a strong, unique secret.")
+		lobbyInternalSecret = "dev-internal-secret"
 	}
 
 	lobbyNotifier := lobby.NewHTTPLobbyNotifier(lobbyServiceURL, lobbyInternalSecret)
