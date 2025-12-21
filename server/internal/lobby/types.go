@@ -15,6 +15,8 @@ type LobbyRoom struct {
 	IsPublic    bool      `json:"isPublic"`
 	Status      string    `json:"status"` // waiting, playing, closed
 	ServerAddr  string    `json:"serverAddr"`
+	ServerID    string    `json:"serverId,omitempty"`   // 伺服器 ID（外部伺服器用）
+	IsExternal  bool      `json:"isExternal,omitempty"` // 是否外部伺服器
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }

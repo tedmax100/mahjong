@@ -23,6 +23,7 @@ func main() {
 	authProxyURL := getEnv("AUTH_PROXY_URL", "http://localhost:3001")
 	gameServerURL := getEnv("GAME_SERVER_URL", "http://localhost:8080")
 	lobbyInternalSecret := getEnv("LOBBY_INTERNAL_SECRET", "dev-internal-secret")
+	externalServerSecret := getEnv("EXTERNAL_SERVER_SECRET", "dev-external-secret")
 	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
 	googleClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
 	sessionSecret := getEnv("SESSION_SECRET", "dev-secret")
@@ -60,6 +61,20 @@ func main() {
 	lobbyHandler := lobby.NewHandler(lobbyStore, lobbyHub, gameServerURL, lobbyInternalSecret)
 	lobbyWsHandler := lobby.NewLobbyWsHandler(lobbyHub)
 
+	// 建立外部伺服器組件
+	externalServerStore := lobby.NewExternalServerStore(externalServerSecret)
+	externalServerHandler := lobby.NewExternalServerHandler(
+		externalServerStore,
+		lobbyStore,
+		lobbyHub,
+		lobbyInternalSecret,
+		externalServerSecret,
+	)
+	// 設置伺服器離線回調
+	externalServerStore.SetOnOfflineCallback(externalServerHandler.OnServerOffline)
+	// 啟動心跳監控
+	externalServerStore.StartMonitor()
+
 	// 啟動大廳 Hub
 	go lobbyHub.Run()
 
@@ -83,10 +98,11 @@ func main() {
 	// 健康檢查
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"status":      "ok",
-			"service":     "mahjong-lobby",
-			"onlineCount": lobbyHub.GetOnlineCount(),
-			"roomCount":   lobbyStore.PublicRoomCount(),
+			"status":              "ok",
+			"service":             "mahjong-lobby",
+			"onlineCount":         lobbyHub.GetOnlineCount(),
+			"roomCount":           lobbyStore.PublicRoomCount(),
+			"externalServerCount": externalServerStore.OnlineCount(),
 		})
 	})
 
@@ -112,6 +128,19 @@ func main() {
 		internalGroup.POST("/room-events", lobbyHandler.HandleRoomEvent)
 	}
 
+	// 外部伺服器 API
+	externalGroup := r.Group("/internal/external-servers")
+	{
+		// 註冊需要共享密鑰
+		externalGroup.POST("/register", externalServerHandler.Register)
+		// 其他操作需要 JWT Token（在 handler 中驗證）
+		externalGroup.POST("/:serverId/heartbeat", externalServerHandler.Heartbeat)
+		externalGroup.POST("/:serverId/room-events", externalServerHandler.HandleRoomEvent)
+		externalGroup.DELETE("/:serverId", externalServerHandler.Deregister)
+		// 管理端點（需要內部密鑰）
+		externalGroup.GET("", lobby.InternalAuthMiddleware(lobbyInternalSecret), externalServerHandler.ListServers)
+	}
+
 	// 大廳 WebSocket
 	r.GET("/ws/lobby", lobbyWsHandler.ServeWs)
 
@@ -126,6 +155,7 @@ func main() {
 	log.Printf("   JWKS:        http://localhost:%s/.well-known/jwks.json", port)
 	log.Printf("   大廳 API:    http://localhost:%s/api/lobby/rooms", port)
 	log.Printf("   大廳 WS:     ws://localhost:%s/ws/lobby", port)
+	log.Printf("   外部伺服器:  http://localhost:%s/internal/external-servers", port)
 	log.Println("=====================================")
 	log.Println("")
 

@@ -1,0 +1,147 @@
+import { Container, Sprite, Assets } from 'pixi.js';
+
+/**
+ * 遊戲動作按鈕（碰、吃、槓、胡）
+ */
+export class ActionButtons {
+  constructor(screenWidth, screenHeight) {
+    this.screenWidth = screenWidth;
+    this.screenHeight = screenHeight;
+    this.container = new Container();
+    this.buttons = {}; // 儲存各個按鈕
+    this.visible = false;
+    this.callbacks = {}; // 儲存回呼函數
+
+    // 按鈕配置
+    this.buttonConfigs = [
+      { action: 'pong', image: '/assets/ui/Pong.png', x: -240 },
+      { action: 'chow', image: '/assets/ui/Chow.png', x: -120 },
+      { action: 'kong', image: '/assets/ui/Kong.png', x: 0 },
+      { action: 'ready', image: '/assets/ui/ting.png', x: 120 },
+      { action: 'hu', image: '/assets/ui/Hu.png', x: 240 },
+      { action: 'cancel', image: '/assets/ui/playcancel.png', x: 360 }
+    ];
+
+    this.init();
+  }
+
+  async init() {
+    console.log('開始載入動作按鈕...');
+
+    // 載入所有按鈕圖片
+    for (const config of this.buttonConfigs) {
+      try {
+        const texture = await Assets.load(config.image);
+        const button = new Sprite(texture);
+
+        button.anchor.set(0.5);
+        button.scale.set(0.8); // 縮小按鈕
+        button.x = this.screenWidth / 2 + config.x;
+        button.y = this.screenHeight - 250; // 按鈕位置（在手牌上方）
+
+        // 設定為可互動
+        button.eventMode = 'static';
+        button.cursor = 'pointer';
+
+        // 新增點擊事件
+        button.on('pointerdown', () => this.onButtonClick(config.action));
+
+        // 新增懸停效果
+        button.on('pointerover', () => {
+          button.scale.set(0.9);
+        });
+        button.on('pointerout', () => {
+          button.scale.set(0.8);
+        });
+
+        this.buttons[config.action] = button;
+        this.container.addChild(button);
+
+        console.log(`✅ 按鈕載入成功: ${config.action}`);
+      } catch (error) {
+        console.warn(`⚠️ 無法載入按鈕圖片: ${config.image}`, error);
+        // 即使圖片載入失敗，也不要中斷初始化
+      }
+    }
+
+    // 初始隱藏所有按鈕
+    this.hide();
+
+    console.log('✅ 動作按鈕初始化完成');
+  }
+
+  /**
+   * 顯示指定的按鈕
+   * @param {Array<string>} actions - 要顯示的動作列表，例如 ['pong', 'chow', 'cancel']
+   */
+  show(actions) {
+    // 先隱藏所有按鈕
+    this.hide();
+
+    // 顯示指定的按鈕
+    actions.forEach(action => {
+      if (this.buttons[action]) {
+        this.buttons[action].visible = true;
+      }
+    });
+
+    this.visible = true;
+    this.container.visible = true;
+  }
+
+  /**
+   * 隱藏所有按鈕
+   */
+  hide() {
+    Object.values(this.buttons).forEach(button => {
+      button.visible = false;
+    });
+    this.visible = false;
+    this.container.visible = false;
+  }
+
+  /**
+   * 按鈕點擊處理
+   */
+  onButtonClick(action) {
+    console.log(`✅ 按鈕點擊: ${action}`);
+    console.log('可用回呼:', Object.keys(this.callbacks));
+    console.log(`${action} 回呼存在?`, !!this.callbacks[action]);
+
+    // 隱藏按鈕
+    this.hide();
+
+    // 觸發回呼
+    if (this.callbacks[action]) {
+      console.log(`✅ 觸發 ${action} 回呼`);
+      this.callbacks[action]();
+    } else {
+      console.error(`❌ ${action} 回呼不存在`);
+    }
+  }
+
+  /**
+   * 設定按鈕回呼函數
+   * @param {string} action - 動作名稱
+   * @param {Function} callback - 回呼函數
+   */
+  on(action, callback) {
+    this.callbacks[action] = callback;
+  }
+
+  /**
+   * 調整按鈕位置（當螢幕大小改變時）
+   */
+  resize(width, height) {
+    this.screenWidth = width;
+    this.screenHeight = height;
+
+    // 重新定位所有按鈕
+    this.buttonConfigs.forEach(config => {
+      if (this.buttons[config.action]) {
+        this.buttons[config.action].x = width / 2 + config.x;
+        this.buttons[config.action].y = height - 250;
+      }
+    });
+  }
+}

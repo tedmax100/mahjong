@@ -1,6 +1,7 @@
 package lobby
 
 import (
+	"log"
 	"sync"
 	"time"
 
@@ -34,6 +35,7 @@ func (s *LobbyStore) AddRoom(room *LobbyRoom) {
 
 	room.UpdatedAt = time.Now()
 	s.rooms[room.ID] = room
+	log.Printf("[LobbyStore] 添加房間: %s (公開: %t, 狀態: %s, 玩家數: %d)", room.ID, room.IsPublic, room.Status, room.PlayerCount)
 }
 
 // UpdateRoom 更新房間資訊

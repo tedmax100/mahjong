@@ -167,8 +167,81 @@ install: ## 安裝所有依賴
 # Lobby & Auth Proxy 相關命令
 start-lobby: ## 啟動 Lobby & Auth Proxy 伺服器 (Port 3001)
 	@echo "$(GREEN)🏠 啟動 Lobby & Auth Proxy (Port 3001)...$(NC)"
-	@cd server && go run cmd/lobby/main.go
+	@cd server && GAME_SERVER_URL=http://localhost:5175 go run cmd/lobby/main.go
 
 dev-with-auth: ## 啟動本地開發環境（含 Lobby & Auth）
 	@echo "$(YELLOW)啟動本地開發環境（含認證）...$(NC)"
 	@$(MAKE) -j3 start-backend start-frontend start-lobby
+
+# ============================================
+# 分離式前端開發命令
+# ============================================
+
+dev-lobby: ## 啟動大廳前端開發 (Port 5174)
+	@echo "$(GREEN)🏠 啟動大廳前端 (Port 5174)...$(NC)"
+	@cd lobby-client && npm run dev
+
+dev-game: ## 啟動遊戲前端開發 (Port 5175)
+	@echo "$(GREEN)🎮 啟動遊戲前端 (Port 5175)...$(NC)"
+	@cd game-client && npm run dev
+
+dev-all: ## 啟動所有服務（分離模式）
+	@echo "$(YELLOW)啟動分離模式開發環境...$(NC)"
+	@$(MAKE) -j4 start-backend start-lobby dev-lobby dev-game
+
+# ============================================
+# 分離式前端構建命令
+# ============================================
+
+build-lobby-client: ## 構建大廳前端
+	@echo "$(YELLOW)構建大廳前端...$(NC)"
+	@cd lobby-client && npm run build
+	@echo "$(GREEN)✓ 大廳前端構建完成 → dist/lobby/$(NC)"
+
+build-game-client: ## 構建遊戲前端
+	@echo "$(YELLOW)構建遊戲前端...$(NC)"
+	@cd game-client && npm run build
+	@echo "$(GREEN)✓ 遊戲前端構建完成 → dist/game/$(NC)"
+
+build-game-bundle: build-game-client ## 構建遊戲獨立部署包
+	@echo "$(YELLOW)構建遊戲獨立部署包...$(NC)"
+	@mkdir -p game-bundle/dist
+	@cd server && go build -o ../game-bundle/dist/mahjong-game-server cmd/main.go
+	@cp -r dist/game/* game-bundle/dist/ 2>/dev/null || true
+	@echo "$(GREEN)✓ 遊戲獨立部署包已準備: game-bundle/dist/$(NC)"
+
+# ============================================
+# Docker 相關命令
+# ============================================
+
+docker-build-game: ## 構建遊戲 Docker 映像
+	@echo "$(YELLOW)構建遊戲 Docker 映像...$(NC)"
+	@docker build -f game-bundle/Dockerfile -t mahjong-game:latest .
+	@echo "$(GREEN)✓ Docker 映像構建完成: mahjong-game:latest$(NC)"
+
+docker-run-game: ## 運行遊戲 Docker 容器
+	@echo "$(YELLOW)運行遊戲 Docker 容器...$(NC)"
+	@docker run -d -p 8080:8080 --name mahjong-game mahjong-game:latest
+	@echo "$(GREEN)✓ 容器已啟動: http://localhost:8080$(NC)"
+
+docker-stop-game: ## 停止遊戲 Docker 容器
+	@docker stop mahjong-game 2>/dev/null || true
+	@docker rm mahjong-game 2>/dev/null || true
+	@echo "$(GREEN)✓ 容器已停止$(NC)"
+
+# ============================================
+# 安裝分離式前端依賴
+# ============================================
+
+install-lobby-client: ## 安裝大廳前端依賴
+	@echo "$(YELLOW)安裝大廳前端依賴...$(NC)"
+	@cd lobby-client && npm install
+	@echo "$(GREEN)✓ 大廳前端依賴安裝完成$(NC)"
+
+install-game-client: ## 安裝遊戲前端依賴
+	@echo "$(YELLOW)安裝遊戲前端依賴...$(NC)"
+	@cd game-client && npm install
+	@echo "$(GREEN)✓ 遊戲前端依賴安裝完成$(NC)"
+
+install-all: install install-lobby-client install-game-client ## 安裝所有依賴（含分離式前端）
+	@echo "$(GREEN)✓ 所有依賴安裝完成$(NC)"

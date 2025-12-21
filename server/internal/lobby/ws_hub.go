@@ -128,6 +128,7 @@ func (h *LobbyHub) BroadcastChatMessage(msg *ChatMessage) {
 // sendRoomListTo 發送房間列表給單個客戶端
 func (h *LobbyHub) sendRoomListTo(client *LobbyClient) {
 	rooms := h.store.GetPublicRooms()
+	log.Printf("[LobbyHub] 發送房間列表給 %s: %d 個公開房間", client.userName, len(rooms))
 
 	msg := WSMessage{
 		Type: WSTypeRoomList,

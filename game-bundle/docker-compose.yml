@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  mahjong-game:
+    build:
+      context: ..
+      dockerfile: game-bundle/Dockerfile
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - STANDALONE_MODE=true
+      - STATIC_DIR=./public
+      - PORT=8080
+      # 可選：向中央大廳註冊
+      - LOBBY_SERVICE_URL=${LOBBY_SERVICE_URL:-}
+      - LOBBY_INTERNAL_SECRET=${LOBBY_INTERNAL_SECRET:-}
+      - EXTERNAL_SERVER_ID=${EXTERNAL_SERVER_ID:-}
+      - EXTERNAL_SERVER_SECRET=${EXTERNAL_SERVER_SECRET:-}
+      - EXTERNAL_SERVER_WEB_URL=${EXTERNAL_SERVER_WEB_URL:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

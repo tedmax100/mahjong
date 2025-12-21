@@ -1,0 +1,44 @@
+# 遊戲伺服器配置範本
+# 複製此檔案為 config.yaml 並修改設定
+
+# 基本設定
+server:
+  port: 8080
+  standalone_mode: true
+  static_dir: ./public
+
+# 中央大廳註冊（可選）
+# 如果要讓房間顯示在中央大廳，需要設定以下項目
+lobby:
+  # 是否啟用大廳註冊
+  enabled: false
+
+  # 中央大廳 URL
+  url: https://lobby.example.com
+
+  # 內部通訊密鑰（與大廳伺服器的 LOBBY_INTERNAL_SECRET 相同）
+  internal_secret: your-internal-secret
+
+  # 外部伺服器設定
+  external:
+    # 伺服器 ID（唯一識別符）
+    server_id: game-server-01
+
+    # 顯示名稱
+    display_name: "遊戲伺服器 #1"
+
+    # 外部伺服器註冊密鑰
+    secret: your-external-secret
+
+    # 此伺服器的公開 URL（用戶將被導向此 URL）
+    public_url: https://game-01.example.com
+
+    # 最大房間數
+    max_rooms: 10
+
+# 使用 Docker Compose 時，可透過環境變數覆蓋：
+# LOBBY_SERVICE_URL=https://lobby.example.com
+# LOBBY_INTERNAL_SECRET=xxx
+# EXTERNAL_SERVER_ID=game-server-01
+# EXTERNAL_SERVER_SECRET=xxx
+# EXTERNAL_SERVER_WEB_URL=https://game-01.example.com
