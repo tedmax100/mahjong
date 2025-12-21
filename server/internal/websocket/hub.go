@@ -15,6 +15,15 @@ import (
 	"time"
 )
 
+// LobbyNotifier 定義 Lobby 通知器介面
+type LobbyNotifier interface {
+	NotifyRoomCreated(room *game.Room) error
+	NotifyPlayerJoined(room *game.Room) error
+	NotifyPlayerLeft(room *game.Room) error
+	NotifyGameStarted(roomID string) error
+	NotifyRoomClosed(roomID string) error
+}
+
 // Hub 管理所有 WebSocket 連接和房間
 type Hub struct {
 	// 所有房間
@@ -28,6 +37,9 @@ type Hub struct {
 
 	// 互斥鎖
 	mu sync.RWMutex
+
+	// Lobby 通知器（用於同步房間狀態到 Lobby Service）
+	lobbyNotifier LobbyNotifier
 }
 
 // NewHub 建立新的 Hub
@@ -89,6 +101,11 @@ func (h *Hub) registerClient(client *Client) {
 
 	if roomToUpdate != nil {
 		h.broadcastRoomUpdate(roomToUpdate)
+
+		// 通知 Lobby Service 玩家加入
+		if h.lobbyNotifier != nil && roomToUpdate.IsPublic {
+			go h.lobbyNotifier.NotifyPlayerJoined(roomToUpdate)
+		}
 	}
 
 	if shouldStartGame {
@@ -141,9 +158,19 @@ func (h *Hub) unregisterClient(client *Client) {
 			delete(h.rooms, room.ID)
 			log.Printf("房間 %s 已無真實玩家連線，刪除房間", room.ID)
 			shouldCheckBotTurn = false // 房間已刪除，不需要檢查
+
+			// 通知 Lobby Service 房間關閉
+			if h.lobbyNotifier != nil && room.IsPublic {
+				go h.lobbyNotifier.NotifyRoomClosed(room.ID)
+			}
 		} else {
 			// 還有玩家，廣播房間更新
 			h.broadcastRoomUpdateNoLock(room)
+
+			// 通知 Lobby Service 玩家離開
+			if h.lobbyNotifier != nil && room.IsPublic {
+				go h.lobbyNotifier.NotifyPlayerLeft(room)
+			}
 		}
 	}
 
@@ -257,6 +284,11 @@ func (h *Hub) startGame(room *game.Room) {
 
 	log.Printf("房間 %s 開始遊戲流程", room.ID)
 
+	// 通知 Lobby Service 遊戲開始（房間會從列表中移除）
+	if h.lobbyNotifier != nil && room.IsPublic {
+		go h.lobbyNotifier.NotifyGameStarted(room.ID)
+	}
+
 	// 擲骰決定莊家
 	diceResult := game.RollDiceForDealer(room.Players)
 	room.DiceRollResult = diceResult
@@ -330,6 +362,29 @@ func (h *Hub) CreateRoom(roomID string) *game.Room {
 
 	log.Printf("建立房間: %s", roomID)
 	return room
+}
+
+// CreateRoomWithOptions 建立帶選項的房間
+func (h *Hub) CreateRoomWithOptions(roomID string, opts game.RoomOptions) *game.Room {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	room := game.NewRoomWithOptions(roomID, opts)
+	h.rooms[roomID] = room
+
+	log.Printf("建立房間: %s (公開: %v, 房主: %s)", roomID, opts.IsPublic, opts.HostName)
+
+	// 如果是公開房間，通知 Lobby Service
+	if h.lobbyNotifier != nil && opts.IsPublic {
+		go h.lobbyNotifier.NotifyRoomCreated(room)
+	}
+
+	return room
+}
+
+// SetLobbyNotifier 設置 Lobby 通知器
+func (h *Hub) SetLobbyNotifier(notifier LobbyNotifier) {
+	h.lobbyNotifier = notifier
 }
 
 // addBot 添加 Bot 玩家

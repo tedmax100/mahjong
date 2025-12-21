@@ -1,6 +1,7 @@
 package api
 
 import (
+	"mahjong/internal/game"
 	"mahjong/internal/websocket"
 	"net/http"
 
@@ -12,6 +13,8 @@ import (
 type CreateRoomRequest struct {
 	UserID   string `json:"userId"`
 	UserName string `json:"userName"`
+	RoomName string `json:"roomName,omitempty"` // 房間名稱（可選）
+	IsPublic bool   `json:"isPublic"`           // 是否公開
 }
 
 // CreateRoom 建立房間 API
@@ -29,12 +32,25 @@ func CreateRoom(hub *websocket.Hub) gin.HandlerFunc {
 		// 生成房間 ID（6 位數字）
 		roomID := generateRoomID()
 
-		// 建立房間
-		hub.CreateRoom(roomID)
+		// 生成房間名稱（如果未提供）
+		roomName := req.RoomName
+		if roomName == "" {
+			roomName = req.UserName + " 的房間"
+		}
+
+		// 建立房間（帶選項）
+		opts := game.RoomOptions{
+			Name:     roomName,
+			IsPublic: req.IsPublic,
+			HostID:   req.UserID,
+			HostName: req.UserName,
+		}
+		hub.CreateRoomWithOptions(roomID, opts)
 
 		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"roomId":  roomID,
+			"success":  true,
+			"roomId":   roomID,
+			"isPublic": req.IsPublic,
 		})
 	}
 }

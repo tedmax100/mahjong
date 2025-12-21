@@ -1,6 +1,7 @@
 import { Application } from 'pixi.js';
 import { Game } from './game/Game.js';
 import { WebSocketClient } from './network/WebSocketClient.js';
+import { LobbyClient } from './network/LobbyClient.js';
 import { VoiceChat } from './voice/VoiceChat.js';
 import { VoiceChatUI } from './voice/VoiceChatUI.js';
 import { GoogleAuth } from './auth/GoogleAuth.js';
@@ -16,6 +17,9 @@ class MahjongApp {
     // Voice chat
     this.voiceChat = null;
     this.voiceChatUI = null;
+
+    // Lobby
+    this.lobbyClient = null;
 
     // Auth
     this.auth = null;
@@ -45,8 +49,11 @@ class MahjongApp {
     this.auth.onSignIn = (user) => {
       console.log('使用者已登入:', user.name);
       this.user = user;
-      // 如果已在登入畫面，可自動跳轉到房間選擇
-      // this.showRoomScreen();
+      // 如果已在登入畫面，自動跳轉到大廳
+      const loginScreen = document.getElementById('login-screen');
+      if (loginScreen && !loginScreen.classList.contains('hidden')) {
+        this.showLobbyScreen();
+      }
     };
 
     // 設定登出回調
@@ -129,6 +136,55 @@ class MahjongApp {
     document.getElementById('toggle-sound-btn').addEventListener('click', () => {
       this.toggleSound();
     });
+
+    // === 大廳相關事件 ===
+
+    // 返回登入畫面
+    document.getElementById('lobby-back-btn').addEventListener('click', () => {
+      this.leaveLobby();
+    });
+
+    // 創建公開房間
+    document.getElementById('create-public-room-btn').addEventListener('click', () => {
+      this.createRoom(true);
+    });
+
+    // 創建私人房間
+    document.getElementById('create-private-room-btn').addEventListener('click', () => {
+      this.createRoom(false);
+    });
+
+    // 加入私人房間
+    document.getElementById('join-private-btn').addEventListener('click', () => {
+      const roomId = document.getElementById('private-room-id').value.trim();
+      if (roomId) {
+        this.joinRoom(roomId);
+      } else {
+        alert('請輸入房間號');
+      }
+    });
+
+    // 私人房間輸入框回車
+    document.getElementById('private-room-id').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const roomId = document.getElementById('private-room-id').value.trim();
+        if (roomId) {
+          this.joinRoom(roomId);
+        }
+      }
+    });
+
+    // 發送聊天訊息
+    document.getElementById('send-chat-btn').addEventListener('click', () => {
+      this.sendChatMessage();
+    });
+
+    // 聊天輸入框回車
+    document.getElementById('chat-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        this.sendChatMessage();
+      }
+    });
   }
 
   toggleSound() {
@@ -152,36 +208,31 @@ class MahjongApp {
   }
 
   quickStart() {
-    // 獲取輸入的名字或生成隨機名字
-    let playerName = document.getElementById('player-name-input').value.trim();
+    // 如果已經透過 Google 登入，直接使用該帳號
+    if (this.user && this.auth.isAuthenticated()) {
+      console.log('使用 Google 帳號:', this.user.name);
+    } else {
+      // 訪客模式：獲取輸入的名字或生成隨機名字
+      let playerName = document.getElementById('player-name-input').value.trim();
 
-    if (!playerName) {
-      // 隨機生成名字
-      const adjectives = ['快樂的', '勇敢的', '聰明的', '幸運的', '神秘的', '強大的', '可愛的', '酷炫的'];
-      const nouns = ['麻將王', '雀神', '元肥', '東協', '西卡', '北麥', '南沾', '中周'];
-      const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
-      const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
-      playerName = randomAdj + randomNoun;
+      if (!playerName) {
+        // 隨機生成名字
+        const adjectives = ['快樂的', '勇敢的', '聰明的', '幸運的', '神秘的', '強大的', '可愛的', '酷炫的'];
+        const nouns = ['麻將王', '雀神', '元肥', '東協', '西卡', '北麥', '南沾', '中周'];
+        const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+        playerName = randomAdj + randomNoun;
+      }
+
+      // 創建訪客使用者物件
+      this.user = {
+        id: 'guest_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11),
+        name: playerName,
+        picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(playerName)}&background=random&size=40`
+      };
+
+      console.log('創建訪客玩家:', this.user);
     }
-
-    // 創建使用者物件
-    this.user = {
-      id: 'player_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11),
-      name: playerName,
-      picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(playerName)}&background=random&size=40`
-    };
-
-    console.log('創建玩家:', this.user);
-
-    // 顯示房間選擇介面
-    this.showRoomScreen();
-  }
-
-  showRoomScreen() {
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('room-screen').classList.remove('hidden');
-
-    // 使用者資訊已移至遊戲內的玩家資訊條顯示
 
     // 檢查 URL 是否有房間參數，自動加入房間
     const urlParams = new URLSearchParams(window.location.search);
@@ -191,10 +242,151 @@ class MahjongApp {
       // 清除 URL 參數，避免重複加入
       window.history.replaceState({}, document.title, window.location.pathname);
       this.joinRoom(roomIdFromUrl);
+    } else {
+      // 顯示大廳介面
+      this.showLobbyScreen();
     }
   }
 
-  async createRoom() {
+  /**
+   * 顯示大廳介面
+   */
+  showLobbyScreen() {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('room-screen').classList.add('hidden');
+    document.getElementById('lobby-screen').classList.remove('hidden');
+
+    // 連接大廳 WebSocket
+    this.lobbyClient = new LobbyClient(this.user);
+
+    this.lobbyClient.onRoomListUpdate = (rooms) => {
+      this.updateRoomList(rooms);
+    };
+
+    this.lobbyClient.onChatMessage = (msg) => {
+      this.addChatMessage(msg);
+    };
+
+    this.lobbyClient.onOnlineCountUpdate = (count) => {
+      document.getElementById('online-count').textContent = count;
+    };
+
+    this.lobbyClient.onError = (message) => {
+      console.error('[Lobby] 錯誤:', message);
+    };
+
+    this.lobbyClient.connect();
+  }
+
+  /**
+   * 離開大廳，返回登入畫面
+   */
+  leaveLobby() {
+    if (this.lobbyClient) {
+      this.lobbyClient.close();
+      this.lobbyClient = null;
+    }
+
+    document.getElementById('lobby-screen').classList.add('hidden');
+    document.getElementById('login-screen').classList.remove('hidden');
+
+    // 清空聊天訊息
+    document.getElementById('chat-messages').innerHTML = '';
+  }
+
+  /**
+   * 更新房間列表
+   */
+  updateRoomList(rooms) {
+    const container = document.getElementById('room-list');
+
+    if (!rooms || rooms.length === 0) {
+      container.innerHTML = `
+        <div class="empty-room-list">
+          <div class="empty-room-list-icon">🀄</div>
+          <div>目前沒有公開房間</div>
+          <div style="font-size: 14px; margin-top: 5px;">創建一個新房間開始遊戲吧！</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = rooms.map(room => `
+      <div class="room-item" data-room-id="${room.id}">
+        <div class="room-item-info">
+          <span class="room-name">${this.escapeHtml(room.name || '房間 ' + room.id)}</span>
+          <span class="room-host">房主: ${this.escapeHtml(room.hostName)}</span>
+        </div>
+        <div class="room-item-status">
+          <span class="player-count-badge">${room.playerCount}/4</span>
+          <button class="join-btn" ${room.playerCount >= 4 ? 'disabled' : ''}>
+            ${room.playerCount >= 4 ? '已滿' : '加入'}
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    // 綁定加入按鈕事件
+    container.querySelectorAll('.join-btn:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const roomId = e.target.closest('.room-item').dataset.roomId;
+        this.joinRoom(roomId);
+      });
+    });
+  }
+
+  /**
+   * 添加聊天訊息
+   */
+  addChatMessage(msg) {
+    const container = document.getElementById('chat-messages');
+    const msgElement = document.createElement('div');
+    msgElement.className = `chat-message ${msg.type === 'system' ? 'system' : ''}`;
+
+    const time = new Date(msg.timestamp).toLocaleTimeString('zh-TW', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    msgElement.innerHTML = `
+      <span class="chat-time">${time}</span>
+      <span class="chat-user">${this.escapeHtml(msg.userName)}:</span>
+      <span class="chat-content">${this.escapeHtml(msg.content)}</span>
+    `;
+
+    container.appendChild(msgElement);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  /**
+   * 發送聊天訊息
+   */
+  sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const content = input.value.trim();
+
+    if (content && this.lobbyClient) {
+      this.lobbyClient.sendChat(content);
+      input.value = '';
+    }
+  }
+
+  /**
+   * HTML 轉義
+   */
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // 舊的房間選擇介面（保留向後兼容）
+  showRoomScreen() {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('room-screen').classList.remove('hidden');
+  }
+
+  async createRoom(isPublic = false) {
     try {
       // 使用 authFetch 自動附加 token 並處理 401
       const response = await this.authFetch('/api/rooms/create', {
@@ -204,7 +396,8 @@ class MahjongApp {
         },
         body: JSON.stringify({
           userId: this.user.id,
-          userName: this.user.name
+          userName: this.user.name,
+          isPublic: isPublic
         })
       });
 
@@ -228,11 +421,18 @@ class MahjongApp {
   async joinRoom(roomId) {
     this.roomId = roomId;
 
+    // 關閉大廳連接
+    if (this.lobbyClient) {
+      this.lobbyClient.close();
+      this.lobbyClient = null;
+    }
+
     // 顯示房間資訊
     document.getElementById('current-room-id').textContent = roomId;
     document.getElementById('room-info').classList.remove('hidden');
 
-    // 隱藏房間選擇介面
+    // 隱藏大廳和房間選擇介面
+    document.getElementById('lobby-screen').classList.add('hidden');
     document.getElementById('room-screen').classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
 

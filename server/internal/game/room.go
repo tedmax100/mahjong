@@ -50,6 +50,21 @@ type Room struct {
 	noResponseTimer     *time.Timer
 	timerMu             sync.Mutex
 	DiceRollResult      *DiceRollResult // 擲骰結果（用於斷線重連）
+
+	// 大廳相關欄位
+	Name      string    // 房間名稱
+	IsPublic  bool      // 是否公開（顯示在大廳列表）
+	HostID    string    // 房主 ID
+	HostName  string    // 房主名稱
+	CreatedAt time.Time // 創建時間
+}
+
+// RoomOptions 創建房間的選項
+type RoomOptions struct {
+	Name     string
+	IsPublic bool
+	HostID   string
+	HostName string
 }
 
 // Player 代表一個玩家
@@ -162,7 +177,36 @@ func NewRoom(id string) *Room {
 		Players:     make([]*Player, 0, 4),
 		Clients:     make(map[string]interface{}),
 		GameStarted: false,
+		CreatedAt:   time.Now(),
 	}
+}
+
+// NewRoomWithOptions 建立帶選項的新房間
+func NewRoomWithOptions(id string, opts RoomOptions) *Room {
+	return &Room{
+		ID:          id,
+		Name:        opts.Name,
+		IsPublic:    opts.IsPublic,
+		HostID:      opts.HostID,
+		HostName:    opts.HostName,
+		Players:     make([]*Player, 0, 4),
+		Clients:     make(map[string]interface{}),
+		GameStarted: false,
+		CreatedAt:   time.Now(),
+	}
+}
+
+// GetStatus 獲取房間狀態
+func (r *Room) GetStatus() string {
+	if r.GameStarted {
+		return "playing"
+	}
+	return "waiting"
+}
+
+// GetPlayerCount 獲取玩家數量
+func (r *Room) GetPlayerCount() int {
+	return len(r.Players)
 }
 
 // AddPlayer 新增玩家到房間

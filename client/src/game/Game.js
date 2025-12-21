@@ -837,17 +837,15 @@ ${'='.repeat(60)}`);
     // 使用 DiscardManager 處理視覺呈現
     await this.discardManager.addDiscard(tile, playerPosition, this.tileAssets);
 
-    // 從玩家手牌中移除該牌（視覺上）
-    if (player) {
+    // 從玩家手牌中移除該牌（視覺上）- 只處理自己的手牌
+    if (player && visualPosition === 0) {
       // 🎯 如果玩家已聽牌，等待一小段時間確保摸牌動畫完成
       if (player.isTing) {
         console.log(`⏳ [handleDiscard] 玩家已聽牌，等待摸牌完成後再移除 ${tile}`);
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      // 對於其他玩家（非自己），手牌都是 'back' 類型，需要移除 'back' 而非實際牌名
-      const tileToRemove = (visualPosition === 0) ? tile : 'back';
-      player.removeTile(tileToRemove);
+      player.removeTile(tile);
 
       // 📋 記錄打牌後的手牌狀態
       setTimeout(() => {
@@ -915,11 +913,15 @@ ${'='.repeat(60)}`);
       }
     }
 
-    // 如果是自己（視覺位置 0），顯示摸到的牌；如果是其他玩家，顯示牌背
-    const tileToAdd = (visualPosition === 0) ? tile : 'back';
+    // 只為自己（視覺位置 0）加入手牌，其他玩家不顯示手牌
+    if (visualPosition === 0) {
+      await player.addTile(tile, this.tileAssets);
 
-    // 加入新牌到手牌（等待完成）
-    await player.addTile(tileToAdd, this.tileAssets);
+      // 📋 記錄摸牌後的手牌狀態
+      setTimeout(() => {
+        this.logPlayerHand(playerPosition, `摸牌: ${tile}`);
+      }, 100);
+    }
 
     // 更新剩餘牌數
     if (this.remainingTiles > 0) {
@@ -927,11 +929,6 @@ ${'='.repeat(60)}`);
     }
 
     console.log(`玩家 ${playerPosition} 摸牌完成，剩餘 ${this.remainingTiles} 張`);
-
-    // 📋 記錄摸牌後的手牌狀態
-    setTimeout(() => {
-      this.logPlayerHand(playerPosition, `摸牌: ${tile}`);
-    }, 100);
 
     // 如果是自己摸牌（視覺位置 0），檢查是否可以自摸或聽牌
     if (visualPosition === 0) {

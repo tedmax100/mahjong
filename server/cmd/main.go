@@ -4,8 +4,10 @@ import (
 	"log"
 	"mahjong/internal/api"
 	"mahjong/internal/auth"
+	"mahjong/internal/lobby"
 	"mahjong/internal/logger"
 	"mahjong/internal/websocket"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -42,6 +44,21 @@ func main() {
 
 	// 建立遊戲伺服器
 	hub := websocket.NewHub()
+
+	// 初始化 Lobby Notifier（如果 LOBBY_SERVICE_URL 有設定）
+	lobbyServiceURL := os.Getenv("LOBBY_SERVICE_URL")
+	lobbyInternalSecret := os.Getenv("LOBBY_INTERNAL_SECRET")
+	if lobbyServiceURL == "" {
+		lobbyServiceURL = "http://localhost:3001"
+	}
+	if lobbyInternalSecret == "" {
+		lobbyInternalSecret = "dev-internal-secret"
+	}
+
+	lobbyNotifier := lobby.NewHTTPLobbyNotifier(lobbyServiceURL, lobbyInternalSecret)
+	hub.SetLobbyNotifier(lobbyNotifier)
+	log.Printf("🔗 Lobby Notifier 已設置: %s", lobbyServiceURL)
+
 	go hub.Run()
 
 	// API 路由（使用可選 JWT 驗證）
