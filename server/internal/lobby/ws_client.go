@@ -118,7 +118,7 @@ func (c *LobbyClient) writePump() {
 			if err != nil {
 				return
 			}
-			if err := w.Write(message); err != nil {
+			if _, err := w.Write(message); err != nil {
 				log.Printf("[LobbyClient] writePump: 寫入訊息錯誤: %v", err)
 				return
 			}
@@ -126,11 +126,11 @@ func (c *LobbyClient) writePump() {
 			// 批量發送隊列中的訊息
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				if err := w.Write([]byte{'\n'}); err != nil {
+				if _, err := w.Write([]byte{'\n'}); err != nil {
 					log.Printf("[LobbyClient] writePump: 寫入換行符錯誤: %v", err)
 					return
 				}
-				if err := w.Write(<-c.send); err != nil {
+				if _, err := w.Write(<-c.send); err != nil {
 					log.Printf("[LobbyClient] writePump: 寫入隊列訊息錯誤: %v", err)
 					return
 				}
