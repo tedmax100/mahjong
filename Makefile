@@ -68,7 +68,7 @@ dev-tunnel: install-cloudflared ## 啟動開發服務器並通過 Cloudflare Tun
 
 start-backend: ## 啟動後端服務器
 	@echo "$(GREEN)🚀 啟動後端服務器 (Port $(BACKEND_PORT))...$(NC)"
-	@cd server && go run cmd/main.go
+	@cd server && LOBBY_INTERNAL_SECRET=dev-internal-secret go run cmd/main.go
 
 start-frontend: ## 啟動前端開發服務器
 	@echo "$(GREEN)🚀 啟動前端開發服務器 (Port $(FRONTEND_PORT))...$(NC)"
@@ -167,7 +167,7 @@ install: ## 安裝所有依賴
 # Lobby & Auth Proxy 相關命令
 start-lobby: ## 啟動 Lobby & Auth Proxy 伺服器 (Port 3001)
 	@echo "$(GREEN)🏠 啟動 Lobby & Auth Proxy (Port 3001)...$(NC)"
-	@cd server && GAME_SERVER_URL=http://localhost:5175 go run cmd/lobby/main.go
+	@cd server && go run cmd/lobby/main.go
 
 dev-with-auth: ## 啟動本地開發環境（含 Lobby & Auth）
 	@echo "$(YELLOW)啟動本地開發環境（含認證）...$(NC)"

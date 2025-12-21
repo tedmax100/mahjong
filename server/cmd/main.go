@@ -10,9 +10,15 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// 載入 .env 檔案（如果存在）
+	if err := godotenv.Load(); err != nil {
+		log.Println("提示: 未找到 .env 檔案，使用系統環境變數")
+	}
+
 	// 初始化 logger（同時輸出到 stdout 和檔案）
 	if err := logger.Init(); err != nil {
 		log.Fatal("Logger 初始化失敗:", err)
@@ -52,7 +58,8 @@ func main() {
 		lobbyServiceURL = "http://localhost:3001"
 	}
 	if lobbyInternalSecret == "" {
-		log.Fatal("LOBBY_INTERNAL_SECRET 環境變數未設定。請設定此變數以確保內部服務間通訊安全。")
+		lobbyInternalSecret = "dev-internal-secret"
+		log.Println("⚠️ LOBBY_INTERNAL_SECRET 未設定，使用開發環境預設值")
 	}
 
 	lobbyNotifier := lobby.NewHTTPLobbyNotifier(lobbyServiceURL, lobbyInternalSecret)
