@@ -53,13 +53,14 @@ func main() {
 
 	// 初始化 Lobby Notifier（如果 LOBBY_SERVICE_URL 有設定）
 	lobbyServiceURL := getEnv("LOBBY_SERVICE_URL", "http://localhost:3001")
-	lobbyInternalSecret := getEnv("LOBBY_INTERNAL_SECRET", "dev-internal-secret")
+	lobbyInternalSecret := os.Getenv("LOBBY_INTERNAL_SECRET")
 
 	// 檢查生產環境安全性
-	if lobbyInternalSecret == "dev-internal-secret" {
+	if lobbyInternalSecret == "" {
 		if gin.Mode() == gin.ReleaseMode {
 			log.Fatal("❌ 錯誤: 在生產環境 (release mode) 下必須設定 LOBBY_INTERNAL_SECRET")
 		}
+		lobbyInternalSecret = "dev-internal-secret" // #nosec G101
 		log.Println("⚠️ LOBBY_INTERNAL_SECRET 未設定，使用開發環境預設值")
 	}
 

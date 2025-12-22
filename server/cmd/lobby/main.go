@@ -22,19 +22,41 @@ func main() {
 	port := getEnv("PORT", "3001")
 	authProxyURL := getEnv("AUTH_PROXY_URL", "http://localhost:3001")
 	gameServerURL := getEnv("GAME_SERVER_URL", "http://localhost:8080")
-	lobbyInternalSecret := getEnv("LOBBY_INTERNAL_SECRET", "dev-internal-secret")
-	externalServerSecret := getEnv("EXTERNAL_SERVER_SECRET", "dev-external-secret")
+
+	// 取得內部密鑰
+	lobbyInternalSecret := os.Getenv("LOBBY_INTERNAL_SECRET")
+	if lobbyInternalSecret == "" {
+		if gin.Mode() == gin.ReleaseMode {
+			log.Fatal("錯誤: 在生產環境 (release mode) 下必須設定 LOBBY_INTERNAL_SECRET")
+		}
+		lobbyInternalSecret = "dev-internal-secret" // #nosec G101
+		log.Println("⚠️ LOBBY_INTERNAL_SECRET 未設定，使用開發環境預設值")
+	}
+
+	externalServerSecret := os.Getenv("EXTERNAL_SERVER_SECRET")
+	if externalServerSecret == "" {
+		if gin.Mode() == gin.ReleaseMode {
+			log.Fatal("錯誤: 在生產環境 (release mode) 下必須設定 EXTERNAL_SERVER_SECRET")
+		}
+		externalServerSecret = "dev-external-secret" // #nosec G101
+		log.Println("⚠️ EXTERNAL_SERVER_SECRET 未設定，使用開發環境預設值")
+	}
+
 	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
 	googleClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
-	sessionSecret := getEnv("SESSION_SECRET", "dev-secret")
+
+	sessionSecret := os.Getenv("SESSION_SECRET")
+	if sessionSecret == "" {
+		if gin.Mode() == gin.ReleaseMode {
+			log.Fatal("錯誤: 生產環境必須設定 SESSION_SECRET")
+		}
+		sessionSecret = "dev-secret" // #nosec G101
+		log.Println("⚠️ SESSION_SECRET 未設定，使用開發環境預設值")
+	}
 
 	// 驗證必要設定
 	if googleClientID == "" || googleClientSecret == "" {
 		log.Fatal("錯誤: GOOGLE_CLIENT_ID 和 GOOGLE_CLIENT_SECRET 必須設定")
-	}
-
-	if sessionSecret == "dev-secret" && os.Getenv("GIN_MODE") == "release" {
-		log.Fatal("錯誤: 生產環境必須設定 SESSION_SECRET")
 	}
 
 	// 建立金鑰管理器
