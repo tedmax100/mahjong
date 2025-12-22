@@ -1,7 +1,7 @@
 # 台灣十六張麻將專案 README
 
 [![Security Scan](https://github.com/tedmax100/mahjong/actions/workflows/security.yml/badge.svg)](https://github.com/tedmax100/mahjong/actions/workflows/security.yml)
-![Go Coverage](https://img.shields.io/badge/Go_Coverage-34.9%25-red)
+![Go Coverage](https://img.shields.io/badge/Go_Coverage-34.8%25-red)
 ![Frontend Coverage](https://img.shields.io/badge/Frontend_Coverage-14.3%25-red)
 
 這是一個功能完整的台灣十六張麻將網頁遊戲專案，旨在提供玩家一個即時、互動的線上麻將體驗，並可選擇 AI 輔助來提升遊戲策略。
