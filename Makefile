@@ -1,4 +1,4 @@
-.PHONY: help install-cloudflared start stop tunnel dev dev-tunnel clean start-lobby dev-with-auth
+.PHONY: help install-cloudflared start stop tunnel tunnel-all dev dev-tunnel clean start-lobby dev-with-auth
 
 # 顏色定義
 GREEN  := \033[0;32m
@@ -18,7 +18,8 @@ help: ## 顯示幫助信息
 	@echo "$(BLUE)======================================$(NC)"
 	@echo ""
 	@echo "$(YELLOW)快速開始:$(NC)"
-	@echo "  $(GREEN)make start$(NC)          - 啟動所有服務 + Cloudflare Tunnel"
+	@echo "  $(GREEN)make tunnel-all$(NC)     - 啟動分離式前端 + 雙 Tunnel（推薦）"
+	@echo "  $(GREEN)make start$(NC)          - 啟動舊版單一前端 + Tunnel"
 	@echo "  $(GREEN)make stop$(NC)           - 停止所有服務"
 	@echo ""
 	@echo "$(YELLOW)所有命令:$(NC)"
@@ -41,18 +42,23 @@ install-cloudflared: ## 安裝 cloudflared（如果尚未安裝）
 		echo "$(GREEN)✓ cloudflared 已安裝$(NC)"; \
 	fi
 
-start: install-cloudflared ## 啟動所有服務 + Cloudflare Tunnel（推薦）
+start: install-cloudflared ## 啟動舊版單一前端 + Cloudflare Tunnel
 	@echo "$(BLUE)======================================$(NC)"
 	@echo "$(BLUE)  啟動麻將遊戲開發環境$(NC)"
 	@echo "$(BLUE)======================================$(NC)"
 	@echo ""
 	@./start-tunnel.sh
 
+tunnel-all: install-cloudflared ## 啟動分離式前端 + 雙 Tunnel（大廳+遊戲，推薦）
+	@./start-tunnel-all.sh
+
 stop: ## 停止所有服務
 	@echo "$(YELLOW)正在停止所有服務...$(NC)"
 	@pkill -f "go run cmd/main.go" 2>/dev/null || true
+	@pkill -f "go run cmd/lobby/main.go" 2>/dev/null || true
 	@pkill -f "vite" 2>/dev/null || true
 	@pkill -f "cloudflared tunnel" 2>/dev/null || true
+	@pkill -f "cloudflared" 2>/dev/null || true
 	@pkill -f "npm run dev" 2>/dev/null || true
 	@sleep 1
 	@echo "$(GREEN)✓ 所有服務已停止$(NC)"

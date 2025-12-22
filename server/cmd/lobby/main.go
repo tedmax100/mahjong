@@ -22,6 +22,7 @@ func main() {
 	port := getEnv("PORT", "3001")
 	authProxyURL := getEnv("AUTH_PROXY_URL", "http://localhost:3001")
 	gameServerURL := getEnv("GAME_SERVER_URL", "http://localhost:8080")
+	gameClientURL := getEnv("GAME_CLIENT_URL", "") // 公開給前端的遊戲 URL（留空則使用 gameServerURL）
 
 	// 取得內部密鑰
 	lobbyInternalSecret := os.Getenv("LOBBY_INTERNAL_SECRET")
@@ -80,7 +81,7 @@ func main() {
 	// 建立大廳組件
 	lobbyStore := lobby.NewLobbyStore()
 	lobbyHub := lobby.NewLobbyHub(lobbyStore)
-	lobbyHandler := lobby.NewHandler(lobbyStore, lobbyHub, gameServerURL, lobbyInternalSecret)
+	lobbyHandler := lobby.NewHandler(lobbyStore, lobbyHub, gameServerURL, gameClientURL, lobbyInternalSecret)
 	lobbyWsHandler := lobby.NewLobbyWsHandler(lobbyHub)
 
 	// 建立外部伺服器組件
@@ -165,6 +166,18 @@ func main() {
 
 	// 大廳 WebSocket
 	r.GET("/ws/lobby", lobbyWsHandler.ServeWs)
+
+	// 提供靜態檔案（生產環境 Bundle 部署）
+	staticDir := getEnv("STATIC_DIR", "")
+	if staticDir != "" {
+		r.Static("/assets", staticDir+"/assets")
+		r.StaticFile("/", staticDir+"/index.html")
+		// SPA fallback - 所有非 API/WS 路由都返回 index.html
+		r.NoRoute(func(c *gin.Context) {
+			c.File(staticDir + "/index.html")
+		})
+		log.Printf("   靜態文件:    %s", staticDir)
+	}
 
 	// 啟動伺服器
 	log.Println("")

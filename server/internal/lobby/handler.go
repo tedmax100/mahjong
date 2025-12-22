@@ -15,16 +15,24 @@ import (
 type Handler struct {
 	store         *LobbyStore
 	hub           *LobbyHub
-	gameServerURL string
+	gameServerURL string // 內部 API 代理用（例如 http://localhost:8080）
+	gameClientURL string // 返回給前端的公開 URL（例如 tunnel URL）
 	secretKey     string
 }
 
 // NewHandler 創建新的 Handler
-func NewHandler(store *LobbyStore, hub *LobbyHub, gameServerURL, secretKey string) *Handler {
+// gameServerURL: 內部 API 代理用的 URL
+// gameClientURL: 返回給前端跳轉用的 URL（如果為空則使用 gameServerURL）
+func NewHandler(store *LobbyStore, hub *LobbyHub, gameServerURL, gameClientURL, secretKey string) *Handler {
+	clientURL := gameClientURL
+	if clientURL == "" {
+		clientURL = gameServerURL
+	}
 	return &Handler{
 		store:         store,
 		hub:           hub,
 		gameServerURL: gameServerURL,
+		gameClientURL: clientURL,
 		secretKey:     secretKey,
 	}
 }
@@ -97,7 +105,7 @@ func (h *Handler) CreateRoom(c *gin.Context) {
 	c.JSON(resp.StatusCode, CreateRoomResponse{
 		Success:    gameResp.Success,
 		RoomID:     gameResp.RoomID,
-		ServerAddr: h.gameServerURL,
+		ServerAddr: h.gameClientURL,
 		Error:      gameResp.Error,
 	})
 }

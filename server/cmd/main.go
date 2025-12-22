@@ -95,8 +95,9 @@ func main() {
 	r.StaticFile("/", "./public/index.html")
 
 	// 啟動伺服器
-	log.Println("🀄 麻將伺服器啟動於 http://localhost:8080")
-	if err := r.Run(":8080"); err != nil {
+	port := getEnv("PORT", "8080")
+	log.Printf("🀄 麻將伺服器啟動於 http://localhost:%s", port)
+	if err := r.Run(":" + port); err != nil {
 		log.Fatal("伺服器啟動失敗:", err)
 	}
 }
