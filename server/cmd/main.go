@@ -52,13 +52,14 @@ func main() {
 	hub := websocket.NewHub()
 
 	// 初始化 Lobby Notifier（如果 LOBBY_SERVICE_URL 有設定）
-	lobbyServiceURL := os.Getenv("LOBBY_SERVICE_URL")
-	lobbyInternalSecret := os.Getenv("LOBBY_INTERNAL_SECRET")
-	if lobbyServiceURL == "" {
-		lobbyServiceURL = "http://localhost:3001"
-	}
-	if lobbyInternalSecret == "" {
-		lobbyInternalSecret = "dev-internal-secret"
+	lobbyServiceURL := getEnv("LOBBY_SERVICE_URL", "http://localhost:3001")
+	lobbyInternalSecret := getEnv("LOBBY_INTERNAL_SECRET", "dev-internal-secret")
+
+	// 檢查生產環境安全性
+	if lobbyInternalSecret == "dev-internal-secret" {
+		if gin.Mode() == gin.ReleaseMode {
+			log.Fatal("❌ 錯誤: 在生產環境 (release mode) 下必須設定 LOBBY_INTERNAL_SECRET")
+		}
 		log.Println("⚠️ LOBBY_INTERNAL_SECRET 未設定，使用開發環境預設值")
 	}
 
@@ -97,4 +98,12 @@ func main() {
 	if err := r.Run(":8080"); err != nil {
 		log.Fatal("伺服器啟動失敗:", err)
 	}
+}
+
+// getEnv 取得環境變數，如果不存在則回傳預設值
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
