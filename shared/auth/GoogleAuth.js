@@ -10,9 +10,13 @@ export class GoogleAuth {
     this.onSignIn = null;
     this.onSignOut = null;
     // Auth Proxy URL（從選項或環境變數或預設值）
+    // 生產環境預設使用當前網域（lobby-bundle 前後端同服務）
+    const defaultAuthProxyUrl = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      ? window.location.origin
+      : 'http://localhost:3001';
     this.authProxyUrl = options.authProxyUrl ||
       (typeof import.meta !== 'undefined' && import.meta.env?.VITE_AUTH_PROXY_URL) ||
-      'http://localhost:3001';
+      defaultAuthProxyUrl;
     // localStorage key
     this.storageKey = options.storageKey || 'game_auth_token';
   }
