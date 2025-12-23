@@ -7,20 +7,13 @@ RUN npm ci
 COPY game-client/ .
 RUN npm run build
 
-# 階段二：編譯 Go 後端
-FROM golang:1.21-alpine AS server-builder
-WORKDIR /app
-COPY server/go.mod server/go.sum ./
-RUN go mod download
-COPY server/ .
-# 注意：這裡編譯的是 cmd/main.go (Game Server 入口)
-RUN go build -o mahjong-game-server ./cmd/main.go
-
-# 階段三：最終映像
+# 階段二：最終映像（使用預編譯的二進位）
 FROM alpine:3.19
 WORKDIR /app
 RUN apk --no-cache add ca-certificates
-COPY --from=server-builder /app/mahjong-game-server .
+
+# 複製預編譯的 Go 二進位（由 make docker-compile 產生）
+COPY game-bundle/mahjong-game-server .
 COPY --from=client-builder /app/dist/game ./public
 
 ENV STANDALONE_MODE=true

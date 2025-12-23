@@ -10,22 +10,16 @@ COPY shared/ /shared/
 COPY lobby-client/package*.json ./
 RUN npm ci
 COPY lobby-client/ .
-RUN npm run build && mkdir -p /app/dist && cp -r dist/* /app/dist/
+RUN npm run build
 
-# 階段二：編譯 Go 後端
-FROM golang:1.21-alpine AS server-builder
-WORKDIR /app
-COPY server/go.mod server/go.sum ./
-RUN go mod download
-COPY server/ .
-RUN go build -o mahjong-lobby-server ./cmd/lobby/main.go
-
-# 階段三：最終映像
+# 階段二：最終映像（使用預編譯的二進位）
 FROM alpine:3.19
 WORKDIR /app
 RUN apk --no-cache add ca-certificates
-COPY --from=server-builder /app/mahjong-lobby-server .
-COPY --from=client-builder /app/dist ./public
+
+# 複製預編譯的 Go 二進位（由 make docker-compile 產生）
+COPY lobby-bundle/mahjong-lobby-server .
+COPY --from=client-builder /dist/lobby ./public
 
 ENV PORT=3001
 ENV GIN_MODE=release
