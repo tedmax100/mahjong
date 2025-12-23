@@ -1,4 +1,5 @@
-.PHONY: help install-cloudflared start stop tunnel tunnel-all dev dev-tunnel clean start-lobby dev-with-auth
+.PHONY: help install-cloudflared start stop tunnel tunnel-all dev dev-tunnel clean start-lobby dev-with-auth \
+        docker-compile docker-buildx-setup docker-push-game docker-push-lobby docker-push-all docker-clean-binaries
 
 # 顏色定義
 GREEN  := \033[0;32m
@@ -220,7 +221,12 @@ build-game-bundle: build-game-client ## 構建遊戲獨立部署包
 # Docker 相關命令
 # ============================================
 
-docker-build-game: ## 構建遊戲 Docker 映像
+# DockerHub 配置
+DOCKERHUB_USER := tedmax100
+GAME_IMAGE := $(DOCKERHUB_USER)/mahjong-game
+LOBBY_IMAGE := $(DOCKERHUB_USER)/mahjong-lobby
+
+docker-build-game: ## 構建遊戲 Docker 映像（本地）
 	@echo "$(YELLOW)構建遊戲 Docker 映像...$(NC)"
 	@docker build -f game-bundle/Dockerfile -t mahjong-game:latest .
 	@echo "$(GREEN)✓ Docker 映像構建完成: mahjong-game:latest$(NC)"
@@ -234,6 +240,54 @@ docker-stop-game: ## 停止遊戲 Docker 容器
 	@docker stop mahjong-game 2>/dev/null || true
 	@docker rm mahjong-game 2>/dev/null || true
 	@echo "$(GREEN)✓ 容器已停止$(NC)"
+
+# ============================================
+# DockerHub 構建與推送命令
+# ============================================
+
+docker-compile: ## 交叉編譯 Go 二進位（linux/amd64）
+	@echo "$(YELLOW)交叉編譯 Game Server...$(NC)"
+	@cd server && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../game-bundle/mahjong-game-server ./cmd/main.go
+	@echo "$(GREEN)✓ Game Server 編譯完成$(NC)"
+	@echo "$(YELLOW)交叉編譯 Lobby Server...$(NC)"
+	@cd server && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../lobby-bundle/mahjong-lobby-server ./cmd/lobby/main.go
+	@echo "$(GREEN)✓ Lobby Server 編譯完成$(NC)"
+
+docker-buildx-setup: ## 設置 buildx 多架構構建器
+	@echo "$(YELLOW)設置 buildx...$(NC)"
+	@docker buildx create --name multiarch --driver docker-container --use 2>/dev/null || docker buildx use multiarch
+	@echo "$(GREEN)✓ buildx 已就緒$(NC)"
+
+docker-push-game: docker-compile docker-buildx-setup ## 構建並推送 Game 映像到 DockerHub
+	@echo "$(YELLOW)構建並推送 Game 映像 (linux/amd64)...$(NC)"
+	@docker buildx build --platform linux/amd64 -t $(GAME_IMAGE):latest -f game-bundle/Dockerfile --push .
+	@echo "$(GREEN)✓ 已推送: $(GAME_IMAGE):latest$(NC)"
+
+docker-push-lobby: docker-compile docker-buildx-setup ## 構建並推送 Lobby 映像到 DockerHub
+	@echo "$(YELLOW)構建並推送 Lobby 映像 (linux/amd64)...$(NC)"
+	@docker buildx build --platform linux/amd64 -t $(LOBBY_IMAGE):latest -f lobby-bundle/Dockerfile --push .
+	@echo "$(GREEN)✓ 已推送: $(LOBBY_IMAGE):latest$(NC)"
+
+docker-push-all: docker-compile docker-buildx-setup ## 構建並推送所有映像到 DockerHub
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(BLUE)  構建並推送所有 Docker 映像$(NC)"
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(YELLOW)構建並推送 Game 映像...$(NC)"
+	@docker buildx build --platform linux/amd64 -t $(GAME_IMAGE):latest -f game-bundle/Dockerfile --push .
+	@echo "$(GREEN)✓ 已推送: $(GAME_IMAGE):latest$(NC)"
+	@echo "$(YELLOW)構建並推送 Lobby 映像...$(NC)"
+	@docker buildx build --platform linux/amd64 -t $(LOBBY_IMAGE):latest -f lobby-bundle/Dockerfile --push .
+	@echo "$(GREEN)✓ 已推送: $(LOBBY_IMAGE):latest$(NC)"
+	@echo ""
+	@echo "$(GREEN)======================================$(NC)"
+	@echo "$(GREEN)  所有映像已推送完成！$(NC)"
+	@echo "$(GREEN)======================================$(NC)"
+	@echo "  $(BLUE)Game:$(NC)  $(GAME_IMAGE):latest"
+	@echo "  $(BLUE)Lobby:$(NC) $(LOBBY_IMAGE):latest"
+
+docker-clean-binaries: ## 清理本地編譯的二進位
+	@rm -f game-bundle/mahjong-game-server lobby-bundle/mahjong-lobby-server
+	@echo "$(GREEN)✓ 已清理本地二進位$(NC)"
 
 # ============================================
 # 安裝分離式前端依賴
