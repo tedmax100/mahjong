@@ -1,7 +1,7 @@
 # 台灣十六張麻將專案 README
 
 [![Security Scan](https://github.com/tedmax100/mahjong/actions/workflows/security.yml/badge.svg)](https://github.com/tedmax100/mahjong/actions/workflows/security.yml)
-![Go Coverage](https://img.shields.io/badge/Go_Coverage-34.5%25-red)
+![Go Coverage](https://img.shields.io/badge/Go_Coverage-33.2%25-red)
 ![Frontend Coverage](https://img.shields.io/badge/Frontend_Coverage-14.08%25-red)
 ![Game Version](https://img.shields.io/badge/Game-v0.0.8-blue)
 ![Lobby Version](https://img.shields.io/badge/Lobby-v0.0.10-blue)
