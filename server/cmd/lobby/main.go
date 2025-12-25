@@ -60,12 +60,16 @@ func main() {
 		log.Fatal("錯誤: GOOGLE_CLIENT_ID 和 GOOGLE_CLIENT_SECRET 必須設定")
 	}
 
-	// 建立金鑰管理器
-	keyManager := auth.NewKeyManager("mahjong-auth-proxy", 12*time.Hour)
+	// 建立金鑰管理器 (Access Token 1 小時有效期)
+	keyManager := auth.NewKeyManager("mahjong-auth-proxy", 1*time.Hour)
 	if err := keyManager.Start(1 * time.Hour); err != nil {
 		log.Fatalf("金鑰管理器啟動失敗: %v", err)
 	}
 	defer keyManager.Stop()
+
+	// 建立 Refresh Token 儲存 (1 天有效期)
+	refreshTokenStore := auth.NewRefreshTokenStore(24 * time.Hour)
+	defer refreshTokenStore.Stop()
 
 	// 建立 OAuth 處理器
 	oauthConfig := &auth.OAuthConfig{
@@ -73,7 +77,11 @@ func main() {
 		ClientSecret: googleClientSecret,
 		RedirectURI:  authProxyURL + "/auth/google/callback",
 	}
-	oauthHandler := auth.NewOAuthHandler(oauthConfig, keyManager)
+	oauthHandler := auth.NewOAuthHandler(oauthConfig, keyManager, refreshTokenStore)
+
+	// 建立 Refresh 和 Logout 處理器
+	refreshHandler := auth.NewRefreshHandler(refreshTokenStore, keyManager)
+	logoutHandler := auth.NewLogoutHandler(refreshTokenStore)
 
 	// 建立 JWKS 處理器
 	jwksHandler := auth.NewJWKSHandler(keyManager)
@@ -106,8 +114,18 @@ func main() {
 
 	// CORS 中介軟體
 	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		origin := c.Request.Header.Get("Origin")
+
+		// 驗證 origin 是否在白名單中
+		if origin != "" && auth.ValidateOrigin(origin) {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		} else if origin == "" {
+			// 沒有 Origin header 的請求（例如同源請求）
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		}
+
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if c.Request.Method == "OPTIONS" {
@@ -132,6 +150,8 @@ func main() {
 	// Auth Proxy 路由
 	r.GET("/login", oauthHandler.LoginHandler)
 	r.GET("/auth/google/callback", oauthHandler.CallbackHandler)
+	r.POST("/auth/refresh", refreshHandler.Handler)
+	r.POST("/auth/logout", logoutHandler.Handler)
 	r.GET("/.well-known/jwks.json", jwksHandler.Handler)
 
 	// 大廳 API 路由（使用可選認證）

@@ -15,6 +15,9 @@ export class GoogleAuth {
     this.authProxyUrl = import.meta.env.VITE_AUTH_PROXY_URL || defaultAuthProxyUrl;
     // localStorage key
     this.storageKey = 'game_auth_token';
+    // Token refresh lock
+    this.isRefreshing = false;
+    this.refreshPromise = null;
   }
 
   /**
@@ -135,7 +138,17 @@ export class GoogleAuth {
   /**
    * 登出
    */
-  signOut() {
+  async signOut() {
+    // 通知後端撤銷 refresh token
+    try {
+      await fetch(`${this.authProxyUrl}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (e) {
+      console.warn('Logout API 呼叫失敗:', e);
+    }
+
     localStorage.removeItem(this.storageKey);
     this.user = null;
 
@@ -203,27 +216,97 @@ export class GoogleAuth {
 
   /**
    * 建立帶有認證的 fetch wrapper
-   * 自動附加 Bearer token 並處理 401
+   * 自動附加 Bearer token，遇到 401 時自動刷新 token 並重試
    */
   createAuthFetch() {
     return async (url, options = {}) => {
       const token = this.getToken();
 
+      // 確保 headers 物件存在
+      options.headers = { ...options.headers };
+
       if (token) {
-        options.headers = {
-          ...options.headers,
-          'Authorization': `Bearer ${token}`,
-        };
+        options.headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(url, options);
+      let response = await fetch(url, options);
 
+      // 遇到 401，嘗試刷新 token
       if (response.status === 401) {
-        this.handleUnauthorized();
+        const refreshed = await this.tryRefreshToken();
+
+        if (refreshed) {
+          // 用新 token 重試原請求
+          options.headers['Authorization'] = `Bearer ${this.getToken()}`;
+          response = await fetch(url, options);
+        } else {
+          // 刷新失敗，登出
+          this.handleUnauthorized();
+        }
       }
 
       return response;
     };
+  }
+
+  /**
+   * 嘗試刷新 token（使用鎖避免併發刷新）
+   */
+  async tryRefreshToken() {
+    // 如果已經在刷新中，等待現有的刷新結果
+    if (this.isRefreshing) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = this._doRefresh();
+
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.isRefreshing = false;
+      this.refreshPromise = null;
+    }
+  }
+
+  /**
+   * 實際執行 token 刷新
+   */
+  async _doRefresh() {
+    try {
+      const response = await fetch(`${this.authProxyUrl}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include', // 攜帶 Cookie
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.updateToken(data.accessToken);
+        console.log('Token 刷新成功');
+        return true;
+      }
+
+      console.log('Token 刷新失敗:', response.status);
+      return false;
+    } catch (error) {
+      console.error('Token 刷新錯誤:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 更新 token（刷新後使用）
+   */
+  updateToken(newToken) {
+    const payload = this.parseJwt(newToken);
+
+    if (payload && this.isTokenValid(payload)) {
+      this.user = {
+        ...this.user,
+        token: newToken,
+      };
+      localStorage.setItem(this.storageKey, newToken);
+    }
   }
 
   /**

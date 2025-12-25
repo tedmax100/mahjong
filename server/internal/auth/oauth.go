@@ -32,6 +32,7 @@ type OAuthSession struct {
 type OAuthHandler struct {
 	config     *OAuthConfig
 	keyManager *KeyManager
+	tokenStore *RefreshTokenStore
 	sessions   map[string]*OAuthSession
 	mutex      sync.RWMutex
 }
@@ -55,10 +56,11 @@ type GoogleUserInfo struct {
 }
 
 // NewOAuthHandler 建立新的 OAuth 處理器
-func NewOAuthHandler(config *OAuthConfig, keyManager *KeyManager) *OAuthHandler {
+func NewOAuthHandler(config *OAuthConfig, keyManager *KeyManager, tokenStore *RefreshTokenStore) *OAuthHandler {
 	handler := &OAuthHandler{
 		config:     config,
 		keyManager: keyManager,
+		tokenStore: tokenStore,
 		sessions:   make(map[string]*OAuthSession),
 	}
 
@@ -210,9 +212,32 @@ func (h *OAuthHandler) CallbackHandler(c *gin.Context) {
 
 	log.Printf("[OAuth] 登入成功，使用者: %s (%s)", userInfo.Name, userInfo.ID)
 
-	// 導回 origin，token 放在 URL hash
+	// 生成 Refresh Token 並儲存
+	refreshTokenID := h.tokenStore.Store(userInfo.ID, userInfo.Name, userInfo.Picture)
+
+	// 設定 Refresh Token Cookie
+	h.setRefreshTokenCookie(c, refreshTokenID)
+
+	// 導回 origin，access token 放在 URL hash
 	redirectURL := fmt.Sprintf("%s#token=%s", origin, token)
 	c.Redirect(http.StatusFound, redirectURL)
+}
+
+// setRefreshTokenCookie 設定 Refresh Token Cookie
+func (h *OAuthHandler) setRefreshTokenCookie(c *gin.Context, refreshTokenID string) {
+	isSecure := isSecureContext(c)
+	sameSite := http.SameSiteLaxMode // 使用 Lax 以允許重導向時攜帶 Cookie
+
+	c.SetSameSite(sameSite)
+	c.SetCookie(
+		RefreshTokenCookieName,
+		refreshTokenID,
+		86400, // 1 天 (秒)
+		"/",   // 根路徑，確保所有請求都能攜帶
+		"",
+		isSecure,
+		true, // HttpOnly
+	)
 }
 
 // exchangeCode 用授權碼交換 access token

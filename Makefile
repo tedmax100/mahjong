@@ -75,7 +75,7 @@ dev-tunnel: install-cloudflared ## 啟動開發服務器並通過 Cloudflare Tun
 
 start-backend: ## 啟動後端服務器
 	@echo "$(GREEN)🚀 啟動後端服務器 (Port $(BACKEND_PORT))...$(NC)"
-	@cd server && LOBBY_INTERNAL_SECRET=dev-internal-secret go run cmd/main.go
+	@cd server && PORT=$(BACKEND_PORT) LOBBY_INTERNAL_SECRET=dev-internal-secret go run cmd/main.go
 
 start-frontend: ## 啟動前端開發服務器
 	@echo "$(GREEN)🚀 啟動前端開發服務器 (Port $(FRONTEND_PORT))...$(NC)"
