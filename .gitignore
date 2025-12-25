@@ -12,3 +12,7 @@ client/coverage
 server/coverage.out
 server/coverage.txt
 server/mahjong-server
+
+# Build artifacts
+game-bundle/mahjong-game-server
+lobby-bundle/mahjong-lobby-server
