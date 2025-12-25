@@ -199,10 +199,16 @@ class GameApp {
       addBotBtn.addEventListener('click', () => this.addBot());
     }
 
-    // 切換聲音
-    const toggleSoundBtn = document.getElementById('toggle-sound-btn');
-    if (toggleSoundBtn) {
-      toggleSoundBtn.addEventListener('click', () => this.toggleSound());
+    // 切換音樂
+    const toggleMusicBtn = document.getElementById('toggle-music-btn');
+    if (toggleMusicBtn) {
+      toggleMusicBtn.addEventListener('click', () => this.toggleMusic());
+    }
+
+    // 切換音效
+    const toggleSfxBtn = document.getElementById('toggle-sfx-btn');
+    if (toggleSfxBtn) {
+      toggleSfxBtn.addEventListener('click', () => this.toggleSfx());
     }
   }
 
@@ -566,21 +572,40 @@ class GameApp {
     }
   }
 
-  toggleSound() {
+  toggleMusic() {
     if (!this.game || !this.game.audioManager) {
       console.warn('遊戲尚未初始化');
       return;
     }
 
-    const enabled = this.game.audioManager.toggle();
-    const btn = document.getElementById('toggle-sound-btn');
+    const enabled = this.game.audioManager.toggleMusic();
+    const btn = document.getElementById('toggle-music-btn');
 
     if (enabled) {
-      btn.textContent = '🔊 聲音開';
+      btn.textContent = '🎵 音樂開';
       btn.style.background = '#667eea';
+      // 重新播放背景音樂
       this.game.audioManager.playBGM('game');
     } else {
-      btn.textContent = '🔇 聲音關';
+      btn.textContent = '🎵 音樂關';
+      btn.style.background = '#999';
+    }
+  }
+
+  toggleSfx() {
+    if (!this.game || !this.game.audioManager) {
+      console.warn('遊戲尚未初始化');
+      return;
+    }
+
+    const enabled = this.game.audioManager.toggleSfx();
+    const btn = document.getElementById('toggle-sfx-btn');
+
+    if (enabled) {
+      btn.textContent = '🔔 音效開';
+      btn.style.background = '#667eea';
+    } else {
+      btn.textContent = '🔔 音效關';
       btn.style.background = '#999';
     }
   }
