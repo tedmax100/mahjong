@@ -9,6 +9,9 @@ var allowedOriginPatterns = []*regexp.Regexp{
 	// Cloudflare Tunnel: https://random-name.trycloudflare.com
 	regexp.MustCompile(`^https://[a-z0-9-]+\.trycloudflare\.com$`),
 
+	// 生產環境: https://*.ganhua.wang
+	regexp.MustCompile(`^https://[a-z0-9-]+\.ganhua\.wang$`),
+
 	// 本地開發: http://localhost:任意埠號
 	regexp.MustCompile(`^http://localhost:\d+$`),
 

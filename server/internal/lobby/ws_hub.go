@@ -93,6 +93,12 @@ func (h *LobbyHub) Run() {
 func (h *LobbyHub) BroadcastRoomList() {
 	rooms := h.store.GetPublicRooms()
 
+	h.mu.RLock()
+	clientCount := len(h.clients)
+	h.mu.RUnlock()
+
+	log.Printf("[LobbyHub] 廣播房間列表: %d 個公開房間, %d 個客戶端", len(rooms), clientCount)
+
 	msg := WSMessage{
 		Type: WSTypeRoomList,
 		Data: map[string]interface{}{

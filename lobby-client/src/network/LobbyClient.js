@@ -25,22 +25,15 @@ export class LobbyClient {
    * 獲取 Lobby WebSocket URL
    */
   getLobbyUrl() {
-    // 開發模式下使用 proxy
-    if (import.meta.env.DEV) {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${protocol}//${window.location.host}`;
-    }
-
-    // 生產環境使用環境變數或預設值
+    // 生產環境使用環境變數
     const lobbyServiceUrl = import.meta.env.VITE_LOBBY_SERVICE_URL;
     if (lobbyServiceUrl) {
       return lobbyServiceUrl.replace(/^http/, 'ws');
     }
 
+    // 預設使用當前頁面的 host（開發和生產都適用）
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname;
-    const port = '3001';
-    return `${protocol}//${host}:${port}`;
+    return `${protocol}//${window.location.host}`;
   }
 
   /**

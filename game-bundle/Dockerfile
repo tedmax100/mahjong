@@ -14,7 +14,7 @@ RUN apk --no-cache add ca-certificates
 
 # 複製預編譯的 Go 二進位（由 make docker-compile 產生）
 COPY game-bundle/mahjong-game-server .
-COPY --from=client-builder /app/dist/game ./public
+COPY --from=client-builder /dist/game ./public
 
 ENV STANDALONE_MODE=true
 ENV STATIC_DIR=./public

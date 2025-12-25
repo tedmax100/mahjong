@@ -94,6 +94,11 @@ func main() {
 	r.Static("/assets", "./public/assets")
 	r.StaticFile("/", "./public/index.html")
 
+	// SPA fallback：所有未匹配的路由都返回 index.html
+	r.NoRoute(func(c *gin.Context) {
+		c.File("./public/index.html")
+	})
+
 	// 啟動伺服器
 	port := getEnv("PORT", "8080")
 	log.Printf("🀄 麻將伺服器啟動於 http://localhost:%s", port)
