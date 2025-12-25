@@ -1,0 +1,212 @@
+name: Release & Deploy
+
+on:
+  push:
+    tags:
+      - 'game-v*'
+      - 'lobby-v*'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy'
+        required: true
+        type: choice
+        options:
+          - game
+          - lobby
+          - all
+      version:
+        description: 'Version (e.g., v0.0.9)'
+        required: true
+        type: string
+
+env:
+  DOCKERHUB_USER: tedmax100
+  GAME_IMAGE: tedmax100/mahjong-game
+  LOBBY_IMAGE: tedmax100/mahjong-lobby
+
+jobs:
+  # 解析觸發資訊
+  parse-trigger:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_game: ${{ steps.parse.outputs.deploy_game }}
+      deploy_lobby: ${{ steps.parse.outputs.deploy_lobby }}
+      game_version: ${{ steps.parse.outputs.game_version }}
+      lobby_version: ${{ steps.parse.outputs.lobby_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse trigger info
+        id: parse
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # 手動觸發
+            SERVICE="${{ github.event.inputs.service }}"
+            VERSION="${{ github.event.inputs.version }}"
+
+            if [ "$SERVICE" = "game" ] || [ "$SERVICE" = "all" ]; then
+              echo "deploy_game=true" >> $GITHUB_OUTPUT
+              echo "game_version=$VERSION" >> $GITHUB_OUTPUT
+            else
+              echo "deploy_game=false" >> $GITHUB_OUTPUT
+            fi
+
+            if [ "$SERVICE" = "lobby" ] || [ "$SERVICE" = "all" ]; then
+              echo "deploy_lobby=true" >> $GITHUB_OUTPUT
+              echo "lobby_version=$VERSION" >> $GITHUB_OUTPUT
+            else
+              echo "deploy_lobby=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Tag 觸發
+            TAG="${GITHUB_REF#refs/tags/}"
+
+            if [[ "$TAG" == game-v* ]]; then
+              VERSION="${TAG#game-}"
+              echo "deploy_game=true" >> $GITHUB_OUTPUT
+              echo "deploy_lobby=false" >> $GITHUB_OUTPUT
+              echo "game_version=$VERSION" >> $GITHUB_OUTPUT
+            elif [[ "$TAG" == lobby-v* ]]; then
+              VERSION="${TAG#lobby-}"
+              echo "deploy_game=false" >> $GITHUB_OUTPUT
+              echo "deploy_lobby=true" >> $GITHUB_OUTPUT
+              echo "lobby_version=$VERSION" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  # 部署 Game
+  deploy-game:
+    needs: parse-trigger
+    if: needs.parse-trigger.outputs.deploy_game == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            game-client/package-lock.json
+            shared/package-lock.json
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Cross-compile Game Server
+        run: |
+          cd server
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../game-bundle/mahjong-game-server ./cmd/main.go
+
+      - name: Build and push Game image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./game-bundle/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.GAME_IMAGE }}:${{ needs.parse-trigger.outputs.game_version }}
+            ${{ env.GAME_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create Game Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: game-${{ needs.parse-trigger.outputs.game_version }}
+          name: Game ${{ needs.parse-trigger.outputs.game_version }}
+          body: |
+            ## Game Server Release ${{ needs.parse-trigger.outputs.game_version }}
+
+            ### Docker Image
+            ```
+            docker pull ${{ env.GAME_IMAGE }}:${{ needs.parse-trigger.outputs.game_version }}
+            ```
+          draft: false
+          prerelease: false
+
+  # 部署 Lobby
+  deploy-lobby:
+    needs: parse-trigger
+    if: needs.parse-trigger.outputs.deploy_lobby == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            lobby-client/package-lock.json
+            shared/package-lock.json
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Cross-compile Lobby Server
+        run: |
+          cd server
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../lobby-bundle/mahjong-lobby-server ./cmd/lobby/main.go
+
+      - name: Build and push Lobby image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./lobby-bundle/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.LOBBY_IMAGE }}:${{ needs.parse-trigger.outputs.lobby_version }}
+            ${{ env.LOBBY_IMAGE }}:latest
+          build-args: |
+            VITE_AUTH_PROXY_URL=${{ vars.VITE_AUTH_PROXY_URL }}
+            VITE_GAME_SERVER_URL=${{ vars.VITE_GAME_SERVER_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create Lobby Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: lobby-${{ needs.parse-trigger.outputs.lobby_version }}
+          name: Lobby ${{ needs.parse-trigger.outputs.lobby_version }}
+          body: |
+            ## Lobby Server Release ${{ needs.parse-trigger.outputs.lobby_version }}
+
+            ### Docker Image
+            ```
+            docker pull ${{ env.LOBBY_IMAGE }}:${{ needs.parse-trigger.outputs.lobby_version }}
+            ```
+          draft: false
+          prerelease: false

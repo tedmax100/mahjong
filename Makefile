@@ -1,5 +1,8 @@
 .PHONY: help install-cloudflared start stop tunnel tunnel-all dev dev-tunnel clean start-lobby dev-with-auth \
-        docker-compile docker-buildx-setup docker-push-game docker-push-lobby docker-push-all docker-clean-binaries
+        docker-compile docker-buildx-setup docker-push-game docker-push-lobby docker-push-all docker-clean-binaries \
+        version version-bump-game version-bump-lobby version-bump-all \
+        docker-push-game-versioned docker-push-lobby-versioned docker-push-all-versioned \
+        release-game release-lobby release-all deploy-game deploy-lobby deploy-all
 
 # 顏色定義
 GREEN  := \033[0;32m
@@ -305,3 +308,193 @@ install-game-client: ## 安裝遊戲前端依賴
 
 install-all: install install-lobby-client install-game-client ## 安裝所有依賴（含分離式前端）
 	@echo "$(GREEN)✓ 所有依賴安裝完成$(NC)"
+
+# ============================================
+# 版本管理與發布命令
+# ============================================
+
+VERSIONS_FILE := versions.json
+
+# 從 versions.json 讀取版本
+GAME_VERSION := $(shell cat $(VERSIONS_FILE) | grep '"game"' | sed 's/.*"game": *"\([^"]*\)".*/\1/')
+LOBBY_VERSION := $(shell cat $(VERSIONS_FILE) | grep '"lobby"' | sed 's/.*"lobby": *"\([^"]*\)".*/\1/')
+
+version: ## 顯示當前版本
+	@echo "$(BLUE)當前版本:$(NC)"
+	@echo "  $(YELLOW)Game:$(NC)  $(GAME_VERSION)"
+	@echo "  $(YELLOW)Lobby:$(NC) $(LOBBY_VERSION)"
+
+version-bump-game: ## 更新 Game 版本 (用法: make version-bump-game V=v0.0.9)
+	@if [ -z "$(V)" ]; then \
+		echo "$(RED)錯誤: 請指定版本號 V=vX.X.X$(NC)"; \
+		echo "$(YELLOW)用法: make version-bump-game V=v0.0.9$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)更新 Game 版本: $(GAME_VERSION) → $(V)$(NC)"
+	@sed -i 's/"game": *"[^"]*"/"game": "$(V)"/' $(VERSIONS_FILE)
+	@echo "$(GREEN)✓ Game 版本已更新為 $(V)$(NC)"
+
+version-bump-lobby: ## 更新 Lobby 版本 (用法: make version-bump-lobby V=v0.0.11)
+	@if [ -z "$(V)" ]; then \
+		echo "$(RED)錯誤: 請指定版本號 V=vX.X.X$(NC)"; \
+		echo "$(YELLOW)用法: make version-bump-lobby V=v0.0.11$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)更新 Lobby 版本: $(LOBBY_VERSION) → $(V)$(NC)"
+	@sed -i 's/"lobby": *"[^"]*"/"lobby": "$(V)"/' $(VERSIONS_FILE)
+	@echo "$(GREEN)✓ Lobby 版本已更新為 $(V)$(NC)"
+
+version-bump-all: ## 更新所有版本 (用法: make version-bump-all GAME_V=v0.0.9 LOBBY_V=v0.0.11)
+	@if [ -z "$(GAME_V)" ] || [ -z "$(LOBBY_V)" ]; then \
+		echo "$(RED)錯誤: 請指定版本號$(NC)"; \
+		echo "$(YELLOW)用法: make version-bump-all GAME_V=v0.0.9 LOBBY_V=v0.0.11$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)更新版本:$(NC)"
+	@echo "  Game:  $(GAME_VERSION) → $(GAME_V)"
+	@echo "  Lobby: $(LOBBY_VERSION) → $(LOBBY_V)"
+	@sed -i 's/"game": *"[^"]*"/"game": "$(GAME_V)"/' $(VERSIONS_FILE)
+	@sed -i 's/"lobby": *"[^"]*"/"lobby": "$(LOBBY_V)"/' $(VERSIONS_FILE)
+	@echo "$(GREEN)✓ 所有版本已更新$(NC)"
+
+# ============================================
+# Docker 版本化構建與推送
+# ============================================
+
+docker-push-game-versioned: docker-compile docker-buildx-setup ## 構建並推送 Game 映像（含版本標籤）
+	@echo "$(YELLOW)構建並推送 Game 映像 $(GAME_VERSION)...$(NC)"
+	@docker buildx build --platform linux/amd64 \
+		-t $(GAME_IMAGE):$(GAME_VERSION) \
+		-t $(GAME_IMAGE):latest \
+		-f game-bundle/Dockerfile --push .
+	@echo "$(GREEN)✓ 已推送: $(GAME_IMAGE):$(GAME_VERSION)$(NC)"
+	@echo "$(GREEN)✓ 已推送: $(GAME_IMAGE):latest$(NC)"
+
+docker-push-lobby-versioned: docker-compile docker-buildx-setup ## 構建並推送 Lobby 映像（含版本標籤）
+	@echo "$(YELLOW)構建並推送 Lobby 映像 $(LOBBY_VERSION)...$(NC)"
+	@docker buildx build --platform linux/amd64 \
+		-t $(LOBBY_IMAGE):$(LOBBY_VERSION) \
+		-t $(LOBBY_IMAGE):latest \
+		-f lobby-bundle/Dockerfile --push .
+	@echo "$(GREEN)✓ 已推送: $(LOBBY_IMAGE):$(LOBBY_VERSION)$(NC)"
+	@echo "$(GREEN)✓ 已推送: $(LOBBY_IMAGE):latest$(NC)"
+
+docker-push-all-versioned: docker-compile docker-buildx-setup ## 構建並推送所有映像（含版本標籤）
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(BLUE)  構建並推送所有 Docker 映像（含版本）$(NC)"
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(YELLOW)Game $(GAME_VERSION) | Lobby $(LOBBY_VERSION)$(NC)"
+	@docker buildx build --platform linux/amd64 \
+		-t $(GAME_IMAGE):$(GAME_VERSION) \
+		-t $(GAME_IMAGE):latest \
+		-f game-bundle/Dockerfile --push .
+	@echo "$(GREEN)✓ Game 映像已推送$(NC)"
+	@docker buildx build --platform linux/amd64 \
+		-t $(LOBBY_IMAGE):$(LOBBY_VERSION) \
+		-t $(LOBBY_IMAGE):latest \
+		-f lobby-bundle/Dockerfile --push .
+	@echo "$(GREEN)✓ Lobby 映像已推送$(NC)"
+	@echo ""
+	@echo "$(GREEN)======================================$(NC)"
+	@echo "$(GREEN)  所有映像已推送完成！$(NC)"
+	@echo "$(GREEN)======================================$(NC)"
+	@echo "  $(BLUE)Game:$(NC)  $(GAME_IMAGE):$(GAME_VERSION)"
+	@echo "  $(BLUE)Lobby:$(NC) $(LOBBY_IMAGE):$(LOBBY_VERSION)"
+
+# ============================================
+# GitHub Release 命令
+# ============================================
+
+release-game: ## 創建 Game Release (用法: make release-game 或 make release-game V=v0.0.9)
+	@VERSION=$${V:-$(GAME_VERSION)}; \
+	TAG="game-$$VERSION"; \
+	echo "$(YELLOW)創建 Game Release: $$TAG$(NC)"; \
+	if [ -n "$(V)" ]; then \
+		$(MAKE) version-bump-game V=$(V); \
+		git add $(VERSIONS_FILE); \
+		git commit -m "chore: bump game version to $(V)"; \
+	fi; \
+	git tag -a "$$TAG" -m "Game $$VERSION release"; \
+	git push origin "$$TAG"; \
+	gh release create "$$TAG" \
+		--title "Game $$VERSION" \
+		--notes "## Game Server Release $$VERSION" \
+		--latest=false; \
+	echo "$(GREEN)✓ Game Release 已創建: $$TAG$(NC)"
+
+release-lobby: ## 創建 Lobby Release (用法: make release-lobby 或 make release-lobby V=v0.0.11)
+	@VERSION=$${V:-$(LOBBY_VERSION)}; \
+	TAG="lobby-$$VERSION"; \
+	echo "$(YELLOW)創建 Lobby Release: $$TAG$(NC)"; \
+	if [ -n "$(V)" ]; then \
+		$(MAKE) version-bump-lobby V=$(V); \
+		git add $(VERSIONS_FILE); \
+		git commit -m "chore: bump lobby version to $(V)"; \
+	fi; \
+	git tag -a "$$TAG" -m "Lobby $$VERSION release"; \
+	git push origin "$$TAG"; \
+	gh release create "$$TAG" \
+		--title "Lobby $$VERSION" \
+		--notes "## Lobby Server Release $$VERSION" \
+		--latest=false; \
+	echo "$(GREEN)✓ Lobby Release 已創建: $$TAG$(NC)"
+
+release-all: ## 創建兩個 Release (用法: make release-all 或 make release-all GAME_V=v0.0.9 LOBBY_V=v0.0.11)
+	@if [ -n "$(GAME_V)" ] && [ -n "$(LOBBY_V)" ]; then \
+		$(MAKE) version-bump-all GAME_V=$(GAME_V) LOBBY_V=$(LOBBY_V); \
+		git add $(VERSIONS_FILE); \
+		git commit -m "chore: bump versions - game $(GAME_V), lobby $(LOBBY_V)"; \
+	fi
+	@$(MAKE) release-game
+	@$(MAKE) release-lobby
+
+# ============================================
+# 完整發布流程（版本 + Docker + Release）
+# ============================================
+
+deploy-game: ## 完整部署 Game (版本更新 + Docker 推送 + GitHub Release)
+	@if [ -z "$(V)" ]; then \
+		echo "$(RED)錯誤: 請指定版本號 V=vX.X.X$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(BLUE)  完整部署 Game $(V)$(NC)"
+	@echo "$(BLUE)======================================$(NC)"
+	@$(MAKE) version-bump-game V=$(V)
+	@git add $(VERSIONS_FILE)
+	@git commit -m "chore: bump game version to $(V)"
+	@$(MAKE) docker-push-game-versioned
+	@$(MAKE) release-game
+
+deploy-lobby: ## 完整部署 Lobby (版本更新 + Docker 推送 + GitHub Release)
+	@if [ -z "$(V)" ]; then \
+		echo "$(RED)錯誤: 請指定版本號 V=vX.X.X$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(BLUE)  完整部署 Lobby $(V)$(NC)"
+	@echo "$(BLUE)======================================$(NC)"
+	@$(MAKE) version-bump-lobby V=$(V)
+	@git add $(VERSIONS_FILE)
+	@git commit -m "chore: bump lobby version to $(V)"
+	@$(MAKE) docker-push-lobby-versioned
+	@$(MAKE) release-lobby
+
+deploy-all: ## 完整部署所有服務
+	@if [ -z "$(GAME_V)" ] || [ -z "$(LOBBY_V)" ]; then \
+		echo "$(RED)錯誤: 請指定版本號$(NC)"; \
+		echo "$(YELLOW)用法: make deploy-all GAME_V=v0.0.9 LOBBY_V=v0.0.11$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(BLUE)  完整部署所有服務$(NC)"
+	@echo "$(BLUE)======================================$(NC)"
+	@$(MAKE) version-bump-all GAME_V=$(GAME_V) LOBBY_V=$(LOBBY_V)
+	@git add $(VERSIONS_FILE)
+	@git commit -m "chore: bump versions - game $(GAME_V), lobby $(LOBBY_V)"
+	@$(MAKE) docker-push-all-versioned
+	@$(MAKE) release-game
+	@$(MAKE) release-lobby
+	@echo "$(GREEN)======================================$(NC)"
+	@echo "$(GREEN)  所有服務部署完成！$(NC)"
+	@echo "$(GREEN)======================================$(NC)"

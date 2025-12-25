@@ -125,6 +125,69 @@ make stop
 *   `make docker-run-game`: 運行遊戲服務的 Docker 容器。
 *   `make help`: 顯示所有可用的 `Makefile` 指令及其詳細說明。
 
+## 📦 版本管理與發布
+
+### 版本管理指令
+
+| 指令 | 說明 |
+|------|------|
+| `make version` | 顯示當前 Game 與 Lobby 版本 |
+| `make version-bump-game V=v0.0.9` | 更新 Game 版本 |
+| `make version-bump-lobby V=v0.0.11` | 更新 Lobby 版本 |
+| `make version-bump-all GAME_V=v0.0.9 LOBBY_V=v0.0.11` | 同時更新兩者版本 |
+
+### Docker 版本化推送
+
+| 指令 | 說明 |
+|------|------|
+| `make docker-push-game-versioned` | 推送 Game 映像（含版本 tag + latest） |
+| `make docker-push-lobby-versioned` | 推送 Lobby 映像（含版本 tag + latest） |
+| `make docker-push-all-versioned` | 推送所有映像（含版本 tag + latest） |
+
+### GitHub Release
+
+| 指令 | 說明 |
+|------|------|
+| `make release-game` | 使用當前版本創建 Game Release |
+| `make release-game V=v0.0.9` | 指定版本創建 Game Release |
+| `make release-lobby` | 使用當前版本創建 Lobby Release |
+| `make release-lobby V=v0.0.11` | 指定版本創建 Lobby Release |
+| `make release-all` | 創建兩個 Release |
+
+### 完整部署流程（一鍵發布）
+
+| 指令 | 說明 |
+|------|------|
+| `make deploy-game V=v0.0.9` | 版本更新 → Docker 推送 → GitHub Release |
+| `make deploy-lobby V=v0.0.11` | 版本更新 → Docker 推送 → GitHub Release |
+| `make deploy-all GAME_V=v0.0.9 LOBBY_V=v0.0.11` | 完整部署所有服務 |
+
+### GitHub Actions 自動化 CD
+
+專案已配置 GitHub Actions 工作流程 (`.github/workflows/release.yml`)，支援：
+
+**觸發方式：**
+1. **Tag 推送觸發** - 推送 `game-v*` 或 `lobby-v*` tag 時自動執行
+   ```bash
+   git tag -a game-v0.0.9 -m "Game v0.0.9"
+   git push origin game-v0.0.9
+   ```
+2. **手動觸發** - 在 GitHub Actions 頁面選擇 service (game/lobby/all) 和版本號
+
+**自動執行流程：**
+- Cross-compile Go binary (linux/amd64)
+- Build Docker image
+- Push to DockerHub（版本 tag + latest）
+- 創建 GitHub Release
+
+**所需 Secrets 設定：**
+- `DOCKERHUB_USERNAME` - DockerHub 使用者名稱
+- `DOCKERHUB_TOKEN` - DockerHub Access Token
+
+**所需 Variables 設定（給 Lobby）：**
+- `VITE_AUTH_PROXY_URL` - Auth Proxy URL
+- `VITE_GAME_SERVER_URL` - Game Server URL
+
 ## 部署說明
 
 本專案支援將遊戲服務打包為一個可獨立運行的部署包或 Docker 容器。詳細步驟請參考 `make build-game-bundle` 及 `make docker-build-game` 相關指令。
