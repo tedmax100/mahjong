@@ -157,13 +157,20 @@ test-ui: ## 運行測試 UI
 	@cd client && npm run test:ui
 
 # 構建相關命令
+# 本地構建用的版本資訊
+LOCAL_GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+LOCAL_BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+LOCAL_LDFLAGS := -X mahjong/internal/version.GitCommit=$(LOCAL_GIT_COMMIT) \
+                 -X mahjong/internal/version.Version=dev \
+                 -X mahjong/internal/version.BuildTime=$(LOCAL_BUILD_TIME)
+
 build: ## 構建項目
 	@echo "$(YELLOW)構建前端...$(NC)"
 	@cd client && npm run build
 	@echo "$(YELLOW)構建遊戲伺服器...$(NC)"
-	@cd server && go build -o ../mahjong-server cmd/main.go
+	@cd server && go build -ldflags "$(LOCAL_LDFLAGS)" -o ../mahjong-server cmd/main.go
 	@echo "$(YELLOW)構建 Lobby 伺服器...$(NC)"
-	@cd server && go build -o ../mahjong-lobby cmd/lobby/main.go
+	@cd server && go build -ldflags "$(LOCAL_LDFLAGS)" -o ../mahjong-lobby cmd/lobby/main.go
 	@echo "$(GREEN)✓ 構建完成$(NC)"
 
 # 安裝依賴
@@ -248,12 +255,29 @@ docker-stop-game: ## 停止遊戲 Docker 容器
 # DockerHub 構建與推送命令
 # ============================================
 
-docker-compile: ## 交叉編譯 Go 二進位（linux/amd64）
+# 從 versions.json 讀取版本（用於 Docker 構建）
+VERSIONS_FILE := versions.json
+GAME_VERSION := $(shell cat $(VERSIONS_FILE) | grep '"game"' | sed 's/.*"game": *"\([^"]*\)".*/\1/')
+LOBBY_VERSION := $(shell cat $(VERSIONS_FILE) | grep '"lobby"' | sed 's/.*"lobby": *"\([^"]*\)".*/\1/')
+
+# 構建時注入的版本資訊
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
+BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+LDFLAGS_GAME := -X mahjong/internal/version.GitCommit=$(GIT_COMMIT) \
+                -X mahjong/internal/version.Version=$(GAME_VERSION) \
+                -X mahjong/internal/version.BuildTime=$(BUILD_TIME)
+LDFLAGS_LOBBY := -X mahjong/internal/version.GitCommit=$(GIT_COMMIT) \
+                 -X mahjong/internal/version.Version=$(LOBBY_VERSION) \
+                 -X mahjong/internal/version.BuildTime=$(BUILD_TIME)
+
+docker-compile: ## 交叉編譯 Go 二進位（linux/amd64，含版本資訊）
 	@echo "$(YELLOW)交叉編譯 Game Server...$(NC)"
-	@cd server && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../game-bundle/mahjong-game-server ./cmd/main.go
+	@echo "  Commit: $(GIT_COMMIT) | Version: $(GAME_VERSION)"
+	@cd server && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_GAME)" -o ../game-bundle/mahjong-game-server ./cmd/main.go
 	@echo "$(GREEN)✓ Game Server 編譯完成$(NC)"
 	@echo "$(YELLOW)交叉編譯 Lobby Server...$(NC)"
-	@cd server && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../lobby-bundle/mahjong-lobby-server ./cmd/lobby/main.go
+	@echo "  Commit: $(GIT_COMMIT) | Version: $(LOBBY_VERSION)"
+	@cd server && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_LOBBY)" -o ../lobby-bundle/mahjong-lobby-server ./cmd/lobby/main.go
 	@echo "$(GREEN)✓ Lobby Server 編譯完成$(NC)"
 
 docker-buildx-setup: ## 設置 buildx 多架構構建器
@@ -312,12 +336,6 @@ install-all: install install-lobby-client install-game-client ## 安裝所有依
 # ============================================
 # 版本管理與發布命令
 # ============================================
-
-VERSIONS_FILE := versions.json
-
-# 從 versions.json 讀取版本
-GAME_VERSION := $(shell cat $(VERSIONS_FILE) | grep '"game"' | sed 's/.*"game": *"\([^"]*\)".*/\1/')
-LOBBY_VERSION := $(shell cat $(VERSIONS_FILE) | grep '"lobby"' | sed 's/.*"lobby": *"\([^"]*\)".*/\1/')
 
 version: ## 顯示當前版本
 	@echo "$(BLUE)當前版本:$(NC)"

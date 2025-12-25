@@ -6,6 +6,7 @@ import (
 	"mahjong/internal/auth"
 	"mahjong/internal/lobby"
 	"mahjong/internal/logger"
+	"mahjong/internal/version"
 	"mahjong/internal/websocket"
 	"os"
 
@@ -14,6 +15,9 @@ import (
 )
 
 func main() {
+	// 印出版本資訊
+	version.Print("Mahjong Game Server")
+
 	// 載入 .env 檔案（如果存在）
 	if err := godotenv.Load(); err != nil {
 		log.Println("提示: 未找到 .env 檔案，使用系統環境變數")

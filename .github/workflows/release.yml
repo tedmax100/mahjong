@@ -109,9 +109,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Cross-compile Game Server
+        env:
+          VERSION: ${{ needs.parse-trigger.outputs.game_version }}
         run: |
           cd server
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../game-bundle/mahjong-game-server ./cmd/main.go
+          GIT_COMMIT="${GITHUB_SHA::7}"
+          BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          LDFLAGS="-X mahjong/internal/version.GitCommit=${GIT_COMMIT} -X mahjong/internal/version.Version=${VERSION} -X mahjong/internal/version.BuildTime=${BUILD_TIME}"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ../game-bundle/mahjong-game-server ./cmd/main.go
+          echo "Built with: Commit=${GIT_COMMIT}, Version=${VERSION}, Time=${BUILD_TIME}"
 
       - name: Build and push Game image
         uses: docker/build-push-action@v5
@@ -175,9 +181,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Cross-compile Lobby Server
+        env:
+          VERSION: ${{ needs.parse-trigger.outputs.lobby_version }}
         run: |
           cd server
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../lobby-bundle/mahjong-lobby-server ./cmd/lobby/main.go
+          GIT_COMMIT="${GITHUB_SHA::7}"
+          BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          LDFLAGS="-X mahjong/internal/version.GitCommit=${GIT_COMMIT} -X mahjong/internal/version.Version=${VERSION} -X mahjong/internal/version.BuildTime=${BUILD_TIME}"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ../lobby-bundle/mahjong-lobby-server ./cmd/lobby/main.go
+          echo "Built with: Commit=${GIT_COMMIT}, Version=${VERSION}, Time=${BUILD_TIME}"
 
       - name: Build and push Lobby image
         uses: docker/build-push-action@v5
