@@ -6,7 +6,9 @@ export class AudioManager {
   constructor() {
     this.sounds = new Map(); // 快取已載入的音效
     this.bgm = null; // 當前背景音樂
-    this.enabled = true; // 是否啟用音效
+    this.enabled = true; // 是否啟用音效（總開關）
+    this.musicEnabled = true; // 是否啟用背景音樂
+    this.sfxEnabled = true; // 是否啟用音效（語音、按鈕等）
 
     // 音量設定
     this.volume = {
@@ -47,7 +49,7 @@ export class AudioManager {
    * @param {string} tile - 牌的類型（如 'wan-1', 'dong'）
    */
   playTileVoice(playerId, tile) {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.sfxEnabled) return;
 
     const gender = this.getPlayerGender(playerId);
     const path = `/assets/music/${gender}_${tile}.ogg`;
@@ -61,7 +63,7 @@ export class AudioManager {
    * @param {string} action - 動作名稱（如 'chi', 'peng', 'gang', 'hu', 'ting'）
    */
   playActionVoice(playerId, action) {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.sfxEnabled) return;
 
     const gender = this.getPlayerGender(playerId);
     const path = `/assets/music/${gender}_action_${action}.ogg`;
@@ -74,7 +76,7 @@ export class AudioManager {
    * @param {string} effect - 音效名稱（如 'clock', 'win', 'deal', 'dice'）
    */
   playEffect(effect) {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.sfxEnabled) return;
 
     const path = `/assets/music/effect_${effect}.ogg`;
     this.playSound(path, this.volume.effect);
@@ -85,7 +87,7 @@ export class AudioManager {
    * 播放按鈕音效
    */
   playButtonSound() {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.sfxEnabled) return;
     this.playSound('/assets/music/btn.ogg', this.volume.effect);
   }
 
@@ -93,7 +95,7 @@ export class AudioManager {
    * 播放玩家加入音效
    */
   playPlayerJoin() {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.sfxEnabled) return;
     this.playSound('/assets/music/effect_join.ogg', this.volume.effect);
     console.log('🔔 播放玩家加入音效');
   }
@@ -102,7 +104,7 @@ export class AudioManager {
    * 播放玩家離開/斷線音效
    */
   playPlayerLeft() {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.sfxEnabled) return;
     this.playSound('/assets/music/effect_player_lost.mp3', this.volume.effect);
     console.log('🔔 播放玩家離開音效');
   }
@@ -113,7 +115,7 @@ export class AudioManager {
    * @param {boolean} loop - 是否循環播放，預設為 true
    */
   playBGM(scene, loop = true) {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.musicEnabled) return;
 
     const path = `/assets/music/bg_${scene}.mp3`;
 
@@ -196,7 +198,7 @@ export class AudioManager {
   }
 
   /**
-   * 切換音效啟用狀態
+   * 切換音效啟用狀態（總開關）
    */
   toggle() {
     this.enabled = !this.enabled;
@@ -207,6 +209,30 @@ export class AudioManager {
     }
 
     return this.enabled;
+  }
+
+  /**
+   * 切換背景音樂啟用狀態
+   */
+  toggleMusic() {
+    this.musicEnabled = !this.musicEnabled;
+    console.log(`🎵 背景音樂${this.musicEnabled ? '啟用' : '停用'}`);
+
+    if (!this.musicEnabled) {
+      this.stopBGM();
+    }
+
+    return this.musicEnabled;
+  }
+
+  /**
+   * 切換音效啟用狀態（語音、按鈕等）
+   */
+  toggleSfx() {
+    this.sfxEnabled = !this.sfxEnabled;
+    console.log(`🔔 音效${this.sfxEnabled ? '啟用' : '停用'}`);
+
+    return this.sfxEnabled;
   }
 
   /**

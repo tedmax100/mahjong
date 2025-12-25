@@ -3,7 +3,7 @@
 [![Security Scan](https://github.com/tedmax100/mahjong/actions/workflows/security.yml/badge.svg)](https://github.com/tedmax100/mahjong/actions/workflows/security.yml)
 ![Go Coverage](https://img.shields.io/badge/Go_Coverage-34.5%25-red)
 ![Frontend Coverage](https://img.shields.io/badge/Frontend_Coverage-14.16%25-red)
-![Game Version](https://img.shields.io/badge/Game-v0.0.7-blue)
+![Game Version](https://img.shields.io/badge/Game-v0.0.8-blue)
 ![Lobby Version](https://img.shields.io/badge/Lobby-v0.0.10-blue)
 
 這是一個功能完整的台灣十六張麻將網頁遊戲專案，旨在提供玩家一個即時、互動的線上麻將體驗，並可選擇 AI 輔助來提升遊戲策略。
@@ -133,7 +133,7 @@ make stop
 
 | 服務 | 映像 | 版本 |
 |------|------|------|
-| Game Server | `tedmax100/mahjong-game` | `v0.0.7` |
+| Game Server | `tedmax100/mahjong-game` | `v0.0.8` |
 | Lobby Server | `tedmax100/mahjong-lobby` | `v0.0.10` |
 
 ```bash
@@ -142,6 +142,6 @@ docker pull tedmax100/mahjong-game:latest
 docker pull tedmax100/mahjong-lobby:latest
 
 # 或指定版本
-docker pull tedmax100/mahjong-game:v0.0.7
+docker pull tedmax100/mahjong-game:v0.0.8
 docker pull tedmax100/mahjong-lobby:v0.0.10
 ```
